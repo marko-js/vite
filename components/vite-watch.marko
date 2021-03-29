@@ -1,0 +1,84 @@
+static function buildHTML(parts, attrsLookup) {
+  const last = parts.length - 1;
+  let result = parts[last];
+
+  for (let i = last; i--;) {
+    const part = parts[i];
+    result = part[--i] + attrsLookup[part] + result;
+  }
+
+  return result;
+};
+
+static function attrsToString(attrs) {
+  let result = "";
+
+  for (const name in attrs) {
+    const value = attrs[name];
+
+    if (value === false || value == null) {
+      continue;
+    }
+
+    result += ` ${
+      value === "" || value === true
+        ? name
+        : `${name}="${value.replace(/"/g, "&#39;")}"`
+    }`
+  }
+
+  return result;
+}
+
+$ {
+  const $global = out.global;
+  const entries = $global.__viteEntries || ($global.__viteEntries = []);
+  let writtenEntries = 0;
+  let {
+    scriptAttrs,
+    inlineScriptAttrs,
+    externalScriptAttrs,
+    styleAttrs,
+    inlineStyleAttrs,
+    externalStyleAttrs,
+  } = input;
+
+  if (scriptAttrs) {
+    inlineScriptAttrs = inlineScriptAttrs
+      ? { ...scriptAttrs, ...inlineScriptAttrs }
+      : scriptAttrs;
+    externalScriptAttrs = externalScriptAttrs
+      ? { ...scriptAttrs, ...externalScriptAttrs }
+      : scriptAttrs;
+  }
+
+  if (styleAttrs) {
+    inlineStyleAttrs = inlineStyleAttrs
+      ? { ...styleAttrs, ...inlineStyleAttrs }
+      : styleAttrs;
+    externalStyleAttrs = externalStyleAttrs
+      ? { ...styleAttrs, ...externalStyleAttrs }
+      : styleAttrs;
+  }
+
+  const attrsLookup = [
+    attrsToString(inlineScriptAttrs),
+    attrsToString(externalScriptAttrs),
+    attrsToString(inlineStyleAttrs),
+    attrsToString(externalStyleAttrs)
+  ];
+}
+
+<__flush_here_and_after__>
+  $ const lastWrittenEntry = writtenEntries;
+  $ writtenEntries = entries.length;
+  <for|i| from=lastWrittenEntry to=(writtenEntries - 1)>
+    $ const parts = entries[i][input.slot];
+    <if(parts)>
+      $!{buildHTML(parts, attrsLookup)}
+    </if>
+    <else-if(parts !== null)>
+      $ throw new Error(`@marko/vite: Invalid slot requested "${input.slot}". Expected one of ${Object.keys(manifest).join(", ")}`);
+    </else-if>
+  </>
+</>

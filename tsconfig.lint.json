@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "module": "ESNext",
+    "sourceMap": false,
+    "outDir": "dist/lint",
+    "emitDeclarationOnly": true
+  }
+}

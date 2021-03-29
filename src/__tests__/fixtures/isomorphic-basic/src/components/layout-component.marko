@@ -1,0 +1,13 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <vite slot="head-prepend"/>
+  <title>Hello World</title>
+  <vite slot="head"/>
+</head>
+<body>
+  <vite slot="body-prepend"/>
+  <${input.renderBody}/>
+  <vite slot="body"/>
+</body>
+</html>
