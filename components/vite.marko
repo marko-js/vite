@@ -4,7 +4,7 @@ static function buildHTML(parts, attrsLookup) {
 
   for (let i = last; i--;) {
     const part = parts[i];
-    result = part[--i] + attrsLookup[part] + result;
+    result = parts[--i] + attrsLookup[part] + result;
   }
 
   return result;
@@ -32,7 +32,7 @@ static function attrsToString(attrs) {
 
 $ {
   const $global = out.global;
-  const entries = $global.__viteEntries || ($global.__viteEntries = []);
+  const entries = $global.___viteEntries || ($global.___viteEntries = []);
   let writtenEntries = 0;
   let {
     scriptAttrs,

@@ -1,6 +1,7 @@
 import os from "os";
 import fs from "fs";
 import path from "path";
+import crypto from "crypto";
 import * as vite from "vite";
 import type * as Compiler from "@marko/compiler";
 import getServerEntryTemplate from "./server-entry-template";
@@ -34,18 +35,17 @@ interface ServerManifest {
   chunksNeedingAssets: string[];
 }
 
-const name = "marko-vite";
 const virtualFiles = new Map<string, { code: string; map?: any }>();
 const defaultCompiler = require.resolve("@marko/compiler");
-const prefixReg = /^\0?marko-[^:]+:/;
-const browserEntryPrefix = "\0marko-browser-entry:";
-const serverEntryPrefix = "\0marko-server-entry:";
-const resolveOpts = { skipSelf: true };
+const browserEntryPrefix = "/@marko-browser-entry:";
+const serverEntryPrefix = "/@marko-server-entry:";
+const virtualFilePrefix = "/@marko-virtual:";
 const markoExt = ".marko";
 const htmlExt = ".html";
+const resolveOpts = { skipSelf: true };
 let tempDir: Promise<string> | undefined;
 
-export default function markoPlugin(opts: Options = {}): vite.Plugin {
+export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
   // eslint-disable-next-line @typescript-eslint/no-var-requires
   const compiler = require(opts.compiler || defaultCompiler) as typeof Compiler;
   const { runtimeId, linked = true } = opts;
@@ -58,7 +58,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin {
     babelConfig: {
       ...opts.babelConfig,
       caller: {
-        name,
+        name: "@marko/vite",
         supportsStaticESM: true,
         supportsDynamicImport: true,
         supportsTopLevelAwait: true,
@@ -76,8 +76,10 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin {
   const domConfig: Compiler.Config = {
     ...baseConfig,
     resolveVirtualDependency(from, dep) {
-      const resolved = path.resolve(from, "..", dep.virtualPath);
-      virtualFiles.set(resolved, dep);
+      virtualFiles.set(
+        virtualFilePrefix + path.resolve(from, "..", dep.virtualPath),
+        dep
+      );
       return dep.virtualPath;
     },
     output: "dom",
@@ -88,249 +90,219 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin {
     output: "hydrate",
   };
 
-  let registeredViteTag: string | false = false;
-  let serverManifest: ServerManifest | undefined;
-  let isBuild = false;
-  let isDOM = false;
   let root: string;
-  let server: vite.ViteDevServer;
+  let isBuild = false;
+  let isSSRBuild = false;
+  let devServer: vite.ViteDevServer;
+  let registeredTag: string | false = false;
+  let serverManifest: ServerManifest | undefined;
 
-  return {
-    name,
-    enforce: "pre", // Must be pre to allow us to resolve assets before vite.
-    config(config, env) {
-      if (env.command === "build") {
-        isBuild = true;
+  return [
+    {
+      name: "marko-vite:pre",
+      enforce: "pre", // Must be pre to allow us to resolve assets before vite.
+      async resolveId(importee, importer, _, ssr) {
+        const importeePrefix = getMarkoPrefix(importee);
+        if (importeePrefix) {
+          if (importeePrefix === browserEntryPrefix) {
+            return (
+              browserEntryPrefix +
+              path.resolve(root!, importee.slice(browserEntryPrefix.length))
+            );
+          }
+
+          return importee;
+        }
+
+        let importerPrefix: string | undefined;
+
+        if (importer) {
+          importerPrefix = getMarkoPrefix(importer);
+          if (importerPrefix) {
+            importer = importer.slice(importerPrefix.length);
+          }
+        }
+
+        if (virtualFiles.has(importee)) {
+          return importee;
+        }
+
+        const virtualFile =
+          virtualFilePrefix +
+          (importer
+            ? path.resolve(importer, "..", importee)
+            : path.resolve(importee));
+
+        if (virtualFiles.has(virtualFile)) {
+          return virtualFile;
+        }
+
+        if (
+          linked &&
+          ssr &&
+          importer &&
+          !importerPrefix &&
+          isMarkoFile(importee) &&
+          !isMarkoFile(importer)
+        ) {
+          const resolved = await this.resolve(importee, importer, resolveOpts);
+
+          if (resolved) {
+            resolved.id = serverEntryPrefix + resolved.id;
+            return resolved;
+          }
+        } else if (importerPrefix) {
+          return this.resolve(importee, importer, resolveOpts);
+        }
+
+        return null;
+      },
+    },
+    {
+      name: "marko-vite",
+      config(config, env) {
         root = config.root || process.cwd();
+        isBuild = env.command === "build";
+        isSSRBuild = isBuild && linked && Boolean(config.build!.ssr);
 
-        if (linked) {
-          config.plugins!.push({
-            name: "marko-vite:manifest",
-            enforce: "post",
-            async generateBundle(_outputOptions, bundle, isWrite) {
-              // We push a "post" plugin to ensure vite
-              // has added the html file assets.
-
-              if (!isWrite) {
-                this.error(
-                  `Linked builds are currently only supported when in "write" mode.`
-                );
-              }
-
-              if (isDOM && serverManifest) {
-                const browserManifest: BrowserManifest = {};
-
-                for (const id in serverManifest.entries) {
-                  const chunk = bundle[id];
-
-                  if (chunk?.type === "asset") {
-                    browserManifest[id] = await generateDocManifest(
-                      chunk.source.toString()
-                    );
-
-                    delete bundle[id];
-                  } else {
-                    this.error(
-                      `Marko template had unexpected output from vite, ${path.relative(
-                        root,
-                        serverManifest.entries[id]
-                      )}`
-                    );
-                  }
-                }
-
-                const manifestStr = `;var __MARKO_MANIFEST__=${JSON.stringify(
-                  browserManifest
-                )};\n`;
-
-                for (const fileName of serverManifest.chunksNeedingAssets) {
-                  await fs.promises.appendFile(fileName, manifestStr);
-                }
-              }
-            },
-          } as vite.Plugin);
-        }
-      }
-    },
-    configureServer(_server) {
-      server = _server;
-    },
-    async buildStart(inputOptions) {
-      if (
-        isBuild &&
-        linked &&
-        Array.isArray(inputOptions.input) &&
-        inputOptions.input.some(isHTMLFile)
-      ) {
-        const serverMetaFile = await getServerManifestFile();
-        this.addWatchFile(serverMetaFile);
-        isDOM = true;
-
-        try {
-          serverManifest = JSON.parse(
-            await fs.promises.readFile(serverMetaFile, "utf-8")
-          ) as ServerManifest;
-          inputOptions.input = toHTMLEntries(serverManifest.entries);
-        } catch (err) {
-          this.error(
-            `You must run the "ssr" build before the "browser" build.`
-          );
-        }
-
-        if (isEmpty(inputOptions.input)) {
-          this.error("No Marko files were found when compiling the server.");
-        }
-      }
-    },
-    async resolveId(importee, importer, _, ssr) {
-      let importeePrefix = "";
-      let importerPrefix = "";
-      let importerPrefixMatch;
-
-      if (importer) {
-        if ((importerPrefixMatch = prefixReg.exec(importer))) {
-          [importerPrefix] = importerPrefixMatch;
-          importer = importer.slice(importerPrefix.length);
-        }
-
-        if (ssr) {
-          // this code looks for `.marko` files that are imported from non `.marko` files.
-          // That heuristic is what we use to tell which `marko` files to request assets for.
-          // This code prefixes those `.marko` files with a marker to know that assets are needed.
-          if (linked && isMarkoFile(importee) && !isMarkoFile(importer)) {
-            importeePrefix = serverEntryPrefix;
-          }
-        } else {
-          // this code checks for `.marko` files which are the imported directly
-          // from an html script. These top level Marko files are compiled
-          // to include only the necessary code to "hydrate" the component in the browser.
-          // This code prefixes those `.marko` files with a marker to know to treat it differently.
-          if (isHTMLFile(importer) && isMarkoFile(importee)) {
-            importeePrefix = browserEntryPrefix;
-          }
-        }
-      }
-
-      const virtualFile = importer
-        ? path.resolve(importer, "..", importee)
-        : path.resolve(importee);
-
-      if (virtualFiles.has(virtualFile)) {
-        return virtualFile;
-      }
-
-      if (importerPrefix || importeePrefix) {
-        const resolved = await this.resolve(importee, importer, resolveOpts);
-
-        if (resolved) {
-          resolved.id = importeePrefix + resolved.id;
-          return resolved;
-        }
-      }
-
-      return null;
-    },
-    async load(id, ssr) {
-      if (linked && ssr) {
-        if (!registeredViteTag) {
+        if (!registeredTag) {
           // Here we inject either the watchMode vite tag, or the build one.
-          registeredViteTag = path.resolve(
+          registeredTag = path.resolve(
             __dirname.slice(0, __dirname.lastIndexOf("vite") + 4),
             "components",
-            this.meta.watchMode ? "vite-watch.marko" : "vite.marko"
+            isBuild ? "vite.marko" : "vite-watch.marko"
           );
+
           compiler.taglib.register("@marko/vite", {
             "<vite>": {
-              template: registeredViteTag,
+              template: registeredTag,
             },
           });
         }
 
-        if (id.startsWith(serverEntryPrefix)) {
-          // This code is looking for the markers added from the resolver above.
-          // It then returns a wrapper template that tells the <vite> tag what
-          // entry point we are rendering.
-          //
-          // We also keep track of all of the Marko entry files here to tell
-          // the browser compilers what to bundle in build mode.
-          const fileName = id.slice(serverEntryPrefix.length);
-          const entryId = path.posix.relative(root!, fileName + htmlExt);
+        if (!isBuild) {
+          console.log(compiler.getRuntimeEntryFiles("html", opts.translator));
+          console.log(compiler.getRuntimeEntryFiles("dom", opts.translator));
+          config.optimizeDeps ??= {};
+          config.optimizeDeps.include ??= [];
+          config.optimizeDeps.include.push(...new Set([
+            ...compiler.getRuntimeEntryFiles("html", opts.translator),
+            ...compiler.getRuntimeEntryFiles("dom", opts.translator)
+          ]));
+        }
+      },
+      configureServer(_server) {
+        devServer = _server;
+      },
+      async buildStart(inputOptions) {
+        if (isBuild && linked && !isSSRBuild) {
+          const serverMetaFile = await getServerManifestFile(root);
+          this.addWatchFile(serverMetaFile);
 
-          if (isBuild) {
-            serverManifest ??= {
-              entries: {},
-              chunksNeedingAssets: [],
-            };
-            serverManifest.entries[entryId] = fileName;
+          try {
+            serverManifest = JSON.parse(
+              await fs.promises.readFile(serverMetaFile, "utf-8")
+            ) as ServerManifest;
+            inputOptions.input = toHTMLEntries(serverManifest.entries);
+          } catch (err) {
+            this.error(
+              `You must run the "ssr" build before the "browser" build.`
+            );
           }
 
-          return getServerEntryTemplate({
-            runtimeId,
-            templatePath: `./${path.basename(id)}`,
-            entryData: JSON.stringify(
-              isBuild
-                ? entryId
-                : await generateDocManifest(
-                    await server.transformIndexHtml(
-                      "/",
-                      generateInputDoc(entryId)
+          if (isEmpty(inputOptions.input)) {
+            this.error("No Marko files were found when compiling the server.");
+          }
+        }
+      },
+      async load(id) {
+        switch (getMarkoPrefix(id)) {
+          case serverEntryPrefix: {
+            const fileName = id.slice(serverEntryPrefix.length);
+            const entryId = path.posix.relative(root!, fileName) + htmlExt
+            let entryData: string;
+
+            if (isBuild) {
+              serverManifest ??= {
+                entries: {},
+                chunksNeedingAssets: [],
+              };
+              serverManifest.entries[entryId] = fileName;
+              entryData = JSON.stringify(entryId);
+            } else {
+              entryData = JSON.stringify(
+                await generateDocManifest(
+                  await devServer.transformIndexHtml(
+                    "/",
+                    generateInputDoc(
+                      browserEntryPrefix + path.posix.relative(root!, fileName)
                     )
                   )
-            ),
-          });
+                )
+              );
+            }
+
+            return getServerEntryTemplate({
+              fileName,
+              entryData,
+              runtimeId,
+            });
+          }
+          case browserEntryPrefix:
+            return fs.promises.readFile(
+              id.slice(browserEntryPrefix.length),
+              "utf-8"
+            );
+          case virtualFilePrefix:
+            return virtualFiles.get(id);
+          default:
+            if (virtualFiles.has(id)) {
+              return virtualFiles.get(id);
+            }
+            return null;
         }
-      }
+      },
+      async transform(source, id, ssr) {
+        if (!isMarkoFile(id)) {
+          return null;
+        }
 
-      const virtualFile = virtualFiles.get(id);
+        const prefix = getMarkoPrefix(id);
 
-      if (virtualFile) {
-        return virtualFile;
-      }
+        if (prefix) {
+          id = id.slice(prefix.length);
+        }
 
-      const prefixMatch = prefixReg.exec(id);
+        const { code, map, meta } = await compiler.compile(
+          source,
+          id,
+          ssr
+            ? ssrConfig
+            : prefix === browserEntryPrefix
+            ? hydrateConfig
+            : domConfig
+        );
 
-      if (prefixMatch) {
-        return fs.promises.readFile(id.slice(prefixMatch[0].length), "utf-8");
-      }
+        for (const watchFile of meta.watchFiles!) {
+          this.addWatchFile(watchFile);
+        }
 
-      return null;
+        return { code, map };
+      },
     },
-    async transform(source, id, ssr) {
-      if (!isMarkoFile(id)) {
-        return null;
-      }
+    {
+      name: "marko-vite:post",
+      enforce: "post", // We use a "post" plugin to allow us to read the final generated `.html` from vite.
+      async generateBundle(outputOptions, bundle, isWrite) {
+        if (!linked) {
+          return;
+        }
 
-      const prefixMatch = prefixReg.exec(id);
-      let prefix: string | undefined;
-
-      if (prefixMatch) {
-        prefix = prefixMatch[0];
-        id = id.slice(prefix.length);
-      }
-
-      const { code, map, meta } = await compiler.compile(
-        source,
-        id,
-        ssr
-          ? ssrConfig
-          : prefix === browserEntryPrefix
-          ? hydrateConfig
-          : domConfig
-      );
-
-      for (const watchFile of meta.watchFiles!) {
-        this.addWatchFile(watchFile);
-      }
-
-      return { code, map };
-    },
-
-    async generateBundle(outputOptions, bundle) {
-      if (linked && !isDOM) {
-        let hasViteTag = false;
-        const dir = outputOptions.dir
-          ? path.resolve(outputOptions.dir)
-          : path.resolve(outputOptions.file!, "..");
+        if (!isWrite) {
+          this.error(
+            `Linked builds are currently only supported when in "write" mode.`
+          );
+        }
 
         if (!serverManifest) {
           this.error(
@@ -338,43 +310,79 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin {
           );
         }
 
-        for (const fileName in bundle) {
-          const chunk = bundle[fileName];
+        if (isSSRBuild) {
+          const dir = outputOptions.dir
+            ? path.resolve(outputOptions.dir)
+            : path.resolve(outputOptions.file!, "..");
+          let hasViteTag = false;
 
-          if (chunk.type === "chunk") {
-            for (const id in chunk.modules) {
-              if (id === registeredViteTag) {
-                hasViteTag = true;
-                serverManifest.chunksNeedingAssets.push(
-                  path.resolve(dir, fileName)
-                );
-                break;
+          for (const fileName in bundle) {
+            const chunk = bundle[fileName];
+
+            if (chunk.type === "chunk") {
+              for (const id in chunk.modules) {
+                if (id === registeredTag) {
+                  hasViteTag = true;
+                  serverManifest!.chunksNeedingAssets.push(
+                    path.resolve(dir, fileName)
+                  );
+                  break;
+                }
               }
             }
           }
-        }
 
-        if (!hasViteTag) {
-          this.warn(
-            "The <vite> tag was not discovered when bundling the server. This means no client side assets will be served to the browser."
+          if (!hasViteTag) {
+            this.warn(
+              "The <vite> tag was not discovered when bundling the server. This means no client side assets will be served to the browser."
+            );
+          }
+
+          await fs.promises.writeFile(
+            await getServerManifestFile(root),
+            JSON.stringify(serverManifest)
           );
+        } else {
+          const browserManifest: BrowserManifest = {};
+
+          for (const id in serverManifest.entries) {
+            const chunk = bundle[id];
+
+            if (chunk?.type === "asset") {
+              browserManifest[id] = await generateDocManifest(
+                chunk.source.toString()
+              );
+
+              delete bundle[id];
+            } else {
+              this.error(
+                `Marko template had unexpected output from vite, ${path.relative(
+                  root,
+                  serverManifest.entries[id]
+                )}`
+              );
+            }
+          }
+
+          const manifestStr = `;var __MARKO_MANIFEST__=${JSON.stringify(
+            browserManifest
+          )};\n`;
+
+          for (const fileName of serverManifest.chunksNeedingAssets) {
+            await fs.promises.appendFile(fileName, manifestStr);
+          }
         }
-
-        await fs.promises.writeFile(
-          await getServerManifestFile(),
-          JSON.stringify(serverManifest)
-        );
-      }
+      },
     },
-  };
+  ];
 }
 
-function isHTMLFile(file: string) {
-  return file.endsWith(htmlExt);
+function getMarkoPrefix(id: string) {
+  return /^\/@marko[^:]+:/.exec(id)?.[0];
 }
 
-function isMarkoFile(file: string) {
-  return file.endsWith(markoExt);
+function isMarkoFile(id: string) {
+  return id.endsWith(markoExt);
 }
 
 function toHTMLEntries(serverEntries: ServerManifest["entries"]) {
@@ -384,7 +392,7 @@ function toHTMLEntries(serverEntries: ServerManifest["entries"]) {
     const markoFile = serverEntries[id];
     const htmlFile = markoFile + htmlExt;
     virtualFiles.set(htmlFile, {
-      code: generateInputDoc(markoFile),
+      code: generateInputDoc(browserEntryPrefix + markoFile),
     });
     result.push(htmlFile);
   }
@@ -392,14 +400,32 @@ function toHTMLEntries(serverEntries: ServerManifest["entries"]) {
   return result;
 }
 
-async function getServerManifestFile() {
-  return path.join(await getTempDir(), "server-meta.json");
+async function getServerManifestFile(root: string) {
+  return path.join(await getTempDir(root), "manifest.json");
 }
 
-function getTempDir() {
+function getTempDir(root: string) {
   return (
     tempDir ||
-    (tempDir = fs.promises.mkdtemp(path.join(os.tmpdir(), "marko-vite-")))
+    (tempDir = (async () => {
+      const dir = path.join(
+        os.tmpdir(),
+        `marko-vite-${crypto.createHash("SHA1").update(root).digest("hex")}`
+      );
+
+      try {
+        const stat = await fs.promises.stat(dir);
+
+        if (stat.isDirectory()) {
+          return dir;
+        }
+      } catch {
+        await fs.promises.mkdir(dir);
+        return dir;
+      }
+
+      throw new Error("Unable to create temp directory");
+    })())
   );
 }
 

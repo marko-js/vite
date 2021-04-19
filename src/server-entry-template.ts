@@ -1,11 +1,11 @@
 export default async (opts: {
-  runtimeId?: string;
-  templatePath: string;
+  fileName: string;
   entryData: string;
+  runtimeId?: string;
 }): Promise<string> => {
-  const templatePathStr = JSON.stringify(opts.templatePath);
-  return `import template from ${templatePathStr};
-export * from ${templatePathStr};
+  const fileNameStr = JSON.stringify(opts.fileName);
+  return `import template from ${fileNameStr};
+export * from ${fileNameStr};
 $ const $global = out.global;
 ${
   opts.runtimeId

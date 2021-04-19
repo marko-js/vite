@@ -16,8 +16,8 @@ var __assign = (a, b) => {
   return a;
 };
 var http = require("http");
-var _marko_renderer = require("marko/dist/runtime/components/renderer");
 var html = require("marko/dist/runtime/html");
+var _marko_renderer = require("marko/dist/runtime/components/renderer");
 var _marko_tag = require("marko/dist/runtime/helpers/render-tag");
 var _marko_to_string = require("marko/dist/runtime/helpers/to-string");
 var _flush_here_and_after__ = require("marko/dist/core-tags/core/__flush_here_and_after__.js");
@@ -64,7 +64,7 @@ function buildHTML(parts, attrsLookup) {
   let result = parts[last];
   for (let i = last; i--; ) {
     const part = parts[i];
-    result = part[--i] + attrsLookup[part] + result;
+    result = parts[--i] + attrsLookup[part] + result;
   }
   return result;
 }
@@ -82,7 +82,7 @@ function attrsToString(attrs) {
 const _marko_componentType$3 = "Zzp70RF5", _marko_component$3 = {};
 _marko_template$3._ = _marko_renderer__default["default"](function(input, out, _component, component, state) {
   const $global = out.global;
-  const entries = $global.__viteEntries || ($global.__viteEntries = []);
+  const entries = $global.___viteEntries || ($global.___viteEntries = []);
   let writtenEntries = 0;
   let {
     scriptAttrs,

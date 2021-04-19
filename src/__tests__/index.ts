@@ -2,6 +2,7 @@ import fs from "fs";
 import path from "path";
 import * as vite from "vite";
 import { toMatchFile } from "jest-file-snapshot";
+import type { RollupOutput } from "rollup";
 
 const FIXTURES = path.join(__dirname, "fixtures");
 
@@ -9,6 +10,13 @@ expect.extend({ toMatchFile });
 
 fs.readdirSync(FIXTURES).forEach((fixture) => {
   test(`${fixture}`, async () => {
+    try {
+      await fs.promises.rmdir(path.join(__dirname, "../../node_modules/.vite"), {
+        recursive: true
+      });
+      // eslint-disable-next-line no-empty
+    } catch (_) {}
+
     const dir = path.join(FIXTURES, fixture);
     const { serverEntry, targets, config } = (await import(
       path.join(dir, "config.ts")
@@ -43,7 +51,9 @@ fs.readdirSync(FIXTURES).forEach((fixture) => {
         throw new Error("Unexpected array build");
       }
 
-      bundle.output.forEach((chunk) => {
+
+
+      (bundle as RollupOutput).output.forEach((chunk) => {
         expect(
           (chunk.type === "chunk" ? chunk.code : chunk.source)
             .toString()
