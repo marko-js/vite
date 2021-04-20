@@ -166,7 +166,7 @@ const _marko_template = html.t();
 const _marko_componentType = "NgVTgNMO", _marko_component = {};
 _marko_template._ = _marko_renderer__default["default"](function(input, out, _component, component, state) {
   const $global = out.global;
-  ($global.___viteEntries || ($global.___viteEntries = [])).push("src/template.marko.html");
+  ($global.___viteEntries || ($global.___viteEntries = [])).push("src_fcab");
   _marko_tag__default["default"](_marko_template$1, input, out, _component, "0");
   _marko_tag__default["default"](_initComponents__default["default"], {}, out, _component, "1");
   _marko_tag__default["default"](_awaitReorderer__default["default"], {}, out, _component, "2");

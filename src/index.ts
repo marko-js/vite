@@ -37,9 +37,10 @@ interface ServerManifest {
 
 const virtualFiles = new Map<string, { code: string; map?: any }>();
 const defaultCompiler = require.resolve("@marko/compiler");
-const browserEntryPrefix = "/@marko-browser-entry:";
-const serverEntryPrefix = "/@marko-server-entry:";
-const virtualFilePrefix = "/@marko-virtual:";
+const queryReg = /\?.+$/;
+const browserEntryQuery = "?marko-browser-entry";
+const serverEntryQuery = "?marko-server-entry";
+const virtualFileQuery = "?marko-virtual";
 const markoExt = ".marko";
 const htmlExt = ".html";
 const resolveOpts = { skipSelf: true };
@@ -76,11 +77,8 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
   const domConfig: Compiler.Config = {
     ...baseConfig,
     resolveVirtualDependency(from, dep) {
-      virtualFiles.set(
-        virtualFilePrefix + path.resolve(from, "..", dep.virtualPath),
-        dep
-      );
-      return dep.virtualPath;
+      virtualFiles.set(path.join(from, "..", dep.virtualPath), dep);
+      return dep.virtualPath + virtualFileQuery;
     },
     output: "dom",
   };
@@ -101,65 +99,6 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
     {
       name: "marko-vite:pre",
       enforce: "pre", // Must be pre to allow us to resolve assets before vite.
-      async resolveId(importee, importer, _, ssr) {
-        const importeePrefix = getMarkoPrefix(importee);
-        if (importeePrefix) {
-          if (importeePrefix === browserEntryPrefix) {
-            return (
-              browserEntryPrefix +
-              path.resolve(root!, importee.slice(browserEntryPrefix.length))
-            );
-          }
-
-          return importee;
-        }
-
-        let importerPrefix: string | undefined;
-
-        if (importer) {
-          importerPrefix = getMarkoPrefix(importer);
-          if (importerPrefix) {
-            importer = importer.slice(importerPrefix.length);
-          }
-        }
-
-        if (virtualFiles.has(importee)) {
-          return importee;
-        }
-
-        const virtualFile =
-          virtualFilePrefix +
-          (importer
-            ? path.resolve(importer, "..", importee)
-            : path.resolve(importee));
-
-        if (virtualFiles.has(virtualFile)) {
-          return virtualFile;
-        }
-
-        if (
-          linked &&
-          ssr &&
-          importer &&
-          !importerPrefix &&
-          isMarkoFile(importee) &&
-          !isMarkoFile(importer)
-        ) {
-          const resolved = await this.resolve(importee, importer, resolveOpts);
-
-          if (resolved) {
-            resolved.id = serverEntryPrefix + resolved.id;
-            return resolved;
-          }
-        } else if (importerPrefix) {
-          return this.resolve(importee, importer, resolveOpts);
-        }
-
-        return null;
-      },
-    },
-    {
-      name: "marko-vite",
       config(config, env) {
         root = config.root || process.cwd();
         isBuild = env.command === "build";
@@ -181,14 +120,14 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         }
 
         if (!isBuild) {
-          console.log(compiler.getRuntimeEntryFiles("html", opts.translator));
-          console.log(compiler.getRuntimeEntryFiles("dom", opts.translator));
           config.optimizeDeps ??= {};
           config.optimizeDeps.include ??= [];
-          config.optimizeDeps.include.push(...new Set([
-            ...compiler.getRuntimeEntryFiles("html", opts.translator),
-            ...compiler.getRuntimeEntryFiles("dom", opts.translator)
-          ]));
+          config.optimizeDeps.include.push(
+            ...new Set([
+              ...compiler.getRuntimeEntryFiles("html", opts.translator),
+              ...compiler.getRuntimeEntryFiles("dom", opts.translator),
+            ])
+          );
         }
       },
       configureServer(_server) {
@@ -203,7 +142,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
             serverManifest = JSON.parse(
               await fs.promises.readFile(serverMetaFile, "utf-8")
             ) as ServerManifest;
-            inputOptions.input = toHTMLEntries(serverManifest.entries);
+            inputOptions.input = toHTMLEntries(root!, serverManifest.entries);
           } catch (err) {
             this.error(
               `You must run the "ssr" build before the "browser" build.`
@@ -215,19 +154,60 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           }
         }
       },
+      async resolveId(importee, importer, _importOpts, ssr) {
+        const importeeIsAbsolute = path.isAbsolute(importee);
+        if (!importeeIsAbsolute || importee.startsWith(root!)) {
+          let importeeQuery = getMarkoQuery(importee);
+
+          if (importeeQuery) {
+            importee = importee.slice(0, -importeeQuery.length);
+          } else if (
+            ssr &&
+            linked &&
+            importer &&
+            isMarkoFile(importee) &&
+            !isMarkoFile(importer.replace(queryReg, ""))
+          ) {
+            importeeQuery = serverEntryQuery;
+          } else if (virtualFiles.has(importee)) {
+            return importee;
+          }
+
+          if (importeeQuery) {
+            const resolved = importeeIsAbsolute
+              ? { id: importee }
+              : importee[0] === "."
+              ? {
+                  id: importer
+                    ? path.resolve(importer, "..", importee)
+                    : path.resolve(root!, importee),
+                }
+              : await this.resolve(importee, importer, resolveOpts);
+
+            if (resolved) {
+              resolved.id += importeeQuery;
+            }
+
+            return resolved;
+          }
+        }
+
+        return null;
+      },
       async load(id) {
-        switch (getMarkoPrefix(id)) {
-          case serverEntryPrefix: {
-            const fileName = id.slice(serverEntryPrefix.length);
-            const entryId = path.posix.relative(root!, fileName) + htmlExt
+        switch (getMarkoQuery(id)) {
+          case serverEntryQuery: {
+            const fileName = id.slice(0, -serverEntryQuery.length);
             let entryData: string;
 
             if (isBuild) {
+              const relativeFileName = path.relative(root!, fileName);
+              const entryId = toEntryId(relativeFileName);
               serverManifest ??= {
                 entries: {},
                 chunksNeedingAssets: [],
               };
-              serverManifest.entries[entryId] = fileName;
+              serverManifest.entries[entryId] = relativeFileName;
               entryData = JSON.stringify(entryId);
             } else {
               entryData = JSON.stringify(
@@ -235,7 +215,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
                   await devServer.transformIndexHtml(
                     "/",
                     generateInputDoc(
-                      browserEntryPrefix + path.posix.relative(root!, fileName)
+                      path.relative(root!, fileName) + browserEntryQuery
                     )
                   )
                 )
@@ -248,29 +228,30 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
               runtimeId,
             });
           }
-          case browserEntryPrefix:
+          case browserEntryQuery:
             return fs.promises.readFile(
-              id.slice(browserEntryPrefix.length),
+              id.slice(0, -browserEntryQuery.length),
               "utf-8"
             );
-          case virtualFilePrefix:
-            return virtualFiles.get(id);
-          default:
-            if (virtualFiles.has(id)) {
-              return virtualFiles.get(id);
+          case virtualFileQuery:
+            if (!id.startsWith(root!)) {
+              id = path.join(root!, id);
             }
-            return null;
+
+            return virtualFiles.get(id.slice(0, -virtualFileQuery.length));
+          default:
+            return virtualFiles.get(id) || null;
         }
       },
       async transform(source, id, ssr) {
-        if (!isMarkoFile(id)) {
-          return null;
+        const query = getMarkoQuery(id);
+
+        if (query) {
+          id = id.slice(0, -query.length);
         }
 
-        const prefix = getMarkoPrefix(id);
-
-        if (prefix) {
-          id = id.slice(prefix.length);
+        if (!isMarkoFile(id)) {
+          return null;
         }
 
         const { code, map, meta } = await compiler.compile(
@@ -278,7 +259,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           id,
           ssr
             ? ssrConfig
-            : prefix === browserEntryPrefix
+            : query === browserEntryQuery
             ? hydrateConfig
             : domConfig
         );
@@ -345,21 +326,20 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         } else {
           const browserManifest: BrowserManifest = {};
 
-          for (const id in serverManifest.entries) {
-            const chunk = bundle[id];
+          for (const entryId in serverManifest.entries) {
+            const fileName = serverManifest.entries[entryId];
+            const chunkId = fileName + htmlExt;
+            const chunk = bundle[chunkId];
 
             if (chunk?.type === "asset") {
-              browserManifest[id] = await generateDocManifest(
+              browserManifest[entryId] = await generateDocManifest(
                 chunk.source.toString()
               );
 
-              delete bundle[id];
+              delete bundle[chunkId];
             } else {
               this.error(
-                `Marko template had unexpected output from vite, ${path.relative(
-                  root,
-                  serverManifest.entries[id]
-                )}`
+                `Marko template had unexpected output from vite, ${fileName}`
               );
             }
           }
@@ -377,22 +357,22 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
   ];
 }
 
-function getMarkoPrefix(id: string) {
-  return /^\/@marko[^:]+:/.exec(id)?.[0];
+function getMarkoQuery(id: string) {
+  return queryReg.exec(id)?.[0] || "";
 }
 
 function isMarkoFile(id: string) {
   return id.endsWith(markoExt);
 }
 
-function toHTMLEntries(serverEntries: ServerManifest["entries"]) {
+function toHTMLEntries(root: string, serverEntries: ServerManifest["entries"]) {
   const result: string[] = [];
 
   for (const id in serverEntries) {
-    const markoFile = serverEntries[id];
+    const markoFile = path.join(root, serverEntries[id]);
     const htmlFile = markoFile + htmlExt;
     virtualFiles.set(htmlFile, {
-      code: generateInputDoc(browserEntryPrefix + markoFile),
+      code: generateInputDoc(markoFile + browserEntryQuery),
     });
     result.push(htmlFile);
   }
@@ -427,6 +407,16 @@ function getTempDir(root: string) {
       throw new Error("Unable to create temp directory");
     })())
   );
+}
+
+function toEntryId(id: string) {
+  return `${id
+    .replace(/(\/(index|template)|)\..*$/, "")
+    .replace(/^.*\//, "")}_${crypto
+    .createHash("SHA1")
+    .update(id)
+    .digest("hex")
+    .slice(0, 4)}`;
 }
 
 function isEmpty(obj: unknown) {

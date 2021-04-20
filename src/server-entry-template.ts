@@ -1,9 +1,10 @@
+import path from "path";
 export default async (opts: {
   fileName: string;
   entryData: string;
   runtimeId?: string;
 }): Promise<string> => {
-  const fileNameStr = JSON.stringify(opts.fileName);
+  const fileNameStr = JSON.stringify(`./${path.basename(opts.fileName)}`);
   return `import template from ${fileNameStr};
 export * from ${fileNameStr};
 $ const $global = out.global;
