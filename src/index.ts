@@ -116,6 +116,12 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
             "<vite>": {
               template: registeredTag,
             },
+            "<head>": {
+              transformer: require.resolve("./inject-vite-transform")
+            },
+            "<body>": {
+              transformer: require.resolve("./inject-vite-transform")
+            }
           });
         }
 
