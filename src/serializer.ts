@@ -18,16 +18,9 @@ const voidElements = new Set([
   "wbr",
 ]);
 
-export const enum Interpolate {
-  inlineScriptAttributes,
-  externalScriptAttributes,
-  inlineStyleAttributes,
-  externalStyleAttributes,
-}
-
 export default function serialize(
   nodes: Node[],
-  parts?: (string | Interpolate)[]
+  parts?: string[]
 ) {
   let curString = parts ? (parts.pop() as string) : "";
   parts ??= [];
@@ -43,21 +36,16 @@ export default function serialize(
 
         switch (tag.tagName) {
           case "script":
-            parts.push(
-              curString,
-              tag.attribs.src
-                ? Interpolate.externalScriptAttributes
-                : Interpolate.inlineScriptAttributes
-            );
+            parts.push(curString);
             curString = "";
             break;
           case "style":
-            parts.push(curString, Interpolate.inlineStyleAttributes);
+            parts.push(curString);
             curString = "";
             break;
           case "link":
             if (tag.attribs.rel === "stylesheet") {
-              parts.push(curString, Interpolate.externalStyleAttributes);
+              parts.push(curString);
               curString = "";
             }
             break;

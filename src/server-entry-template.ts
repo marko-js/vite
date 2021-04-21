@@ -15,12 +15,12 @@ ${
 }$ ($global.___viteEntries || ($global.___viteEntries = [])).push(${
     opts.entryData
   });
-<vite slot="head-prepend" _p=2/>
-<vite slot="head" _p=2/>
-<vite slot="body-prepend" _p=2/>
+<_vite slot="head-prepend"/>
+<_vite slot="head"/>
+<_vite slot="body-prepend"/>
 <\${template} ...input/>
 <init-components/>
 <await-reorderer/>
-<vite slot="body" _p=2/>
+<_vite slot="body"/>
 `;
 };

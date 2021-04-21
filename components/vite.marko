@@ -1,97 +1,31 @@
-static function buildHTML(parts, attrsLookup) {
-  const last = parts.length - 1;
-  let result = parts[last];
+static function renderAssets(out, slot) {
+  const entries = this.___viteEntries;
 
-  for (let i = last; i--;) {
-    const part = parts[i];
-    result = parts[--i] + attrsLookup[part] + result;
-  }
+  if (entries) {
+    const slotWrittenEntriesKey = `___viteWrittenEntries-${slot}`;
+    const lastWrittenEntry = this[slotWrittenEntriesKey] || 0;
+    const writtenEntries = this[slotWrittenEntriesKey] = entries.length;
+    let html = "";
+  
+    for (let i = lastWrittenEntry; i < writtenEntries; i++) {
+      const manifest = __MARKO_MANIFEST__[entries[i]];
+      const slotHtml = manifest && manifest[slot] && manifest[slot].join(this.___viteInjectAttrs);
 
-  return result;
-};
-
-static function attrsToString(attrs) {
-  let result = "";
-
-  for (const name in attrs) {
-    const value = attrs[name];
-
-    if (value === false || value == null) {
-      continue;
-    }
-
-    result += ` ${
-      value === "" || value === true
-        ? name
-        : `${name}="${value.replace(/"/g, "&#39;")}"`
-    }`
-  }
-
-  return result;
-}
-
-$ {
-  const $global = out.global;
-  const priority = input._p || 0;
-  const priorityProp = `___vite-${input.slot}`;
-  let writtenEntries = 0;
-  let attrsLookup;
-  let entries;
-  $global[priorityProp] = Math.min(priority, 0);
-}
-
-<__flush_here_and_after__>
-  <if($global[priorityProp] === priority)>
-    $ {
-      if (!entries) {
-        entries = $global.___viteEntries || ($global.___viteEntries = []);
-        let {
-          scriptAttrs,
-          inlineScriptAttrs,
-          externalScriptAttrs,
-          styleAttrs,
-          inlineStyleAttrs,
-          externalStyleAttrs,
-        } = input;
-      
-        if (scriptAttrs) {
-          inlineScriptAttrs = inlineScriptAttrs
-            ? { ...scriptAttrs, ...inlineScriptAttrs }
-            : scriptAttrs;
-          externalScriptAttrs = externalScriptAttrs
-            ? { ...scriptAttrs, ...externalScriptAttrs }
-            : scriptAttrs;
-        }
-      
-        if (styleAttrs) {
-          inlineStyleAttrs = inlineStyleAttrs
-            ? { ...styleAttrs, ...inlineStyleAttrs }
-            : styleAttrs;
-          externalStyleAttrs = externalStyleAttrs
-            ? { ...styleAttrs, ...externalStyleAttrs }
-            : styleAttrs;
-        }
-      
-        attrsLookup = [
-          attrsToString(inlineScriptAttrs),
-          attrsToString(externalScriptAttrs),
-          attrsToString(inlineStyleAttrs),
-          attrsToString(externalStyleAttrs)
-        ];
+      if (slotHtml) {
+        html += slotHtml;
       }
     }
 
-    $ const lastWrittenEntry = writtenEntries;
-    $ writtenEntries = entries.length;
-    <for|i| from=lastWrittenEntry to=(writtenEntries - 1)>
-      $ const manifest = __MARKO_MANIFEST__[entries[i]];
-      $ const parts = manifest[input.slot];
-      <if(parts)>
-        $!{buildHTML(parts, attrsLookup)}
-      </if>
-      <else-if(parts !== null)>
-        $ throw new Error(`@marko/vite: Invalid slot requested "${input.slot}". Expected one of ${Object.keys(manifest).join(", ")}`);
-      </else-if>
-    </>
-  </if>
+    out.write(html);
+  }
+}
+
+$ const $global = out.global;
+$ if (!$global.___viteRenderAssets) {
+  $global.___viteInjectAttrs = $global.cspNonce ? ` nonce="${$global.cspNonce.replace(/"/g, "&#39;")}"` : "";
+  $global.___viteRenderAssets = renderAssets;
+}
+
+<__flush_here_and_after__>
+  $ $global.___viteRenderAssets(out, input.slot);
 </>

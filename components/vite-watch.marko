@@ -1,84 +1,31 @@
-static function buildHTML(parts, attrsLookup) {
-  const last = parts.length - 1;
-  let result = parts[last];
+static function renderAssets(out, slot) {
+  const entries = this.___viteEntries;
 
-  for (let i = last; i--;) {
-    const part = parts[i];
-    result = parts[--i] + attrsLookup[part] + result;
-  }
+  if (entries) {
+    const slotWrittenEntriesKey = `___viteWrittenEntries-${slot}`;
+    const lastWrittenEntry = this[slotWrittenEntriesKey] || 0;
+    const writtenEntries = this[slotWrittenEntriesKey] = entries.length;
+    let html = "";
+  
+    for (let i = lastWrittenEntry; i < writtenEntries; i++) {
+      const slotParts = entries[i][slot];
+      const slotHtml = slotParts && slotParts.join(this.___viteInjectAttrs);
 
-  return result;
-};
-
-static function attrsToString(attrs) {
-  let result = "";
-
-  for (const name in attrs) {
-    const value = attrs[name];
-
-    if (value === false || value == null) {
-      continue;
+      if (slotHtml) {
+        html += slotHtml;
+      }
     }
 
-    result += ` ${
-      value === "" || value === true
-        ? name
-        : `${name}="${value.replace(/"/g, "&#39;")}"`
-    }`
+    out.write(html);
   }
-
-  return result;
 }
 
-$ {
-  const $global = out.global;
-  const entries = $global.___viteEntries || ($global.___viteEntries = []);
-  let writtenEntries = 0;
-  let {
-    scriptAttrs,
-    inlineScriptAttrs,
-    externalScriptAttrs,
-    styleAttrs,
-    inlineStyleAttrs,
-    externalStyleAttrs,
-  } = input;
-
-  if (scriptAttrs) {
-    inlineScriptAttrs = inlineScriptAttrs
-      ? { ...scriptAttrs, ...inlineScriptAttrs }
-      : scriptAttrs;
-    externalScriptAttrs = externalScriptAttrs
-      ? { ...scriptAttrs, ...externalScriptAttrs }
-      : scriptAttrs;
-  }
-
-  if (styleAttrs) {
-    inlineStyleAttrs = inlineStyleAttrs
-      ? { ...styleAttrs, ...inlineStyleAttrs }
-      : styleAttrs;
-    externalStyleAttrs = externalStyleAttrs
-      ? { ...styleAttrs, ...externalStyleAttrs }
-      : styleAttrs;
-  }
-
-  const attrsLookup = [
-    attrsToString(inlineScriptAttrs),
-    attrsToString(externalScriptAttrs),
-    attrsToString(inlineStyleAttrs),
-    attrsToString(externalStyleAttrs)
-  ];
+$ const $global = out.global;
+$ if (!$global.___viteRenderAssets) {
+  $global.___viteInjectAttrs = $global.cspNonce ? ` nonce="${$global.cspNonce.replace(/"/g, "&#39;")}"` : "";
+  $global.___viteRenderAssets = renderAssets;
 }
 
 <__flush_here_and_after__>
-  $ const lastWrittenEntry = writtenEntries;
-  $ writtenEntries = entries.length;
-  <for|i| from=lastWrittenEntry to=(writtenEntries - 1)>
-    $ const parts = entries[i][input.slot];
-    <if(parts)>
-      $!{buildHTML(parts, attrsLookup)}
-    </if>
-    <else-if(parts !== null)>
-      $ throw new Error(`@marko/vite: Invalid slot requested "${input.slot}". Expected one of ${Object.keys(manifest).join(", ")}`);
-    </else-if>
-  </>
+  $ $global.___viteRenderAssets(out, input.slot);
 </>

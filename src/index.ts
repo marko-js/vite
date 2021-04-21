@@ -113,14 +113,14 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           );
 
           compiler.taglib.register("@marko/vite", {
-            "<vite>": {
+            "<_vite>": {
               template: registeredTag,
             },
             "<head>": {
-              transformer: require.resolve("./inject-vite-transform")
+              transformer: require.resolve("./render-assets-transform")
             },
             "<body>": {
-              transformer: require.resolve("./inject-vite-transform")
+              transformer: require.resolve("./render-assets-transform")
             }
           });
         }
@@ -301,7 +301,6 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           const dir = outputOptions.dir
             ? path.resolve(outputOptions.dir)
             : path.resolve(outputOptions.file!, "..");
-          let hasViteTag = false;
 
           for (const fileName in bundle) {
             const chunk = bundle[fileName];
@@ -309,7 +308,6 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
             if (chunk.type === "chunk") {
               for (const id in chunk.modules) {
                 if (id === registeredTag) {
-                  hasViteTag = true;
                   serverManifest!.chunksNeedingAssets.push(
                     path.resolve(dir, fileName)
                   );
@@ -317,12 +315,6 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
                 }
               }
             }
-          }
-
-          if (!hasViteTag) {
-            this.warn(
-              "The <vite> tag was not discovered when bundling the server. This means no client side assets will be served to the browser."
-            );
           }
 
           await fs.promises.writeFile(

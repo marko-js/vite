@@ -57,7 +57,7 @@ fs.readdirSync(FIXTURES).forEach((fixture) => {
         expect(
           (chunk.type === "chunk" ? chunk.code : chunk.source)
             .toString()
-            .replace(/@marko\/rollup\$\d\.\d\.\d/g, "@marko/rollup$latest")
+            .replace(/@marko\/vite\$\d\.\d\.\d/g, "@marko/vite$latest")
         ).toMatchFile(path.join(snapshotDir, chunk.fileName));
       });
     }
