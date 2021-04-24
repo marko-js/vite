@@ -18,8 +18,8 @@
     <img src="https://github.com/marko-js/vite/actions/workflows/ci.yml/badge.svg" alt="Build status"/>
   </a>
   <!-- Coverage -->
-  <a href="https://coveralls.io/github/marko-js/vite">
-    <img src="https://img.shields.io/coveralls/marko-js/vite.svg" alt="Test Coverage"/>
+  <a href="https://codecov.io/gh/marko-js/vite">
+    <img src="https://codecov.io/gh/marko-js/vite/branch/main/graph/badge.svg?token=3VFGDEC7G7"/>
   </a>
   <!-- NPM Version -->
   <a href="https://npmjs.org/package/@marko/vite">
