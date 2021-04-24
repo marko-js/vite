@@ -45,9 +45,8 @@ npm install @marko/vite
 import { defineConfig } from "vite";
 import marko from "@marko/vite";
 export default defineConfig({
-  plugins: [marko()]
+  plugins: [marko()],
 });
-
 ```
 
 # Linked Mode
@@ -60,32 +59,42 @@ Scripts, styles and other content that _would have_ been injected into the `.htm
 In this mode you must use the [Vite SSR API](https://vitejs.dev/guide/ssr.html#setting-up-the-dev-server).
 
 Here's an example using `express`.
+
 ```js
 import { createServer } from "vite";
 
 const app = express();
-const vite = await createViteServer({
-  server: { middlewareMode: true }
-});
+let loadTemplate;
 
-app.use(vite.middlewares);
+if (process.env.NODE_ENV === "production") {
+  // Use Vite's built asset in prod mode.
+  loadTemplate = () => import("./dist");
+} else {
+  // Hookup the vite dev server.
+  const vite = await createViteServer({
+    server: { middlewareMode: true }
+  });
 
-app.use("*", async (req, res) => {
-  const template = (await vite.ssrLoadModule("./template.marko")).default;
-  template.render(..., res); // When the template is loaded, it will automaticall have `vite` assets inlined.
-)
+  app.use(vite.middlewares);
+  loadTemplate = () => vite.ssrLoadModule("./template.marko");
+}
 
-app.listen(3000)
+app.get("/", async (req, res) => {
+  const template = (await loadTemplate()).default;
+  // When the template is loaded, it will automaticall have `vite` assets inlined.
+  template.render({ hello: "world" }, res);
+);
+
+app.listen(3000);
 ```
 
-> Note: This is only showing the dev server api, you'd also need to have a production build setup that loaded the dist template.
 > For a more real world setup check out our [vite express](https://github.com/marko-js/examples/tree/master/examples/vite-express) example app.
 
 # Options
 
 ### options.babelConfig
 
-You can manually override the Babel configuration used by passing a `babelConfig` object to the `@marko/vite` plugin. By default Babels regular [config file resolution](https://babeljs.io/docs/en/config-files) will be used.
+You can manually override Marko's Babel configuration by passing a `babelConfig` object to the `@marko/vite` plugin. By default Babel's regular [config file resolution](https://babeljs.io/docs/en/config-files) will be used.
 
 ```javascript
 marko({
