@@ -18,10 +18,7 @@ const voidElements = new Set([
   "wbr",
 ]);
 
-export default function serialize(
-  nodes: Node[],
-  parts?: string[]
-) {
+export default function serialize(nodes: Node[], parts?: string[]) {
   let curString = parts ? (parts.pop() as string) : "";
   parts ??= [];
 

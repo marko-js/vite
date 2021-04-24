@@ -117,11 +117,11 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
               template: registeredTag,
             },
             "<head>": {
-              transformer: require.resolve("./render-assets-transform")
+              transformer: require.resolve("./render-assets-transform"),
             },
             "<body>": {
-              transformer: require.resolve("./render-assets-transform")
-            }
+              transformer: require.resolve("./render-assets-transform"),
+            },
           });
         }
 

@@ -11,9 +11,12 @@ expect.extend({ toMatchFile });
 fs.readdirSync(FIXTURES).forEach((fixture) => {
   test(`${fixture}`, async () => {
     try {
-      await fs.promises.rmdir(path.join(__dirname, "../../node_modules/.vite"), {
-        recursive: true
-      });
+      await fs.promises.rmdir(
+        path.join(__dirname, "../../node_modules/.vite"),
+        {
+          recursive: true,
+        }
+      );
       // eslint-disable-next-line no-empty
     } catch (_) {}
 
@@ -50,8 +53,6 @@ fs.readdirSync(FIXTURES).forEach((fixture) => {
       if (Array.isArray(bundle)) {
         throw new Error("Unexpected array build");
       }
-
-
 
       (bundle as RollupOutput).output.forEach((chunk) => {
         expect(
