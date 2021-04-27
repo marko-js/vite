@@ -137,6 +137,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         }
       },
       configureServer(_server) {
+        ssrConfig.hot = domConfig.hot = true;
         devServer = _server;
       },
       async buildStart(inputOptions) {
@@ -260,7 +261,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           return null;
         }
 
-        const { code, map, meta } = await compiler.compile(
+        const compiled = await compiler.compile(
           source,
           id,
           ssr
@@ -269,6 +270,13 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
             ? hydrateConfig
             : domConfig
         );
+
+        const { map, meta } = compiled;
+        let { code } = compiled;
+
+        if (query !== browserEntryQuery && devServer) {
+          code += `\nif (import.meta.hot) import.meta.hot.accept();`;
+        }
 
         for (const watchFile of meta.watchFiles!) {
           this.addWatchFile(watchFile);
