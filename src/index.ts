@@ -408,12 +408,21 @@ function getTempDir(root: string) {
 }
 
 function toEntryId(id: string) {
-  return `${id
-    .replace(/(\/(index|template)|)\..*$/, "")
-    .replace(/^.*\//, "")}_${crypto
+  const lastSepIndex = id.lastIndexOf(path.sep);
+  let name = id.slice(lastSepIndex + 1, id.indexOf(".", lastSepIndex));
+
+  if (name === "index" || name === "template") {
+    name = id.slice(
+      id.lastIndexOf(path.sep, lastSepIndex - 1) + 1,
+      lastSepIndex
+    );
+  }
+
+  return `${name}_${crypto
     .createHash("SHA1")
     .update(id)
-    .digest("hex")
+    .digest("base64")
+    .replace(/[/+]/g, "-")
     .slice(0, 4)}`;
 }
 
