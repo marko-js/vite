@@ -1,0 +1,77 @@
+{
+  "name": "@marko/vite",
+  "description": "A Marko plugin for Vite",
+  "version": "1.0.0",
+  "author": "Dylan Piercey <dpiercey@ebay.com>",
+  "bugs": "https://github.com/marko-js/vite/issues",
+  "dependencies": {
+    "domelementtype": "^2.1.0",
+    "domhandler": "^4.0.0",
+    "htmlparser2": "^6.0.1",
+    "tslib": "^2.1.0"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^12.0.1",
+    "@commitlint/config-conventional": "^12.0.1",
+    "@marko/compiler": "^5.9.0",
+    "@types/jest": "^26.0.22",
+    "@types/jsesc": "^2.5.1",
+    "@types/node": "^14.14.37",
+    "@typescript-eslint/eslint-plugin": "^4.20.0",
+    "@typescript-eslint/parser": "^4.20.0",
+    "codecov": "^3.8.1",
+    "eslint": "^7.23.0",
+    "eslint-config-prettier": "^8.1.0",
+    "eslint-plugin-jest": "^24.3.2",
+    "eslint-plugin-prettier": "^3.3.1",
+    "fixpack": "^4.0.0",
+    "husky": "^4.3.8",
+    "jest": "^26.6.3",
+    "jest-file-snapshot": "0.3.8",
+    "lint-staged": "^10.5.4",
+    "marko": "^5.9.0",
+    "prettier": "^2.2.1",
+    "standard-version": "^9.1.1",
+    "ts-jest": "^26.5.4",
+    "typescript": "^4.2.3",
+    "vite": "^2.2.2"
+  },
+  "files": [
+    "components",
+    "dist/cjs",
+    "dist/esm"
+  ],
+  "homepage": "https://github.com/marko-js/vite",
+  "keywords": [
+    "loader",
+    "marko",
+    "plugin",
+    "transform",
+    "vite"
+  ],
+  "license": "MIT",
+  "main": "dist/cjs/index.js",
+  "module": "dist/esm/index.js",
+  "peerDependencies": {
+    "@marko/compiler": "^5.9.0",
+    "vite": "^2.2.2"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/marko-js/vite"
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "ci:report": "codecov",
+    "ci:test": "jest --ci --coverage",
+    "format": "npm run lint:eslint -- --fix && npm run lint:prettier -- --write && (fixpack || true)",
+    "lint": "npm run build && npm run lint:eslint && npm run lint:prettier -- -l && fixpack",
+    "lint:eslint": "eslint -f visualstudio .",
+    "lint:prettier": "prettier \"**/*{.ts,.js,.json,.md,.yml,rc}\"",
+    "prepublishOnly": "npm run build",
+    "release": "standard-version",
+    "test": "jest --watch",
+    "test:inspect": "node --inspect=0.0.0.0 $(which jest) --watch --runInBand --testTimeout 99999999"
+  },
+  "types": "dist/esm/index.d.ts"
+}

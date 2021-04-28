@@ -1,0 +1,13 @@
+{
+  "files": [],
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "module": "es2020"
+  },
+  "references": [
+    { "path": "./tsconfig.cjs.json" },
+    { "path": "./tsconfig.esm.json" },
+    { "path": "./tsconfig.lint.json" }
+  ]
+}

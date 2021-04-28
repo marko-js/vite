@@ -1,0 +1,31 @@
+static function renderAssets(out, slot) {
+  const entries = this.___viteEntries;
+
+  if (entries) {
+    const slotWrittenEntriesKey = `___viteWrittenEntries-${slot}`;
+    const lastWrittenEntry = this[slotWrittenEntriesKey] || 0;
+    const writtenEntries = this[slotWrittenEntriesKey] = entries.length;
+    let html = "";
+  
+    for (let i = lastWrittenEntry; i < writtenEntries; i++) {
+      const slotParts = entries[i][slot];
+      const slotHtml = slotParts && slotParts.join(this.___viteInjectAttrs);
+
+      if (slotHtml) {
+        html += slotHtml;
+      }
+    }
+
+    out.write(html);
+  }
+}
+
+$ const $global = out.global;
+$ if (!$global.___viteRenderAssets) {
+  $global.___viteInjectAttrs = $global.cspNonce ? ` nonce="${$global.cspNonce.replace(/"/g, "&#39;")}"` : "";
+  $global.___viteRenderAssets = renderAssets;
+}
+
+<__flush_here_and_after__>
+  $ $global.___viteRenderAssets(out, input.slot);
+</>
