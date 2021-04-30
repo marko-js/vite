@@ -3,6 +3,7 @@ import fs from "fs";
 import path from "path";
 import crypto from "crypto";
 import * as vite from "vite";
+import anyMatch from "anymatch";
 import type * as Compiler from "@marko/compiler";
 import getServerEntryTemplate from "./server-entry-template";
 import {
@@ -106,7 +107,8 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
   let devServer: vite.ViteDevServer;
   let registeredTag: string | false = false;
   let serverManifest: ServerManifest | undefined;
-  const transformWatchDeps = new Map<string, string[]>();
+  const transformWatchFiles = new Map<string, string[]>();
+  const transformOptionalFiles = new Map<string, string[]>();
 
   return [
     {
@@ -152,21 +154,26 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
       configureServer(_server) {
         ssrConfig.hot = domConfig.hot = true;
         devServer = _server;
-      },
-      handleHotUpdate(ctx) {
-        const invalidatedModules: vite.ModuleNode[] = [];
-        for (const [id, watchFiles] of transformWatchDeps) {
-          if (watchFiles.includes(ctx.file)) {
-            const mod = devServer.moduleGraph.getModuleById(id);
-            if (mod) {
-              invalidatedModules.push(mod);
+        devServer.watcher.on("all", (type, filename) => {
+          for (const [id, files] of transformWatchFiles) {
+            if (anyMatch(files, filename)) {
+              devServer.watcher.emit("change", id);
             }
           }
-        }
 
-        if (invalidatedModules.length) {
-          return ctx.modules.concat(invalidatedModules);
-        }
+          if (type === "add" || type === "unlink") {
+            let clearedCache = false;
+            for (const [id, files] of transformOptionalFiles) {
+              if (anyMatch(files, filename)) {
+                if (!clearedCache) {
+                  baseConfig.cache!.clear();
+                  clearedCache = true;
+                }
+                devServer.watcher.emit("change", id);
+              }
+            }
+          }
+        });
       },
       async buildStart(inputOptions) {
         if (isBuild && linked && !isSSRBuild) {
@@ -277,7 +284,6 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         }
       },
       async transform(source, id, ssr) {
-        const originalId = id;
         const query = getMarkoQuery(id);
 
         if (query && !query.startsWith(virtualFileQuery)) {
@@ -312,11 +318,24 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           code += `\nif (import.meta.hot) import.meta.hot.accept();`;
         }
 
+        const templateName = getBasenameWithoutExt(id);
+        const optionalFilePrefix =
+          path.dirname(id) +
+          path.sep +
+          (templateName === "index" ? "" : `${templateName}.`);
+
+        transformOptionalFiles.set(id, [
+          `${optionalFilePrefix}style.*`,
+          `${optionalFilePrefix}component.*`,
+          `${optionalFilePrefix}component-browser.*`,
+          `${optionalFilePrefix}marko-tag.json`,
+        ]);
+
         for (const watchFile of meta.watchFiles!) {
           this.addWatchFile(watchFile);
         }
 
-        transformWatchDeps.set(originalId, meta.watchFiles!);
+        transformWatchFiles.set(id, meta.watchFiles!);
 
         return { code, map };
       },
@@ -469,6 +488,12 @@ function toEntryId(id: string) {
     .digest("base64")
     .replace(/[/+]/g, "-")
     .slice(0, 4)}`;
+}
+
+function getBasenameWithoutExt(file: string): string {
+  const baseStart = file.lastIndexOf(path.sep) + 1;
+  const extStart = file.indexOf(".", baseStart + 1);
+  return file.slice(baseStart, extStart);
 }
 
 function isEmpty(obj: unknown) {
