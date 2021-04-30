@@ -282,6 +282,13 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
 
         if (query && !query.startsWith(virtualFileQuery)) {
           id = id.slice(0, -query.length);
+
+          switch (query) {
+            case browserEntryQuery:
+            case serverEntryQuery:
+              id = `${id.slice(0, -markoExt.length)}.entry.marko`;
+              break;
+          }
         }
 
         if (!isMarkoFile(id)) {
