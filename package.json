@@ -5,6 +5,7 @@
   "author": "Dylan Piercey <dpiercey@ebay.com>",
   "bugs": "https://github.com/marko-js/vite/issues",
   "dependencies": {
+    "anymatch": "^3.1.2",
     "domelementtype": "^2.1.0",
     "domhandler": "^4.0.0",
     "htmlparser2": "^6.0.1",

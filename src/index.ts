@@ -3,6 +3,7 @@ import fs from "fs";
 import path from "path";
 import crypto from "crypto";
 import * as vite from "vite";
+import anyMatch from "anymatch";
 import type * as Compiler from "@marko/compiler";
 import getServerEntryTemplate from "./server-entry-template";
 import {
@@ -44,6 +45,44 @@ const virtualFileQuery = "?marko-virtual";
 const markoExt = ".marko";
 const htmlExt = ".html";
 const resolveOpts = { skipSelf: true };
+const watchMissingFiles = [
+  {
+    basename: "style",
+    has(meta: Compiler.MarkoMeta): boolean {
+      return Boolean(
+        meta.deps &&
+          meta.deps.some(
+            (dep) =>
+              getBasenameWithoutExt(
+                (typeof dep === "object" && dep.virtualPath) ||
+                  ((dep as unknown) as string)
+              ) === this.basename
+          )
+      );
+    },
+  },
+  {
+    basename: "component",
+    has(meta: Compiler.MarkoMeta): boolean {
+      return Boolean(meta.component);
+    },
+  },
+  {
+    basename: "component-browser",
+    has(meta: Compiler.MarkoMeta): boolean {
+      return Boolean(
+        meta.deps &&
+          meta.deps.some(
+            (dep) =>
+              getBasenameWithoutExt(
+                (typeof dep === "object" && dep.virtualPath) ||
+                  ((dep as unknown) as string)
+              ) === this.basename
+          )
+      );
+    },
+  },
+];
 let tempDir: Promise<string> | undefined;
 
 export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
@@ -107,6 +146,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
   let registeredTag: string | false = false;
   let serverManifest: ServerManifest | undefined;
   const transformWatchDeps = new Map<string, string[]>();
+  const transformMissingDeps = new Map<string, string[]>();
 
   return [
     {
@@ -152,21 +192,26 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
       configureServer(_server) {
         ssrConfig.hot = domConfig.hot = true;
         devServer = _server;
-      },
-      handleHotUpdate(ctx) {
-        const invalidatedModules: vite.ModuleNode[] = [];
-        for (const [id, watchFiles] of transformWatchDeps) {
-          if (watchFiles.includes(ctx.file)) {
-            const mod = devServer.moduleGraph.getModuleById(id);
-            if (mod) {
-              invalidatedModules.push(mod);
+        devServer.watcher.on("all", (type, filename) => {
+          for (const [id, watchFiles] of transformWatchDeps) {
+            if (anyMatch(watchFiles, filename)) {
+              devServer.watcher.emit("change", id);
             }
           }
-        }
 
-        if (invalidatedModules.length) {
-          return ctx.modules.concat(invalidatedModules);
-        }
+          if (type === "add") {
+            let clearedCache = false;
+            for (const [id, missingFiles] of transformMissingDeps) {
+              if (anyMatch(missingFiles, filename)) {
+                if (!clearedCache) {
+                  baseConfig.cache!.clear();
+                  clearedCache = true;
+                }
+                devServer.watcher.emit("change", id);
+              }
+            }
+          }
+        });
       },
       async buildStart(inputOptions) {
         if (isBuild && linked && !isSSRBuild) {
@@ -277,7 +322,6 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         }
       },
       async transform(source, id, ssr) {
-        const originalId = id;
         const query = getMarkoQuery(id);
 
         if (query && !query.startsWith(virtualFileQuery)) {
@@ -312,11 +356,26 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           code += `\nif (import.meta.hot) import.meta.hot.accept();`;
         }
 
+        const templateName = getBasenameWithoutExt(id);
+        const missingDepPrefix =
+          path.dirname(id) +
+          path.sep +
+          (templateName === "index" ? "" : `${templateName}.`);
+        const missingFiles: string[] = [];
+        for (const check of watchMissingFiles) {
+          if (!check.has(meta)) {
+            const missingFile = `${missingDepPrefix + check.basename}.*`;
+            missingFiles.push(missingFile);
+            this.addWatchFile(missingFile);
+          }
+        }
+
         for (const watchFile of meta.watchFiles!) {
           this.addWatchFile(watchFile);
         }
 
-        transformWatchDeps.set(originalId, meta.watchFiles!);
+        transformMissingDeps.set(id, missingFiles);
+        transformWatchDeps.set(id, meta.watchFiles!);
 
         return { code, map };
       },
@@ -469,6 +528,12 @@ function toEntryId(id: string) {
     .digest("base64")
     .replace(/[/+]/g, "-")
     .slice(0, 4)}`;
+}
+
+function getBasenameWithoutExt(file: string): string {
+  const baseStart = file.lastIndexOf(path.sep) + 1;
+  const extStart = file.indexOf(".", baseStart + 1);
+  return file.slice(baseStart, extStart);
 }
 
 function isEmpty(obj: unknown) {
