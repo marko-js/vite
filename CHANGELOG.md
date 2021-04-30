@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.2.1](https://github.com/marko-js/vite/compare/v1.2.0...v1.2.1) (2021-04-30)
+
+
+### Bug Fixes
+
+* issue with common ids across multiple templates for entry files ([7633c9b](https://github.com/marko-js/vite/commit/7633c9bbf6198bb1ae33e86fc382ca8c4163d54f))
+
 ## 1.2.0 (2021-04-30)
 
 
