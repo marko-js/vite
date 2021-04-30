@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## 1.2.0 (2021-04-30)
+
+
+### Features
+
+* enable hmr ([8d3fca7](https://github.com/marko-js/vite/commit/8d3fca71b29c22cbf08f1b3d264f25b69fc4b670))
+* initial release ([c4c1747](https://github.com/marko-js/vite/commit/c4c17471260fc8c1ea0640198fefd946a66a75be))
+
+
+### Bug Fixes
+
+* invalid entry id output in windows ([cbe9696](https://github.com/marko-js/vite/commit/cbe9696ca79d79a9d0541a61e61b82a9e1fa85eb))
+
 ## 1.1.0 (2021-04-28)
 
 ### Bug Fixes
