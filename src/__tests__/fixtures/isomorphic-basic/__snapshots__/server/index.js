@@ -19,8 +19,8 @@ var _initComponents__default = /* @__PURE__ */ _interopDefaultLegacy(_initCompon
 var _awaitReorderer__default = /* @__PURE__ */ _interopDefaultLegacy(_awaitReorderer);
 var _preferredScriptLocation__default = /* @__PURE__ */ _interopDefaultLegacy(_preferredScriptLocation);
 var _flush_here_and_after____default = /* @__PURE__ */ _interopDefaultLegacy(_flush_here_and_after__);
-const _marko_template$5 = html.t();
-const _marko_componentType$5 = "1BSUdNzk", _marko_component$5 = {
+const _marko_componentType$5 = "1BSUdNzk", _marko_template$5 = html.t(_marko_componentType$5);
+const _marko_component$5 = {
   onMount() {
     console.log("mounted");
   }
@@ -30,8 +30,8 @@ _marko_template$5._ = _marko_renderer__default["default"](function(input, out, _
 }, {
   t: _marko_componentType$5
 }, _marko_component$5);
-const _marko_template$4 = html.t();
-const _marko_componentType$4 = "9/pH0cjn", _marko_component$4 = {};
+const _marko_componentType$4 = "9/pH0cjn", _marko_template$4 = html.t(_marko_componentType$4);
+const _marko_component$4 = {};
 _marko_template$4._ = _marko_renderer__default["default"](function(input, out, _component, component, state) {
   out.w("<div id=implicit>");
   _marko_tag__default["default"](_marko_template$5, {}, out, _component, "1");
@@ -40,8 +40,8 @@ _marko_template$4._ = _marko_renderer__default["default"](function(input, out, _
   t: _marko_componentType$4,
   i: true
 }, _marko_component$4);
-const _marko_template$3 = html.t();
-const _marko_componentType$3 = "EBjOWFdJ", _marko_component$3 = {};
+const _marko_componentType$3 = "EBjOWFdJ", _marko_template$3 = html.t(_marko_componentType$3);
+const _marko_component$3 = {};
 _marko_template$3._ = _marko_renderer__default["default"](function(input, out, _component, component, state) {
   out.w("<!DOCTYPE html><html lang=en><head>");
   out.global.___viteRenderAssets(out, "head-prepend");
@@ -59,8 +59,8 @@ _marko_template$3._ = _marko_renderer__default["default"](function(input, out, _
   t: _marko_componentType$3,
   i: true
 }, _marko_component$3);
-const _marko_template$2 = html.t();
-const _marko_componentType$2 = "NgVTgNMO", _marko_component$2 = {};
+const _marko_componentType$2 = "NgVTgNMO", _marko_template$2 = html.t(_marko_componentType$2);
+const _marko_component$2 = {};
 _marko_template$2._ = _marko_renderer__default["default"](function(input, out, _component, component, state) {
   _marko_tag__default["default"](_marko_template$3, {
     renderBody: (out2) => {
@@ -73,7 +73,7 @@ _marko_template$2._ = _marko_renderer__default["default"](function(input, out, _
   t: _marko_componentType$2,
   i: true
 }, _marko_component$2);
-const _marko_template$1 = html.t();
+const _marko_componentType$1 = "Zzp70RF5", _marko_template$1 = html.t(_marko_componentType$1);
 function renderAssets(out, slot) {
   const entries = this.___viteEntries;
   if (entries) {
@@ -91,7 +91,7 @@ function renderAssets(out, slot) {
     out.write(html2);
   }
 }
-const _marko_componentType$1 = "Zzp70RF5", _marko_component$1 = {};
+const _marko_component$1 = {};
 _marko_template$1._ = _marko_renderer__default["default"](function(input, out, _component, component, state) {
   const $global = out.global;
   if (!$global.___viteRenderAssets) {
@@ -107,8 +107,8 @@ _marko_template$1._ = _marko_renderer__default["default"](function(input, out, _
   t: _marko_componentType$1,
   i: true
 }, _marko_component$1);
-const _marko_template = html.t();
-const _marko_componentType = "NgVTgNMO", _marko_component = {};
+const _marko_componentType = "NgVTgNMO", _marko_template = html.t(_marko_componentType);
+const _marko_component = {};
 _marko_template._ = _marko_renderer__default["default"](function(input, out, _component, component, state) {
   const $global = out.global;
   ($global.___viteEntries || ($global.___viteEntries = [])).push("src_-Ku-");
