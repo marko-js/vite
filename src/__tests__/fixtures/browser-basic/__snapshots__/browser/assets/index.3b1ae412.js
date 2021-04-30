@@ -1,4 +1,4 @@
-import {v as vElement, r as renderer, d as defineComponent, t, a as r, b as renderTag} from "./vendor.cca7bcb5.js";
+import {v as vElement, r as renderer, d as defineComponent, t, a as r, b as renderTag} from "./vendor.2003b531.js";
 const p = function polyfill(modulePath = ".", importFunctionName = "__import__") {
   try {
     self[importFunctionName] = new Function("u", `return import(u)`);
@@ -35,12 +35,13 @@ const p = function polyfill(modulePath = ".", importFunctionName = "__import__")
   }
 };
 p("/assets/");
-var index_marko = "\n  div { color: green }\n";
-const _marko_template$2 = t();
+var template_marko = "\n  div { color: green }\n";
+const _marko_componentType$2 = "NApEsAbr", _marko_template$2 = t(_marko_componentType$2);
 const _marko_node = vElement("div", {
   id: "class"
 }, "0", null, 0, 1);
-const _marko_componentType$2 = r("n16FFHyL", () => _marko_template$2), _marko_component$2 = {
+r(_marko_componentType$2, () => _marko_template$2);
+const _marko_component$2 = {
   onMount() {
     console.log("mounted");
   }
@@ -51,8 +52,9 @@ _marko_template$2._ = renderer(function(input, out, _component, component, state
   t: _marko_componentType$2
 }, _marko_component$2);
 _marko_template$2.Component = defineComponent(_marko_component$2, _marko_template$2._);
-const _marko_template$1 = t();
-const _marko_componentType$1 = r("yC5aAoyn", () => _marko_template$1), _marko_component$1 = {};
+const _marko_componentType$1 = "XB6QxsYj", _marko_template$1 = t(_marko_componentType$1);
+r(_marko_componentType$1, () => _marko_template$1);
+const _marko_component$1 = {};
 _marko_template$1._ = renderer(function(input, out, _component, component, state) {
   out.be("div", {
     id: "implicit"
@@ -64,8 +66,9 @@ _marko_template$1._ = renderer(function(input, out, _component, component, state
   i: true
 }, _marko_component$1);
 _marko_template$1.Component = defineComponent(_marko_component$1, _marko_template$1._);
-const _marko_template = t();
-const _marko_componentType = r("iBqAFeSK", () => _marko_template), _marko_component = {};
+const _marko_componentType = "aXMop0py", _marko_template = t(_marko_componentType);
+r(_marko_componentType, () => _marko_template);
+const _marko_component = {};
 _marko_template._ = renderer(function(input, out, _component, component, state) {
   out.be("div", {
     id: "page"
@@ -77,3 +80,4 @@ _marko_template._ = renderer(function(input, out, _component, component, state) 
   i: true
 }, _marko_component);
 _marko_template.Component = defineComponent(_marko_component, _marko_template._);
+_marko_template.renderSync().appendTo(document.getElementById("app"));

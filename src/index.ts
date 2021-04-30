@@ -37,7 +37,7 @@ interface ServerManifest {
 
 const virtualFiles = new Map<string, { code: string; map?: any }>();
 const defaultCompiler = require.resolve("@marko/compiler");
-const queryReg = /\?.+$/;
+const queryReg = /\?marko-.+$/;
 const browserEntryQuery = "?marko-browser-entry";
 const serverEntryQuery = "?marko-server-entry";
 const virtualFileQuery = "?marko-virtual";
@@ -77,8 +77,20 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
   const domConfig: Compiler.Config = {
     ...baseConfig,
     resolveVirtualDependency(from, dep) {
-      virtualFiles.set(path.join(from, "..", dep.virtualPath), dep);
-      return dep.virtualPath + virtualFileQuery;
+      const query = `${virtualFileQuery}&id=${dep.virtualPath}`;
+      const id = from + query;
+
+      if (devServer) {
+        const prev = virtualFiles.get(id);
+        if (prev && prev.code !== dep.code) {
+          devServer.moduleGraph.invalidateModule(
+            devServer.moduleGraph.getModuleById(id)!
+          );
+        }
+      }
+
+      virtualFiles.set(id, dep);
+      return `./${path.basename(from) + query}`;
     },
     output: "dom",
   };
@@ -94,6 +106,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
   let devServer: vite.ViteDevServer;
   let registeredTag: string | false = false;
   let serverManifest: ServerManifest | undefined;
+  const transformWatchDeps = new Map<string, string[]>();
 
   return [
     {
@@ -137,7 +150,23 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         }
       },
       configureServer(_server) {
+        ssrConfig.hot = domConfig.hot = true;
         devServer = _server;
+      },
+      handleHotUpdate(ctx) {
+        const invalidatedModules: vite.ModuleNode[] = [];
+        for (const [id, watchFiles] of transformWatchDeps) {
+          if (watchFiles.includes(ctx.file)) {
+            const mod = devServer.moduleGraph.getModuleById(id);
+            if (mod) {
+              invalidatedModules.push(mod);
+            }
+          }
+        }
+
+        if (invalidatedModules.length) {
+          return ctx.modules.concat(invalidatedModules);
+        }
       },
       async buildStart(inputOptions) {
         if (isBuild && linked && !isSSRBuild) {
@@ -148,7 +177,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
             serverManifest = JSON.parse(
               await fs.promises.readFile(serverMetaFile, "utf-8")
             ) as ServerManifest;
-            inputOptions.input = toHTMLEntries(root!, serverManifest.entries);
+            inputOptions.input = toHTMLEntries(root, serverManifest.entries);
           } catch (err) {
             this.error(
               `You must run the "ssr" build before the "browser" build.`
@@ -162,7 +191,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
       },
       async resolveId(importee, importer, _importOpts, ssr) {
         const importeeIsAbsolute = path.isAbsolute(importee);
-        if (!importeeIsAbsolute || importee.startsWith(root!)) {
+        if (!importeeIsAbsolute || importee.startsWith(root)) {
           let importeeQuery = getMarkoQuery(importee);
 
           if (importeeQuery) {
@@ -186,7 +215,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
               ? {
                   id: importer
                     ? path.resolve(importer, "..", importee)
-                    : path.resolve(root!, importee),
+                    : path.resolve(root, importee),
                 }
               : await this.resolve(importee, importer, resolveOpts);
 
@@ -207,7 +236,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
             let entryData: string;
 
             if (isBuild) {
-              const relativeFileName = path.relative(root!, fileName);
+              const relativeFileName = path.relative(root, fileName);
               const entryId = toEntryId(relativeFileName);
               serverManifest ??= {
                 entries: {},
@@ -221,7 +250,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
                   await devServer.transformIndexHtml(
                     "/",
                     generateInputDoc(
-                      path.relative(root!, fileName) + browserEntryQuery
+                      path.relative(root, fileName) + browserEntryQuery
                     )
                   )
                 )
@@ -239,20 +268,19 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
               id.slice(0, -browserEntryQuery.length),
               "utf-8"
             );
-          case virtualFileQuery:
-            if (!id.startsWith(root!)) {
-              id = path.join(root!, id);
+          default:
+            if (!id.startsWith(root)) {
+              id = path.join(root, id);
             }
 
-            return virtualFiles.get(id.slice(0, -virtualFileQuery.length));
-          default:
             return virtualFiles.get(id) || null;
         }
       },
       async transform(source, id, ssr) {
+        const originalId = id;
         const query = getMarkoQuery(id);
 
-        if (query) {
+        if (query && !query.startsWith(virtualFileQuery)) {
           id = id.slice(0, -query.length);
         }
 
@@ -260,7 +288,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           return null;
         }
 
-        const { code, map, meta } = await compiler.compile(
+        const compiled = await compiler.compile(
           source,
           id,
           ssr
@@ -270,15 +298,25 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
             : domConfig
         );
 
+        const { map, meta } = compiled;
+        let { code } = compiled;
+
+        if (query !== browserEntryQuery && devServer) {
+          code += `\nif (import.meta.hot) import.meta.hot.accept();`;
+        }
+
         for (const watchFile of meta.watchFiles!) {
           this.addWatchFile(watchFile);
         }
+
+        transformWatchDeps.set(originalId, meta.watchFiles!);
 
         return { code, map };
       },
     },
     {
       name: "marko-vite:post",
+      apply: "build",
       enforce: "post", // We use a "post" plugin to allow us to read the final generated `.html` from vite.
       async generateBundle(outputOptions, bundle, isWrite) {
         if (!linked) {

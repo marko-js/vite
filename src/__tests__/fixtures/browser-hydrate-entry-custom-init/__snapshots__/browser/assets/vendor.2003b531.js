@@ -1998,11 +1998,11 @@ var actualCreateOut;
 function setCreateOut(createOutFunc) {
   actualCreateOut = createOutFunc;
 }
-function createOut$1(globalData) {
+function createOut(globalData) {
   return actualCreateOut(globalData);
 }
-createOut$1.aD_ = setCreateOut;
-var createOut_1 = createOut$1;
+createOut.aD_ = setCreateOut;
+var createOut_1 = createOut;
 var queue = [];
 var msg = "" + Math.random();
 window.addEventListener("message", function(ev) {
@@ -2038,14 +2038,14 @@ function safeRender(renderFunc, finalData, finalOut, shouldEnd) {
 }
 var renderable = function(target, renderer2) {
   var renderFunc = renderer2 && (renderer2.renderer || renderer2.render || renderer2);
-  var createOut2 = target.createOut || renderer2.createOut || createOut_1;
+  var createOut3 = target.createOut || renderer2.createOut || createOut_1;
   return extend(target, {
-    createOut: createOut2,
+    createOut: createOut3,
     renderToString: function(data, callback) {
       var localData = data || {};
       var render = renderFunc || this._;
       var globalData = localData.$global;
-      var out = createOut2(globalData);
+      var out = createOut3(globalData);
       out.global.template = this;
       if (globalData) {
         localData.$global = void 0;
@@ -2065,7 +2065,7 @@ var renderable = function(target, renderer2) {
       var localData = data || {};
       var render = renderFunc || this._;
       var globalData = localData.$global;
-      var out = createOut2(globalData);
+      var out = createOut3(globalData);
       out.sync();
       out.global.template = this;
       if (globalData) {
@@ -2095,10 +2095,10 @@ var renderable = function(target, renderer2) {
         shouldEnd = false;
         extend(out.global, globalData);
       } else if (typeof out == "function") {
-        finalOut = createOut2(globalData);
+        finalOut = createOut3(globalData);
         callback = out;
       } else {
-        finalOut = createOut2(globalData, out, void 0, shouldBuffer);
+        finalOut = createOut3(globalData, out, void 0, shouldBuffer);
       }
       if (callback) {
         finalOut.on("finish", function() {
@@ -2111,22 +2111,16 @@ var renderable = function(target, renderer2) {
     }
   });
 };
-var t = function createTemplate(path) {
-  return new Template(path);
+var t = function createTemplate(typeName) {
+  return new Template(typeName);
 };
-function Template(path, func) {
-  this.path = path;
-  this._ = func;
-  this.meta = void 0;
+function Template(typeName) {
+  this.aX_ = typeName;
 }
-function createOut(globalData, parent, parentOut) {
+createOut_1.aD_(Template.prototype.createOut = function createOut2(globalData, parent, parentOut) {
   return new AsyncVDOMBuilder_1(globalData, parent, parentOut);
-}
-var Template_prototype = Template.prototype = {
-  createOut
-};
-renderable(Template_prototype);
-createOut_1.aD_(createOut);
+});
+renderable(Template.prototype);
 var VElement = vdom.aY_;
 var vElement = function(tagName, attrs2, key, component, childCount, flags, props) {
   return new VElement(tagName, attrs2, key, component, childCount, flags, props);
@@ -2875,8 +2869,8 @@ Component.prototype = componentProto = {
     var globalData = this.S_;
     var rootNode = this.K_;
     var renderer2 = this._n_;
-    var createOut2 = renderer2.createOut || createOut_1;
-    var out = createOut2(globalData);
+    var createOut3 = renderer2.createOut || createOut_1;
+    var out = createOut3(globalData);
     out.sync();
     out.X_ = this.X_;
     out[CONTEXT_KEY] = this._h_;

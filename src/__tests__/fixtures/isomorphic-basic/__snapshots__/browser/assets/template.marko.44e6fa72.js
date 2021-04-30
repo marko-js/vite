@@ -1,4 +1,4 @@
-import {v as vElement, r as renderer, d as defineComponent, t, a as r, i as init} from "./vendor.442a2262.js";
+import {v as vElement, r as renderer, d as defineComponent, t, a as r, c as components} from "./vendor.6c097f0e.js";
 const p = function polyfill(modulePath = ".", importFunctionName = "__import__") {
   try {
     self[importFunctionName] = new Function("u", `return import(u)`);
@@ -36,11 +36,12 @@ const p = function polyfill(modulePath = ".", importFunctionName = "__import__")
 };
 p("/assets/");
 var template_marko = "\n  div { color: green }\n";
-const _marko_template = t();
+const _marko_componentType = "1BSUdNzk", _marko_template = t(_marko_componentType);
 const _marko_node = vElement("div", {
   id: "class"
 }, "0", null, 0, 1);
-const _marko_componentType = r("1BSUdNzk"), _marko_component = {
+r(_marko_componentType, () => _marko_template);
+const _marko_component = {
   onMount() {
     console.log("mounted");
   }
@@ -51,4 +52,4 @@ _marko_template._ = renderer(function(input, out, _component, component, state) 
   t: _marko_componentType
 }, _marko_component);
 _marko_template.Component = defineComponent(_marko_component, _marko_template._);
-init();
+components.init();

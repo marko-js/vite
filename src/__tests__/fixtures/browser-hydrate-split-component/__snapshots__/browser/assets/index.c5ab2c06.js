@@ -1,4 +1,4 @@
-import {v as vElement, r as renderer, d as defineComponent, t, a as r, b as renderTag} from "./vendor.cca7bcb5.js";
+import {v as vElement, r as renderer, d as defineComponent, t, a as r, b as renderTag} from "./vendor.2003b531.js";
 const p = function polyfill(modulePath = ".", importFunctionName = "__import__") {
   try {
     self[importFunctionName] = new Function("u", `return import(u)`);
@@ -36,11 +36,12 @@ const p = function polyfill(modulePath = ".", importFunctionName = "__import__")
 };
 p("/assets/");
 var index_marko = "\n  div { color: green }\n";
-const _marko_template$2 = t();
+const _marko_componentType$2 = "jNoSojxo", _marko_template$2 = t(_marko_componentType$2);
 const _marko_node = vElement("div", {
   id: "implicit"
 }, "0", null, 0, 1);
-const _marko_componentType$2 = r("jNoSojxo", () => _marko_template$2), _marko_component$2 = {};
+r(_marko_componentType$2, () => _marko_template$2);
+const _marko_component$2 = {};
 _marko_template$2._ = renderer(function(input, out, _component, component, state) {
   out.n(_marko_node, component);
 }, {
@@ -53,8 +54,9 @@ var _marko_split_component = {
     console.log("mounted");
   }
 };
-const _marko_template$1 = t();
-const _marko_componentType$1 = r("iKnY83y7", () => _marko_split_component), _marko_component$1 = {};
+const _marko_componentType$1 = "iKnY83y7", _marko_template$1 = t(_marko_componentType$1);
+r(_marko_componentType$1, () => _marko_split_component);
+const _marko_component$1 = {};
 _marko_template$1._ = renderer(function(input, out, _component, component, state) {
   out.be("div", {
     id: "split"
@@ -66,8 +68,9 @@ _marko_template$1._ = renderer(function(input, out, _component, component, state
   s: true
 }, _marko_component$1);
 _marko_template$1.Component = defineComponent(_marko_component$1, _marko_template$1._);
-const _marko_template = t();
-const _marko_componentType = r("pWXzc6jh", () => _marko_template), _marko_component = {};
+const _marko_componentType = "pWXzc6jh", _marko_template = t(_marko_componentType);
+r(_marko_componentType, () => _marko_template);
+const _marko_component = {};
 _marko_template._ = renderer(function(input, out, _component, component, state) {
   out.be("div", {
     id: "page"
