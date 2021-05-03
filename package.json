@@ -1,7 +1,7 @@
 {
   "name": "@marko/vite",
   "description": "A Marko plugin for Vite",
-  "version": "1.3.0",
+  "version": "1.3.1",
   "author": "Dylan Piercey <dpiercey@ebay.com>",
   "bugs": "https://github.com/marko-js/vite/issues",
   "dependencies": {

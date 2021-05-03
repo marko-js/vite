@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.3.1](https://github.com/marko-js/vite/compare/v1.3.0...v1.3.1) (2021-05-03)
+
+
+### Bug Fixes
+
+* issue with loading missing virtual file in build mode ([493466e](https://github.com/marko-js/vite/commit/493466e0c08e012ef831f1adcf38a994d975dd27))
+
 ## [1.3.0](https://github.com/marko-js/vite/compare/v1.2.1...v1.3.0) (2021-05-03)
 
 
