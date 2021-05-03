@@ -289,11 +289,8 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         if (query && !query.startsWith(virtualFileQuery)) {
           id = id.slice(0, -query.length);
 
-          switch (query) {
-            case browserEntryQuery:
-            case serverEntryQuery:
-              id = `${id.slice(0, -markoExt.length)}.entry.marko`;
-              break;
+          if (query === serverEntryQuery) {
+            id = `${id.slice(0, -markoExt.length)}.entry.marko`;
           }
         }
 
@@ -318,24 +315,30 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           code += `\nif (import.meta.hot) import.meta.hot.accept();`;
         }
 
-        const templateName = getBasenameWithoutExt(id);
-        const optionalFilePrefix =
-          path.dirname(id) +
-          path.sep +
-          (templateName === "index" ? "" : `${templateName}.`);
+        if (devServer) {
+          const templateName = getBasenameWithoutExt(id);
+          const optionalFilePrefix =
+            path.dirname(id) +
+            path.sep +
+            (templateName === "index" ? "" : `${templateName}.`);
+          const optionalFiles = [
+            `${optionalFilePrefix}style.*`,
+            `${optionalFilePrefix}component.*`,
+            `${optionalFilePrefix}component-browser.*`,
+            `${optionalFilePrefix}marko-tag.json`,
+          ];
 
-        transformOptionalFiles.set(id, [
-          `${optionalFilePrefix}style.*`,
-          `${optionalFilePrefix}component.*`,
-          `${optionalFilePrefix}component-browser.*`,
-          `${optionalFilePrefix}marko-tag.json`,
-        ]);
+          for (const file of optionalFiles) {
+            this.addWatchFile(file);
+          }
 
-        for (const watchFile of meta.watchFiles!) {
-          this.addWatchFile(watchFile);
+          for (const file of meta.watchFiles!) {
+            this.addWatchFile(file);
+          }
+
+          transformOptionalFiles.set(id, optionalFiles);
+          transformWatchFiles.set(id, meta.watchFiles!);
         }
-
-        transformWatchFiles.set(id, meta.watchFiles!);
 
         return { code, map };
       },
