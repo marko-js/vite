@@ -115,7 +115,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
     {
       name: "marko-vite:pre",
       enforce: "pre", // Must be pre to allow us to resolve assets before vite.
-      config(config, env) {
+      async config(config, env) {
         root = config.root || process.cwd();
         isBuild = env.command === "build";
         isSSRBuild = isBuild && linked && Boolean(config.build!.ssr);
@@ -142,14 +142,64 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         }
 
         if (!isBuild) {
-          config.optimizeDeps ??= {};
-          config.optimizeDeps.include ??= [];
-          config.optimizeDeps.include.push(
-            ...new Set([
-              ...compiler.getRuntimeEntryFiles("html", opts.translator),
-              ...compiler.getRuntimeEntryFiles("dom", opts.translator),
-            ])
+          const lookup = compiler.taglib.buildLookup(root) as any;
+          const domRuntimeDeps = compiler.getRuntimeEntryFiles(
+            "dom",
+            opts.translator
           );
+          const htmlRuntimeDeps = compiler.getRuntimeEntryFiles(
+            "html",
+            opts.translator
+          );
+          const taglibDeps: string[] = [];
+
+          for (const name in lookup.taglibsById) {
+            const taglib = lookup.taglibsById[name];
+            if (/[\\/]node_modules[\\/](?!@marko[\\/])/.test(taglib.dirname)) {
+              for (const tagName in taglib.tags) {
+                const tag = taglib.tags[tagName];
+                const entry = tag.template || tag.renderer;
+
+                if (entry) {
+                  taglibDeps.push(
+                    entry.replace(/^.*?[\\/]node_modules[\\/]/, "")
+                  );
+                }
+              }
+            }
+          }
+
+          const domDeps = Array.from(
+            new Set(domRuntimeDeps.concat(taglibDeps))
+          );
+          const serverDeps = Array.from(
+            new Set(htmlRuntimeDeps.concat(taglibDeps))
+          );
+
+          const optimizeDeps = (config.optimizeDeps ??= {});
+          optimizeDeps.include ??= [];
+          optimizeDeps.include = optimizeDeps.include.concat(
+            domDeps.filter((dep) => path.extname(dep) !== markoExt)
+          );
+
+          optimizeDeps.exclude ??= [];
+          optimizeDeps.exclude = optimizeDeps.exclude.concat(
+            domDeps.filter((dep) => path.extname(dep) === markoExt)
+          );
+
+          const ssr = ((config as any).ssr ??= {});
+          ssr.external ??= [];
+          ssr.external = ssr.external.concat(serverDeps);
+
+          // Vite cannot handle commonjs modules, which many Marko component libraries
+          // use in conjunction with the `.marko` files. To support this
+          // we tell Vite to ignore all `.marko` files in node_modules for the server.
+          // and instead use the require hook.
+          (await import("@marko/compiler/register")).default({
+            ...ssrConfig,
+            sourceMaps: "inline",
+            modules: "cjs",
+          });
         }
       },
       configureServer(_server) {
