@@ -3,6 +3,7 @@ import path from "path";
 import * as vite from "vite";
 import { toMatchFile } from "jest-file-snapshot";
 import type { RollupOutput } from "rollup";
+import "..";
 
 const FIXTURES = path.join(__dirname, "fixtures");
 
