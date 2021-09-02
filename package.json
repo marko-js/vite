@@ -8,7 +8,7 @@
     "anymatch": "^3.1.2",
     "domelementtype": "^2.2.0",
     "domhandler": "^4.2.0",
-    "htmlparser2": "^6.1.0",
+    "htmlparser2": "^7.1.1",
     "tslib": "^2.3.0"
   },
   "devDependencies": {
@@ -35,7 +35,7 @@
     "standard-version": "^9.3.1",
     "ts-jest": "^26.5.4",
     "typescript": "^4.3.5",
-    "vite": "^2.4.4"
+    "vite": "^2.5.3"
   },
   "files": [
     "components",

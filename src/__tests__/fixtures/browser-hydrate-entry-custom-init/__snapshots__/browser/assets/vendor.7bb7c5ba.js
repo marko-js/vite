@@ -2928,7 +2928,9 @@ Component.prototype = componentProto = {
       var targetMethodName = customEvent[1];
       var isOnce = customEvent[2];
       var extraArgs = customEvent[3];
-      finalCustomEvents[eventType] = [targetMethodName, isOnce, extraArgs];
+      if (targetMethodName) {
+        finalCustomEvents[eventType] = [targetMethodName, isOnce, extraArgs];
+      }
     });
   },
   get el() {

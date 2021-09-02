@@ -376,22 +376,18 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
             path.dirname(id) +
             path.sep +
             (templateName === "index" ? "" : `${templateName}.`);
-          const optionalFiles = [
-            `${optionalFilePrefix}style.*`,
-            `${optionalFilePrefix}component.*`,
-            `${optionalFilePrefix}component-browser.*`,
-            `${optionalFilePrefix}marko-tag.json`,
-          ];
-
-          for (const file of optionalFiles) {
-            this.addWatchFile(file);
-          }
 
           for (const file of meta.watchFiles!) {
             this.addWatchFile(file);
           }
 
-          transformOptionalFiles.set(id, optionalFiles);
+          transformOptionalFiles.set(id, [
+            `${optionalFilePrefix}style.*`,
+            `${optionalFilePrefix}component.*`,
+            `${optionalFilePrefix}component-browser.*`,
+            `${optionalFilePrefix}marko-tag.json`,
+          ]);
+
           transformWatchFiles.set(id, meta.watchFiles!);
         }
 
