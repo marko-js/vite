@@ -62,7 +62,7 @@
     "url": "https://github.com/marko-js/vite"
   },
   "scripts": {
-    "build": "tsc && node -r esbuild-register build",
+    "build": "tsc -b && node -r esbuild-register build",
     "ci:report": "codecov",
     "ci:test": "NODE_ENV=test nyc npm run mocha -- --forbid-pending --forbid-only",
     "format": "npm run lint:eslint -- --fix && npm run lint:prettier -- --write && (fixpack || true)",
