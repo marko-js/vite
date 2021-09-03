@@ -8,10 +8,13 @@ const FIXTURES = path.join(__dirname, "fixtures");
 
 fs.readdirSync(FIXTURES).forEach((fixture) => {
   it(fixture, async () => {
-    await fs.promises.rm(path.join(__dirname, "../../node_modules/.vite"), {
-      recursive: true,
-      force: true,
-    });
+    await (fs.promises.rm || fs.promises.rmdir)(
+      path.join(__dirname, "../../node_modules/.vite"),
+      {
+        recursive: true,
+        force: true,
+      }
+    );
 
     const dir = path.join(FIXTURES, fixture);
     // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -52,7 +55,6 @@ fs.readdirSync(FIXTURES).forEach((fixture) => {
         const source = (chunk.type === "chunk" ? chunk.code : chunk.source)
           .toString()
           .replace(/@marko\/vite\$\d\.\d\.\d/g, "@marko/vite$latest");
-        console.log(chunk.fileName);
         await snap(source, { name: chunk.fileName });
       }
     }
