@@ -7,40 +7,40 @@
   "dependencies": {
     "anymatch": "^3.1.2",
     "domelementtype": "^2.2.0",
-    "domhandler": "^4.2.0",
-    "htmlparser2": "^7.1.1",
-    "tslib": "^2.3.0"
+    "domhandler": "^4.2.2",
+    "htmlparser2": "^7.1.1"
   },
   "devDependencies": {
     "@commitlint/cli": "^13.1.0",
     "@commitlint/config-conventional": "^13.1.0",
-    "@marko/compiler": "^5.15.0",
-    "@types/jest": "^26.0.24",
-    "@types/jsesc": "^3.0.1",
-    "@types/node": "^16.4.7",
-    "@typescript-eslint/eslint-plugin": "^4.28.5",
-    "@typescript-eslint/parser": "^4.28.5",
+    "@istanbuljs/nyc-config-typescript": "^1.0.1",
+    "@marko/compiler": "^5.15.6",
+    "@types/mocha": "^9.0.0",
+    "@types/node": "^16.7.10",
+    "@typescript-eslint/eslint-plugin": "^4.30.0",
+    "@typescript-eslint/parser": "^4.30.0",
     "codecov": "^3.8.3",
-    "eslint": "^7.31.0",
+    "esbuild": "^0.12.25",
+    "esbuild-register": "^3.0.0",
+    "eslint": "^7.32.0",
     "eslint-config-prettier": "^8.3.0",
-    "eslint-plugin-jest": "^24.4.0",
-    "eslint-plugin-prettier": "^3.4.0",
+    "fast-glob": "^3.2.7",
     "fixpack": "^4.0.0",
-    "husky": "^4.3.8",
-    "jest": "^26.6.3",
-    "jest-file-snapshot": "0.3.8",
-    "lint-staged": "^11.1.1",
-    "marko": "^5.15.0",
+    "husky": "^7.0.2",
+    "lint-staged": "^11.1.2",
+    "marko": "^5.15.6",
+    "mocha": "^9.1.1",
+    "mocha-snap": "^3.0.0",
+    "nyc": "^15.1.0",
     "prettier": "^2.3.2",
     "standard-version": "^9.3.1",
-    "ts-jest": "^26.5.4",
-    "typescript": "^4.3.5",
+    "typescript": "^4.4.2",
     "vite": "^2.5.3"
   },
   "files": [
-    "components",
-    "dist/cjs",
-    "dist/esm"
+    "dist",
+    "!**/__tests__",
+    "!*.tsbuildinfo"
   ],
   "homepage": "https://github.com/marko-js/vite",
   "keywords": [
@@ -51,10 +51,10 @@
     "vite"
   ],
   "license": "MIT",
-  "main": "dist/cjs/index.js",
-  "module": "dist/esm/index.js",
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
   "peerDependencies": {
-    "@marko/compiler": "^5.15.0",
+    "@marko/compiler": "^5.15.6",
     "vite": "^2.4.4"
   },
   "repository": {
@@ -62,17 +62,21 @@
     "url": "https://github.com/marko-js/vite"
   },
   "scripts": {
-    "build": "tsc -b",
+    "build": "tsc && node -r esbuild-register build",
     "ci:report": "codecov",
-    "ci:test": "jest --ci --coverage",
+    "ci:test": "NODE_ENV=test nyc npm run mocha -- --forbid-pending --forbid-only",
     "format": "npm run lint:eslint -- --fix && npm run lint:prettier -- --write && (fixpack || true)",
-    "lint": "npm run build && npm run lint:eslint && npm run lint:prettier -- -l && fixpack",
+    "lint": "tsc && npm run lint:eslint && npm run lint:prettier -- -l && fixpack",
     "lint:eslint": "eslint -f visualstudio .",
-    "lint:prettier": "prettier \"**/*{.ts,.js,.json,.md,.yml,rc}\"",
+    "lint:prettier": "prettier '**/*{.ts,.js,.json,.md,.yml,rc}'",
+    "mocha": "mocha 'src/**/__tests__/*.test.ts'",
+    "prepare": "husky install",
     "prepublishOnly": "npm run build",
     "release": "standard-version",
-    "test": "jest --watch",
-    "test:inspect": "node --inspect=0.0.0.0 $(which jest) --watch --runInBand --testTimeout 99999999"
+    "report": "open ./coverage/lcov-report/index.html",
+    "test": "NODE_ENV=test npm run mocha -- --watch",
+    "test:inspect": "npm test -- --inspect",
+    "test:update": "npm run mocha --update"
   },
-  "types": "dist/esm/index.d.ts"
+  "types": "dist/index.d.ts"
 }

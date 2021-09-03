@@ -1,9 +1,0 @@
-{
-  "extends": "./tsconfig.base.json",
-  "exclude": ["**/__tests__"],
-  "compilerOptions": {
-    "rootDir": "src",
-    "module": "ESNext",
-    "outDir": "dist/esm"
-  }
-}

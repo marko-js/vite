@@ -1,4 +1,5 @@
 .vscode
+.nyc_output
 package.json
 package-lock.json
 CHANGELOG.md

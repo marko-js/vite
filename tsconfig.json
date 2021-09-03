@@ -1,13 +1,21 @@
 {
-  "files": [],
-  "extends": "./tsconfig.base.json",
+  "include": ["src/**/*"],
   "compilerOptions": {
-    "noEmit": true,
-    "module": "es2020"
-  },
-  "references": [
-    { "path": "./tsconfig.cjs.json" },
-    { "path": "./tsconfig.esm.json" },
-    { "path": "./tsconfig.lint.json" }
-  ]
+    "lib": ["dom", "ESNext", "scripthost"],
+    "strict": true,
+    "outDir": "dist",
+    "target": "ESNext",
+    "sourceMap": false,
+    "declaration": true,
+    "incremental": true,
+    "module": "ESNext",
+    "stripInternal": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "moduleResolution": "node",
+    "preserveConstEnums": true,
+    "emitDeclarationOnly": true,
+    "allowSyntheticDefaultImports": true,
+    "forceConsistentCasingInFileNames": true
+  }
 }

@@ -1,0 +1,6 @@
+{
+  "extends": "@istanbuljs/nyc-config-typescript",
+  "reporter": ["text", "lcov"],
+  "include": ["src/**/*.{ts,marko}"],
+  "exclude": ["**/__tests__"]
+}

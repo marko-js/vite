@@ -2,16 +2,17 @@
   "root": true,
   "extends": ["eslint:recommended", "prettier"],
   "parserOptions": {
-    "ecmaVersion": 2020,
     "sourceType": "module",
+    "impliedStrict": true,
     "ecmaFeatures": {
       "jsx": false
     }
   },
   "env": {
-    "browser": true,
     "node": true,
-    "jest": true
+    "mocha": true,
+    "es2020": true,
+    "browser": true
   },
   "overrides": [
     {
@@ -23,13 +24,11 @@
         "prettier"
       ],
       "rules": {
-        "no-prototype-builtins": "off",
-        "no-constant-condition": "off",
-        "@typescript-eslint/no-explicit-any": "off",
         "@typescript-eslint/explicit-module-boundary-types": "off",
         "@typescript-eslint/no-non-null-assertion": "off",
         "@typescript-eslint/no-empty-function": "off",
-        "@typescript-eslint/no-var-requires": "off"
+        "@typescript-eslint/no-explicit-any": "off",
+        "@typescript-eslint/no-namespace": "off"
       }
     }
   ]

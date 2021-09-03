@@ -38,7 +38,6 @@ interface ServerManifest {
 }
 
 const virtualFiles = new Map<string, { code: string; map?: any }>();
-const defaultCompiler = require.resolve("@marko/compiler");
 const queryReg = /\?marko-.+$/;
 const browserEntryQuery = "?marko-browser-entry";
 const serverEntryQuery = "?marko-server-entry";
@@ -49,8 +48,7 @@ const resolveOpts = { skipSelf: true };
 let tempDir: Promise<string> | undefined;
 
 export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const compiler = require(opts.compiler || defaultCompiler) as typeof Compiler;
+  let compiler: typeof Compiler;
   const { runtimeId, linked = true } = opts;
 
   const baseConfig: Compiler.Config = {
@@ -116,28 +114,28 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
       name: "marko-vite:pre",
       enforce: "pre", // Must be pre to allow us to resolve assets before vite.
       async config(config, env) {
+        compiler ??= (await import(
+          opts.compiler || "@marko/compiler"
+        )) as typeof Compiler;
         root = config.root || process.cwd();
         isBuild = env.command === "build";
         isSSRBuild = isBuild && linked && Boolean(config.build!.ssr);
 
         if (!registeredTag) {
           // Here we inject either the watchMode vite tag, or the build one.
+          const transformer = path.resolve(
+            import.meta.url,
+            "../render-assets-transform"
+          );
           registeredTag = path.resolve(
-            __dirname.slice(0, __dirname.lastIndexOf("vite") + 4),
-            "components",
+            import.meta.url,
+            "../components",
             isBuild ? "vite.marko" : "vite-watch.marko"
           );
-
           compiler.taglib.register("@marko/vite", {
-            "<_vite>": {
-              template: registeredTag,
-            },
-            "<head>": {
-              transformer: require.resolve("./render-assets-transform"),
-            },
-            "<body>": {
-              transformer: require.resolve("./render-assets-transform"),
-            },
+            "<_vite>": { template: registeredTag },
+            "<head>": { transformer },
+            "<body>": { transformer },
           });
         }
 
