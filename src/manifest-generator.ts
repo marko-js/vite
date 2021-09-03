@@ -27,16 +27,20 @@ export function generateDocManifest(rawHtml: string): Promise<DocManifest> {
         const bodyPrepend: Node[] = [];
         const body: Node[] = [];
         splitNodesByMarker(
-          (htmlChildren.find(
-            (node) => isElement(node) && node.tagName === "head"
-          ) as Element).childNodes,
+          (
+            htmlChildren.find(
+              (node) => isElement(node) && node.tagName === "head"
+            ) as Element
+          ).childNodes,
           headPrepend,
           head
         );
         splitNodesByMarker(
-          (htmlChildren.find(
-            (node) => isElement(node) && node.tagName === "body"
-          ) as Element).childNodes,
+          (
+            htmlChildren.find(
+              (node) => isElement(node) && node.tagName === "body"
+            ) as Element
+          ).childNodes,
           bodyPrepend,
           body
         );
