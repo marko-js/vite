@@ -59,7 +59,7 @@ export function generateDocManifest(rawHtml: string): Promise<DocManifest> {
 }
 
 export function generateInputDoc(entry: string) {
-  return `<!DOCTYPE html><html><head><!--${MARKER_COMMENT}--></head><body><!--${MARKER_COMMENT}--><script type="module" src=${JSON.stringify(
+  return `<!DOCTYPE html><html><head><!--${MARKER_COMMENT}--></head><body><!--${MARKER_COMMENT}--><script async type="module" src=${JSON.stringify(
     entry
   )}></script></body></html>`;
 }
