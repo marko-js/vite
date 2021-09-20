@@ -55,7 +55,7 @@ fs.readdirSync(FIXTURES).forEach((fixture) => {
         const source = (chunk.type === "chunk" ? chunk.code : chunk.source)
           .toString()
           .replace(/@marko\/vite\$\d\.\d\.\d/g, "@marko/vite$latest");
-        await snap(source, { name: chunk.fileName });
+        await snap(source, chunk.fileName);
       }
     }
   });
