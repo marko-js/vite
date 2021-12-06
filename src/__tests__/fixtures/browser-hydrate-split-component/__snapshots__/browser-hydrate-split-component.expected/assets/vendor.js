@@ -1,6 +1,6 @@
 var commonjsGlobal = typeof globalThis !== "undefined" ? globalThis : typeof window !== "undefined" ? window : typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : {};
-var indexBrowser$6 = {};
-var indexBrowser$5 = {};
+var indexBrowser$4 = {};
+var indexBrowser$3 = {};
 var constants$2 = {};
 var win$1 = typeof window !== "undefined" ? window : commonjsGlobal;
 constants$2.NOOP = win$1.$W10NOOP = win$1.$W10NOOP || function() {
@@ -60,7 +60,7 @@ var finalize$1 = function finalize(outer) {
 };
 var finalize2 = finalize$1;
 var eventDelegation$3 = {};
-var indexBrowser$4 = {};
+var indexBrowser$2 = {};
 var domData$6 = {
   ad_: new WeakMap(),
   ae_: new WeakMap(),
@@ -76,13 +76,12 @@ var vElementsByDOMNode = domData$5.ae_;
 var vPropsByDOMNode = domData$5.ad_;
 var markoUID = window.$MUID || (window.$MUID = { i: 0 });
 var runtimeId$1 = markoUID.i++;
-var componentLookup$4 = {};
-var defaultDocument$3 = document;
+var componentLookup$3 = {};
 var EMPTY_OBJECT$2 = {};
-function getComponentForEl(el, doc) {
-  var node = typeof el == "string" ? (doc || defaultDocument$3).getElementById(el) : el;
+function getComponentForEl(el, host) {
+  var node = typeof el == "string" ? ((host ? host.ownerDocument : host) || document).getElementById(el) : el;
   var component;
-  var vElement2;
+  var vElement;
   while (node) {
     if (node.fragment) {
       if (node.fragment.endNode === node) {
@@ -91,8 +90,8 @@ function getComponentForEl(el, doc) {
         node = node.fragment;
         component = componentsByDOMNode$2.get(node);
       }
-    } else if (vElement2 = vElementsByDOMNode.get(node)) {
-      component = vElement2.aA_;
+    } else if (vElement = vElementsByDOMNode.get(node)) {
+      component = vElement.aA_;
     }
     if (component) {
       return component;
@@ -104,7 +103,7 @@ function destroyComponentForNode$1(node) {
   var componentToDestroy = componentsByDOMNode$2.get(node.fragment || node);
   if (componentToDestroy) {
     componentToDestroy.Z_();
-    delete componentLookup$4[componentToDestroy.id];
+    delete componentLookup$3[componentToDestroy.id];
   }
 }
 function destroyNodeRecursive$3(node, component) {
@@ -144,10 +143,10 @@ function attachBubblingEvent$1(componentDef, handlerMethodName, isOnce, extraArg
   }
 }
 function getMarkoPropsFromEl$1(el) {
-  var vElement2 = vElementsByDOMNode.get(el);
+  var vElement = vElementsByDOMNode.get(el);
   var virtualProps;
-  if (vElement2) {
-    virtualProps = vElement2.aB_;
+  if (vElement) {
+    virtualProps = vElement.aB_;
   } else {
     virtualProps = vPropsByDOMNode.get(el);
     if (!virtualProps) {
@@ -171,20 +170,20 @@ function addComponentRootToKeyedElements$2(keyedElements, key, rootNode, compone
     keyedElements[key] = rootNode;
   }
 }
-indexBrowser$4.al_ = runtimeId$1;
-indexBrowser$4.C_ = componentLookup$4;
-indexBrowser$4.ah_ = getComponentForEl;
-indexBrowser$4.aC_ = destroyComponentForNode$1;
-indexBrowser$4.D_ = destroyNodeRecursive$3;
-indexBrowser$4._T_ = nextComponentIdProvider$1;
-indexBrowser$4._C_ = attachBubblingEvent$1;
-indexBrowser$4.am_ = getMarkoPropsFromEl$1;
-indexBrowser$4.ap_ = addComponentRootToKeyedElements$2;
-indexBrowser$4.aD_ = normalizeComponentKey$1;
-var componentsUtil$6 = indexBrowser$4;
-var runtimeId = componentsUtil$6.al_;
-var componentLookup$3 = componentsUtil$6.C_;
-var getMarkoPropsFromEl = componentsUtil$6.am_;
+indexBrowser$2.al_ = runtimeId$1;
+indexBrowser$2.C_ = componentLookup$3;
+indexBrowser$2.ah_ = getComponentForEl;
+indexBrowser$2.aC_ = destroyComponentForNode$1;
+indexBrowser$2.D_ = destroyNodeRecursive$3;
+indexBrowser$2._T_ = nextComponentIdProvider$1;
+indexBrowser$2._C_ = attachBubblingEvent$1;
+indexBrowser$2.am_ = getMarkoPropsFromEl$1;
+indexBrowser$2.ap_ = addComponentRootToKeyedElements$2;
+indexBrowser$2.aD_ = normalizeComponentKey$1;
+var componentsUtil$5 = indexBrowser$2;
+var runtimeId = componentsUtil$5.al_;
+var componentLookup$2 = componentsUtil$5.C_;
+var getMarkoPropsFromEl = componentsUtil$5.am_;
 var TEXT_NODE$1 = 3;
 var listenersAttachedKey = "$MDE" + runtimeId;
 var delegatedEvents = {};
@@ -211,7 +210,7 @@ function delegateEvent(node, eventName, target, event) {
     var virtualProps = getMarkoPropsFromEl(node);
     delete virtualProps[eventName];
   }
-  var targetComponent = componentLookup$3[targetComponentId];
+  var targetComponent = componentLookup$2[targetComponentId];
   if (!targetComponent) {
     return;
   }
@@ -235,11 +234,10 @@ function addDelegatedEventHandler$1(eventType) {
     delegatedEvents[eventType] = true;
   }
 }
-function addDelegatedEventHandlerToDoc(eventType, doc) {
-  var body = doc.body || doc;
-  var listeners = doc[listenersAttachedKey] = doc[listenersAttachedKey] || {};
+function addDelegatedEventHandlerToHost(eventType, host) {
+  var listeners = host[listenersAttachedKey] = host[listenersAttachedKey] || {};
   if (!listeners[eventType]) {
-    body.addEventListener(eventType, listeners[eventType] = function(event) {
+    (host.body || host).addEventListener(eventType, listeners[eventType] = function(event) {
       var propagationStopped = false;
       var oldStopPropagation = event.stopPropagation;
       event.stopPropagation = function() {
@@ -271,9 +269,9 @@ eventDelegation$3.___ = noop;
 eventDelegation$3._Z_ = delegateEvent;
 eventDelegation$3.a__ = getEventFromEl;
 eventDelegation$3._D_ = addDelegatedEventHandler$1;
-eventDelegation$3.an_ = function(doc) {
+eventDelegation$3.an_ = function(host) {
   Object.keys(delegatedEvents).forEach(function(eventType) {
-    addDelegatedEventHandlerToDoc(eventType, doc);
+    addDelegatedEventHandlerToHost(eventType, host);
   });
 };
 var fragment$1 = {};
@@ -307,7 +305,7 @@ function removeChild$2(node) {
 }
 helpers$3.aF_ = insertBefore$3;
 helpers$3.aG_ = insertAfter$2;
-helpers$3.bS_ = nextSibling$1;
+helpers$3.bR_ = nextSibling$1;
 helpers$3._r_ = firstChild$1;
 helpers$3.aH_ = removeChild$2;
 var helpers$2 = helpers$3;
@@ -373,16 +371,16 @@ function createFragmentNode$3(startNode, nextNode, parentNode) {
 }
 function beginFragmentNode$1(startNode, parentNode) {
   var fragment2 = createFragmentNode$3(startNode, null, parentNode);
-  fragment2.bY_ = function(nextNode) {
-    fragment2.bY_ = null;
+  fragment2.bX_ = function(nextNode) {
+    fragment2.bX_ = null;
     insertBefore$2(fragment2.endNode, nextNode, parentNode || startNode.parentNode);
   };
   return fragment2;
 }
 fragment$1.ao_ = createFragmentNode$3;
-fragment$1.bZ_ = beginFragmentNode$1;
+fragment$1.bY_ = beginFragmentNode$1;
 var constants = constants$2;
-var extend$5 = function extend(target, source) {
+var extend$4 = function extend(target, source) {
   if (!target) {
     target = {};
   }
@@ -408,15 +406,15 @@ KeySequence$2.prototype._L_ = function(key) {
 };
 var KeySequence_1 = KeySequence$2;
 var w10Noop = constants.NOOP;
-var componentUtil = indexBrowser$4;
+var componentUtil = indexBrowser$2;
 var attachBubblingEvent = componentUtil._C_;
 var addDelegatedEventHandler = eventDelegation$3._D_;
-var extend$4 = extend$5;
+var extend$3 = extend$4;
 var KeySequence$1 = KeySequence_1;
 var EMPTY_OBJECT$1 = {};
 var FLAG_WILL_RERENDER_IN_BROWSER$1 = 1;
 var FLAG_HAS_RENDER_BODY = 2;
-function ComponentDef$2(component, componentId, componentsContext) {
+function ComponentDef$1(component, componentId, componentsContext) {
   this._E_ = componentsContext;
   this.h_ = component;
   this.id = componentId;
@@ -427,7 +425,7 @@ function ComponentDef$2(component, componentId, componentsContext) {
   this._J_ = 0;
   this._K_ = null;
 }
-ComponentDef$2.prototype = {
+ComponentDef$1.prototype = {
   _L_: function(key) {
     return (this._K_ || (this._K_ = new KeySequence$1()))._L_(key);
   },
@@ -457,8 +455,8 @@ ComponentDef$2.prototype = {
     return this.h_._N_;
   }
 };
-ComponentDef$2.prototype.nk = ComponentDef$2.prototype._L_;
-ComponentDef$2._O_ = function(o, types, global2, registry2) {
+ComponentDef$1.prototype.nk = ComponentDef$1.prototype._L_;
+ComponentDef$1._O_ = function(o, types, global2, registry2) {
   var id = o[0];
   var typeName = types[o[1]];
   var input = o[2] || null;
@@ -489,7 +487,7 @@ ComponentDef$2._O_ = function(o, types, global2, registry2) {
       component.state = state;
     }
     if (componentProps) {
-      extend$4(component, componentProps);
+      extend$3(component, componentProps);
     }
   }
   component.Q_ = input;
@@ -509,8 +507,8 @@ ComponentDef$2._O_ = function(o, types, global2, registry2) {
     _I_: extra.f || 0
   };
 };
-var ComponentDef_1 = ComponentDef$2;
-var indexBrowser$3 = {};
+var ComponentDef_1 = ComponentDef$1;
+var indexBrowser$1 = {};
 var promise;
 var queueMicrotask_1 = typeof queueMicrotask === "function" ? queueMicrotask : typeof Promise === "function" && (promise = Promise.resolve()) ? function(cb) {
   promise.then(cb).catch(rethrow);
@@ -520,7 +518,7 @@ function rethrow(err) {
     throw err;
   });
 }
-var extend$3 = extend$5;
+var extend$2 = extend$4;
 function ensure(state, propertyName) {
   var proto2 = state.constructor.prototype;
   if (!(propertyName in proto2)) {
@@ -534,7 +532,7 @@ function ensure(state, propertyName) {
     });
   }
 }
-function State$1(component) {
+function State(component) {
   this.h_ = component;
   this._u_ = {};
   this.V_ = false;
@@ -543,7 +541,7 @@ function State$1(component) {
   this._Y_ = null;
   Object.seal(this);
 }
-State$1.prototype = {
+State.prototype = {
   I_: function() {
     var self2 = this;
     self2.V_ = false;
@@ -578,7 +576,7 @@ State$1.prototype = {
     if (!this.V_) {
       this.V_ = true;
       this._l_ = rawState;
-      this._u_ = rawState = extend$3({}, rawState);
+      this._u_ = rawState = extend$2({}, rawState);
       this._k_ = {};
       this.h_._e_();
     }
@@ -593,11 +591,11 @@ State$1.prototype = {
     return this._u_;
   }
 };
-var State_1 = State$1;
-var extend$2 = extend$5;
-var componentsUtil$5 = indexBrowser$4;
-var destroyComponentForNode = componentsUtil$5.aC_;
-var destroyNodeRecursive$2 = componentsUtil$5.D_;
+var State_1 = State;
+var extend$1 = extend$4;
+var componentsUtil$4 = indexBrowser$2;
+var destroyComponentForNode = componentsUtil$4.aC_;
+var destroyNodeRecursive$2 = componentsUtil$4.D_;
 var helpers$1 = helpers$3;
 var insertBefore$1 = helpers$1.aF_;
 var insertAfter$1 = helpers$1.aG_;
@@ -617,7 +615,7 @@ function beforeRemove(referenceEl) {
   destroyComponentForNode(referenceEl);
 }
 var domInsert$2 = function(target, getEl3, afterInsert3) {
-  extend$2(target, {
+  extend$1(target, {
     appendTo: function(referenceEl) {
       referenceEl = resolveEl(referenceEl);
       var el = getEl3(this, referenceEl);
@@ -674,8 +672,8 @@ function createOut(globalData) {
 }
 createOut.aE_ = setCreateOut;
 var createOut_1 = createOut;
-var ComponentsContext$1 = { exports: {} };
-var nextComponentIdProvider = indexBrowser$4._T_;
+var ComponentsContext = { exports: {} };
+var nextComponentIdProvider = indexBrowser$2._T_;
 function GlobalComponentsContext(out) {
   this._U_ = {};
   this._q_ = void 0;
@@ -709,9 +707,9 @@ var GlobalComponentsContext_1 = GlobalComponentsContext;
     this.p_ = parentComponentsContext && parentComponentsContext.p_;
   }
   ComponentsContext2.prototype = {
-    z_: function(doc) {
+    z_: function(host) {
       var componentDefs = this.b_;
-      ComponentsContext2._R_(componentDefs, doc);
+      ComponentsContext2._R_(componentDefs, host);
       this.y_.emit("_S_");
       this.y_.global.b_ = void 0;
       return componentDefs;
@@ -722,7 +720,7 @@ var GlobalComponentsContext_1 = GlobalComponentsContext;
   }
   module.exports = exports = ComponentsContext2;
   exports.o_ = getComponentsContext2;
-})(ComponentsContext$1, ComponentsContext$1.exports);
+})(ComponentsContext, ComponentsContext.exports);
 var slice$1 = Array.prototype.slice;
 function isFunction(arg) {
   return typeof arg === "function";
@@ -766,11 +764,11 @@ function addListener(eventEmitter, type, listener, prepend) {
   }
   return eventEmitter;
 }
-function EventEmitter$2() {
+function EventEmitter$1() {
   this.$e = this.$e || {};
 }
-EventEmitter$2.EventEmitter = EventEmitter$2;
-EventEmitter$2.prototype = {
+EventEmitter$1.EventEmitter = EventEmitter$1;
+EventEmitter$1.prototype = {
   $e: null,
   emit: function(type) {
     var args = arguments;
@@ -851,8 +849,14 @@ EventEmitter$2.prototype = {
     return listeners ? isFunction(listeners) ? 1 : listeners.length : 0;
   }
 };
-var src = EventEmitter$2;
+var src = EventEmitter$1;
 var domInsert$1 = domInsert$2;
+function getRootNode(el) {
+  var cur = el;
+  while (cur.parentNode)
+    cur = cur.parentNode;
+  return cur;
+}
 function getComponentDefs(result) {
   var componentDefs = result.b_;
   if (!componentDefs) {
@@ -860,12 +864,12 @@ function getComponentDefs(result) {
   }
   return componentDefs;
 }
-function RenderResult$2(out) {
+function RenderResult$1(out) {
   this.out = this.y_ = out;
   this.b_ = void 0;
 }
-var RenderResult_1 = RenderResult$2;
-var proto$2 = RenderResult$2.prototype = {
+var RenderResult_1 = RenderResult$1;
+var proto$1 = RenderResult$1.prototype = {
   getComponent: function() {
     return this.getComponents()[0];
   },
@@ -883,18 +887,18 @@ var proto$2 = RenderResult$2.prototype = {
     });
     return components2;
   },
-  afterInsert: function(doc) {
+  afterInsert: function(host) {
     var out = this.y_;
     var componentsContext = out.b_;
     if (componentsContext) {
-      this.b_ = componentsContext.z_(doc);
+      this.b_ = componentsContext.z_(host);
     } else {
       this.b_ = null;
     }
     return this;
   },
-  getNode: function(doc) {
-    return this.y_.A_(doc);
+  getNode: function(host) {
+    return this.y_.A_(host);
   },
   getOutput: function() {
     return this.y_.B_();
@@ -902,23 +906,22 @@ var proto$2 = RenderResult$2.prototype = {
   toString: function() {
     return this.y_.toString();
   },
-  document: typeof document != "undefined" && document
+  document: typeof window === "object" && document
 };
-Object.defineProperty(proto$2, "html", {
+Object.defineProperty(proto$1, "html", {
   get: function() {
     return this.toString();
   }
 });
-Object.defineProperty(proto$2, "context", {
+Object.defineProperty(proto$1, "context", {
   get: function() {
     return this.y_;
   }
 });
-domInsert$1(proto$2, function getEl(renderResult, referenceEl) {
-  return renderResult.getNode(referenceEl.ownerDocument);
+domInsert$1(proto$1, function getEl(renderResult, referenceEl) {
+  return renderResult.getNode(getRootNode(referenceEl));
 }, function afterInsert(renderResult, referenceEl) {
-  var isShadow = typeof ShadowRoot === "function" && referenceEl instanceof ShadowRoot;
-  return renderResult.afterInsert(isShadow ? referenceEl : referenceEl.ownerDocument);
+  return renderResult.afterInsert(getRootNode(referenceEl));
 });
 var listenerTracker = { exports: {} };
 (function(module, exports) {
@@ -1114,13 +1117,13 @@ var listenerTracker = { exports: {} };
     return new SubscriptionTracker2();
   };
 })(listenerTracker, listenerTracker.exports);
-var copyProps$2 = function copyProps(from, to) {
+var copyProps$1 = function copyProps(from, to) {
   Object.getOwnPropertyNames(from).forEach(function(name) {
     var descriptor = Object.getOwnPropertyDescriptor(from, name);
     Object.defineProperty(to, name, descriptor);
   });
 };
-var copyProps$1 = copyProps$2;
+var copyProps2 = copyProps$1;
 function inherit$7(ctor, superCtor, shouldCopyProps) {
   var oldProto = ctor.prototype;
   var newProto = ctor.prototype = Object.create(superCtor.prototype, {
@@ -1131,7 +1134,7 @@ function inherit$7(ctor, superCtor, shouldCopyProps) {
     }
   });
   if (oldProto && shouldCopyProps !== false) {
-    copyProps$1(oldProto, newProto);
+    copyProps2(oldProto, newProto);
   }
   ctor.$super = superCtor;
   ctor.prototype = newProto;
@@ -1151,7 +1154,7 @@ window.addEventListener("message", function(ev) {
     }
   }
 });
-var indexBrowser$2 = function(callback) {
+var indexBrowser = function(callback) {
   if (queue.push(callback) === 1) {
     window.postMessage(msg, "*");
   }
@@ -1159,7 +1162,7 @@ var indexBrowser$2 = function(callback) {
 var updatesScheduled = false;
 var batchStack = [];
 var unbatchedQueue = [];
-var setImmediate$1 = indexBrowser$2;
+var setImmediate = indexBrowser;
 function updateUnbatchedComponents() {
   if (unbatchedQueue.length) {
     try {
@@ -1174,7 +1177,7 @@ function scheduleUpdates() {
     return;
   }
   updatesScheduled = true;
-  setImmediate$1(updateUnbatchedComponents);
+  setImmediate(updateUnbatchedComponents);
 }
 function updateComponents(queue2) {
   for (var i = 0; i < queue2.length; i++) {
@@ -1229,12 +1232,12 @@ function syncBooleanAttrProp(fromEl, toEl, name) {
 function forEachOption(el, fn, i) {
   var curChild = el._r_;
   while (curChild) {
-    if (curChild.bH_ === "option") {
+    if (curChild.bG_ === "option") {
       fn(curChild, ++i);
     } else {
       i = forEachOption(curChild, fn, i);
     }
-    curChild = curChild.bS_;
+    curChild = curChild.bR_;
   }
   return i;
 }
@@ -1253,12 +1256,12 @@ SpecialElHandlers.prototype = {
     if (fromEl.value != toEl.q_) {
       fromEl.value = toEl.q_;
     }
-    if (fromEl.hasAttribute("value") && !toEl.bL_("value")) {
+    if (fromEl.hasAttribute("value") && !toEl.bK_("value")) {
       fromEl.removeAttribute("value");
     }
   },
   textarea: function(fromEl, toEl) {
-    if (toEl.bV_) {
+    if (toEl.bU_) {
       return;
     }
     var newValue = toEl.q_;
@@ -1275,10 +1278,10 @@ SpecialElHandlers.prototype = {
     }
   },
   select: function(fromEl, toEl) {
-    if (!toEl.bL_("multiple")) {
+    if (!toEl.bK_("multiple")) {
       var selected = 0;
       forEachOption(toEl, function(option, i) {
-        if (option.bL_("selected")) {
+        if (option.bK_("selected")) {
           selected = i;
         }
       }, -1);
@@ -1289,68 +1292,68 @@ SpecialElHandlers.prototype = {
   }
 };
 var specialElHandlers$1 = new SpecialElHandlers();
-var vdom$1 = {};
+var vdom = {};
 function VNode$6() {
 }
 VNode$6.prototype = {
-  bz_: function(finalChildCount, ownerComponent) {
-    this.bP_ = finalChildCount;
-    this.bQ_ = 0;
-    this.bF_ = null;
-    this.bR_ = null;
+  by_: function(finalChildCount, ownerComponent) {
+    this.bO_ = finalChildCount;
+    this.bP_ = 0;
+    this.bE_ = null;
+    this.bQ_ = null;
+    this.bB_ = null;
     this.bC_ = null;
-    this.bD_ = null;
     this.aA_ = ownerComponent;
   },
   get _r_() {
-    var firstChild2 = this.bF_;
-    if (firstChild2 && firstChild2.bE_) {
+    var firstChild2 = this.bE_;
+    if (firstChild2 && firstChild2.bD_) {
       var nestedFirstChild = firstChild2._r_;
-      return nestedFirstChild || firstChild2.bS_;
+      return nestedFirstChild || firstChild2.bR_;
     }
     return firstChild2;
   },
-  get bS_() {
-    var nextSibling2 = this.bD_;
+  get bR_() {
+    var nextSibling2 = this.bC_;
     if (nextSibling2) {
-      if (nextSibling2.bE_) {
+      if (nextSibling2.bD_) {
         var firstChild2 = nextSibling2._r_;
-        return firstChild2 || nextSibling2.bS_;
+        return firstChild2 || nextSibling2.bR_;
       }
     } else {
-      var parentNode = this.bC_;
-      if (parentNode && parentNode.bE_) {
-        return parentNode.bS_;
+      var parentNode = this.bB_;
+      if (parentNode && parentNode.bD_) {
+        return parentNode.bR_;
       }
     }
     return nextSibling2;
   },
-  br_: function(child) {
-    this.bQ_++;
-    if (this.bH_ === "textarea") {
-      if (child.bT_) {
-        var childValue = child.bU_;
-        this.bI_ = (this.bI_ || "") + childValue;
+  bq_: function(child) {
+    this.bP_++;
+    if (this.bG_ === "textarea") {
+      if (child.bS_) {
+        var childValue = child.bT_;
+        this.bH_ = (this.bH_ || "") + childValue;
       } else if (child.n_ || child.m_) {
-        this.bV_ = true;
+        this.bU_ = true;
       } else {
         throw TypeError();
       }
     } else {
-      var lastChild = this.bR_;
-      child.bC_ = this;
+      var lastChild = this.bQ_;
+      child.bB_ = this;
       if (lastChild) {
-        lastChild.bD_ = child;
+        lastChild.bC_ = child;
       } else {
-        this.bF_ = child;
+        this.bE_ = child;
       }
-      this.bR_ = child;
+      this.bQ_ = child;
     }
     return child;
   },
-  bK_: function finishChild() {
-    if (this.bQ_ === this.bP_ && this.bC_) {
-      return this.bC_.bK_();
+  bJ_: function finishChild() {
+    if (this.bP_ === this.bO_ && this.bB_) {
+      return this.bB_.bJ_();
     } else {
       return this;
     }
@@ -1359,31 +1362,31 @@ VNode$6.prototype = {
 var VNode_1 = VNode$6;
 var VNode$5 = VNode_1;
 var inherit$6 = inherit_1;
-var extend$1 = extend$5;
+var extend2 = extend$4;
 function VDocumentFragmentClone(other) {
-  extend$1(this, other);
+  extend2(this, other);
+  this.bB_ = null;
   this.bC_ = null;
-  this.bD_ = null;
 }
-function VDocumentFragment$2(out) {
-  this.bz_(null);
+function VDocumentFragment$1(out) {
+  this.by_(null);
   this.y_ = out;
 }
-VDocumentFragment$2.prototype = {
-  bB_: 11,
-  bE_: true,
-  bs_: function() {
+VDocumentFragment$1.prototype = {
+  bA_: 11,
+  bD_: true,
+  br_: function() {
     return new VDocumentFragmentClone(this);
   },
-  by_: function(doc) {
-    return doc.createDocumentFragment();
+  bx_: function(host) {
+    return (host.ownerDocument || host).createDocumentFragment();
   }
 };
-inherit$6(VDocumentFragment$2, VNode$5);
-VDocumentFragmentClone.prototype = VDocumentFragment$2.prototype;
-var VDocumentFragment_1 = VDocumentFragment$2;
+inherit$6(VDocumentFragment$1, VNode$5);
+VDocumentFragmentClone.prototype = VDocumentFragment$1.prototype;
+var VDocumentFragment_1 = VDocumentFragment$1;
 var domData$4 = domData$6;
-var componentsUtil$4 = indexBrowser$4;
+var componentsUtil$3 = indexBrowser$2;
 var vElementByDOMNode$2 = domData$4.ae_;
 var VNode$4 = VNode_1;
 var inherit$5 = inherit_1;
@@ -1436,58 +1439,58 @@ function removeAttribute(el, namespaceURI, name) {
   }
 }
 function VElementClone(other) {
-  this.bF_ = other.bF_;
+  this.bE_ = other.bE_;
+  this.bB_ = null;
   this.bC_ = null;
-  this.bD_ = null;
-  this.bA_ = other.bA_;
-  this.bG_ = other.bG_;
+  this.bz_ = other.bz_;
+  this.bF_ = other.bF_;
   this.aB_ = other.aB_;
-  this.bH_ = other.bH_;
+  this.bG_ = other.bG_;
   this._I_ = other._I_;
+  this.bH_ = other.bH_;
   this.bI_ = other.bI_;
-  this.bJ_ = other.bJ_;
 }
-function VElement$4(tagName, attrs2, key, ownerComponent, childCount, flags, props) {
-  this.bz_(childCount, ownerComponent);
+function VElement$2(tagName, attrs, key, ownerComponent, childCount, flags, props) {
+  this.by_(childCount, ownerComponent);
   var constId;
   if (props) {
     constId = props.i;
   }
-  this.bA_ = key;
+  this.bz_ = key;
   this._I_ = flags || 0;
-  this.bG_ = attrs2 || EMPTY_OBJECT;
+  this.bF_ = attrs || EMPTY_OBJECT;
   this.aB_ = props || EMPTY_OBJECT;
-  this.bH_ = tagName;
-  this.bI_ = null;
-  this.bJ_ = constId;
+  this.bG_ = tagName;
+  this.bH_ = null;
+  this.bI_ = constId;
   this.n_ = false;
   this.m_ = false;
 }
-VElement$4.prototype = {
-  bB_: 1,
-  bs_: function() {
+VElement$2.prototype = {
+  bA_: 1,
+  br_: function() {
     return new VElementClone(this);
   },
-  e: function(tagName, attrs2, key, ownerComponent, childCount, flags, props) {
-    var child = this.br_(new VElement$4(tagName, attrs2, key, ownerComponent, childCount, flags, props));
+  e: function(tagName, attrs, key, ownerComponent, childCount, flags, props) {
+    var child = this.bq_(new VElement$2(tagName, attrs, key, ownerComponent, childCount, flags, props));
     if (childCount === 0) {
-      return this.bK_();
+      return this.bJ_();
     } else {
       return child;
     }
   },
   n: function(node, ownerComponent) {
-    node = node.bs_();
+    node = node.br_();
     node.aA_ = ownerComponent;
-    this.br_(node);
-    return this.bK_();
+    this.bq_(node);
+    return this.bJ_();
   },
-  by_: function(doc, parentNamespaceURI) {
-    var tagName = this.bH_;
-    var attributes = this.bG_;
+  bx_: function(host, parentNamespaceURI) {
+    var tagName = this.bG_;
+    var attributes = this.bF_;
     var namespaceURI = DEFAULT_NS[tagName] || parentNamespaceURI || NS_HTML;
     var flags = this._I_;
-    var el = doc.createElementNS(namespaceURI, tagName);
+    var el = (host.ownerDocument || host).createElementNS(namespaceURI, tagName);
     if (flags & FLAG_CUSTOM_ELEMENT) {
       assign(el, attributes);
     } else {
@@ -1512,50 +1515,50 @@ VElement$4.prototype = {
     vElementByDOMNode$2.set(el, this);
     return el;
   },
-  bL_: function(name) {
-    var value = this.bG_[name];
+  bK_: function(name) {
+    var value = this.bF_[name];
     return value != null && value !== false;
   }
 };
-inherit$5(VElement$4, VNode$4);
-var proto$1 = VElementClone.prototype = VElement$4.prototype;
+inherit$5(VElement$2, VNode$4);
+var proto = VElementClone.prototype = VElement$2.prototype;
 ["checked", "selected", "disabled"].forEach(function(name) {
-  defineProperty(proto$1, name, {
+  defineProperty(proto, name, {
     get: function() {
-      var value = this.bG_[name];
+      var value = this.bF_[name];
       return value !== false && value != null;
     }
   });
 });
-defineProperty(proto$1, "q_", {
+defineProperty(proto, "q_", {
   get: function() {
-    var value = this.bI_;
+    var value = this.bH_;
     if (value == null) {
-      value = this.bG_.value;
+      value = this.bF_.value;
     }
-    return value != null && value !== false ? value + "" : this.bG_.type === "checkbox" || this.bG_.type === "radio" ? "on" : "";
+    return value != null && value !== false ? value + "" : this.bF_.type === "checkbox" || this.bF_.type === "radio" ? "on" : "";
   }
 });
-VElement$4.bM_ = function(attrs2) {
-  return attrs2;
+VElement$2.bL_ = function(attrs) {
+  return attrs;
 };
 function virtualizeElement$1(node, virtualizeChildNodes2, ownerComponent) {
   var attributes = node.attributes;
   var attrCount = attributes.length;
-  var attrs2 = null;
+  var attrs = null;
   var props = null;
   if (attrCount) {
-    attrs2 = {};
+    attrs = {};
     for (var i = 0; i < attrCount; i++) {
       var attr = attributes[i];
       var attrName = attr.name;
       if (!xmlnsRegExp.test(attrName)) {
         if (attrName === "data-marko") {
-          props = componentsUtil$4.am_(node);
+          props = componentsUtil$3.am_(node);
         } else if (attr.namespaceURI === NS_XLINK) {
-          attrs2[ATTR_XLINK_HREF] = attr.value;
+          attrs[ATTR_XLINK_HREF] = attr.value;
         } else {
-          attrs2[attrName] = attr.value;
+          attrs[attrName] = attr.value;
         }
       }
     }
@@ -1564,29 +1567,29 @@ function virtualizeElement$1(node, virtualizeChildNodes2, ownerComponent) {
   if (node.namespaceURI === NS_HTML) {
     tagName = tagName.toLowerCase();
   }
-  var vdomEl = new VElement$4(tagName, attrs2, null, ownerComponent, 0, 0, props);
-  if (vdomEl.bH_ === "textarea") {
-    vdomEl.bI_ = node.value;
+  var vdomEl = new VElement$2(tagName, attrs, null, ownerComponent, 0, 0, props);
+  if (vdomEl.bG_ === "textarea") {
+    vdomEl.bH_ = node.value;
   } else if (virtualizeChildNodes2) {
     virtualizeChildNodes2(node, vdomEl, ownerComponent);
   }
   return vdomEl;
 }
-VElement$4.bN_ = virtualizeElement$1;
-VElement$4.bO_ = function(fromEl, vFromEl, toEl) {
-  var removePreservedAttributes = VElement$4.bM_;
+VElement$2.bM_ = virtualizeElement$1;
+VElement$2.bN_ = function(fromEl, vFromEl, toEl) {
+  var removePreservedAttributes = VElement$2.bL_;
   var fromFlags = vFromEl._I_;
   var toFlags = toEl._I_;
   vElementByDOMNode$2.set(fromEl, toEl);
-  var attrs2 = toEl.bG_;
+  var attrs = toEl.bF_;
   var props = toEl.aB_;
   if (toFlags & FLAG_CUSTOM_ELEMENT) {
-    return assign(fromEl, attrs2);
+    return assign(fromEl, attrs);
   }
   var attrName;
-  var oldAttrs = vFromEl.bG_;
+  var oldAttrs = vFromEl.bF_;
   if (oldAttrs) {
-    if (oldAttrs === attrs2) {
+    if (oldAttrs === attrs) {
       return;
     } else {
       oldAttrs = removePreservedAttributes(oldAttrs, props);
@@ -1594,21 +1597,21 @@ VElement$4.bO_ = function(fromEl, vFromEl, toEl) {
   }
   var attrValue;
   if (toFlags & FLAG_SIMPLE_ATTRS && fromFlags & FLAG_SIMPLE_ATTRS) {
-    if (oldAttrs["class"] !== (attrValue = attrs2["class"])) {
+    if (oldAttrs["class"] !== (attrValue = attrs["class"])) {
       fromEl.className = attrValue;
     }
-    if (oldAttrs.id !== (attrValue = attrs2.id)) {
+    if (oldAttrs.id !== (attrValue = attrs.id)) {
       fromEl.id = attrValue;
     }
-    if (oldAttrs.style !== (attrValue = attrs2.style)) {
-      fromEl.style.cssText = attrValue;
+    if (oldAttrs.style !== (attrValue = attrs.style)) {
+      fromEl.cssText = attrValue;
     }
     return;
   }
-  attrs2 = removePreservedAttributes(attrs2, props, true);
+  attrs = removePreservedAttributes(attrs, props, true);
   var namespaceURI;
-  for (attrName in attrs2) {
-    attrValue = attrs2[attrName];
+  for (attrName in attrs) {
+    attrValue = attrs[attrName];
     namespaceURI = null;
     if (attrName === ATTR_XLINK_HREF) {
       namespaceURI = NS_XLINK;
@@ -1624,9 +1627,9 @@ VElement$4.bO_ = function(fromEl, vFromEl, toEl) {
       setAttribute(fromEl, namespaceURI, attrName, attrValue);
     }
   }
-  if (toEl.bA_ === null || fromFlags & FLAG_SPREAD_ATTRS) {
+  if (toEl.bz_ === null || fromFlags & FLAG_SPREAD_ATTRS) {
     for (attrName in oldAttrs) {
-      if (!(attrName in attrs2)) {
+      if (!(attrName in attrs)) {
         if (attrName === ATTR_XLINK_HREF) {
           fromEl.removeAttributeNS(ATTR_XLINK_HREF, ATTR_HREF);
         } else {
@@ -1636,60 +1639,60 @@ VElement$4.bO_ = function(fromEl, vFromEl, toEl) {
     }
   }
 };
-var VElement_1 = VElement$4;
+var VElement_1 = VElement$2;
 var VNode$3 = VNode_1;
 var inherit$4 = inherit_1;
-function VText$2(value, ownerComponent) {
-  this.bz_(-1, ownerComponent);
-  this.bU_ = value;
+function VText$1(value, ownerComponent) {
+  this.by_(-1, ownerComponent);
+  this.bT_ = value;
 }
-VText$2.prototype = {
-  bT_: true,
-  bB_: 3,
-  by_: function(doc) {
-    return doc.createTextNode(this.bU_);
+VText$1.prototype = {
+  bS_: true,
+  bA_: 3,
+  bx_: function(host) {
+    return (host.ownerDocument || host).createTextNode(this.bT_);
   },
-  bs_: function() {
-    return new VText$2(this.bU_);
+  br_: function() {
+    return new VText$1(this.bT_);
   }
 };
-inherit$4(VText$2, VNode$3);
-var VText_1 = VText$2;
+inherit$4(VText$1, VNode$3);
+var VText_1 = VText$1;
 var VNode$2 = VNode_1;
 var inherit$3 = inherit_1;
-function VComponent$2(component, key, ownerComponent, preserve) {
-  this.bz_(null, ownerComponent);
-  this.bA_ = key;
+function VComponent$1(component, key, ownerComponent, preserve) {
+  this.by_(null, ownerComponent);
+  this.bz_ = key;
   this.h_ = component;
   this.n_ = preserve;
 }
-VComponent$2.prototype = {
-  bB_: 2
+VComponent$1.prototype = {
+  bA_: 2
 };
-inherit$3(VComponent$2, VNode$2);
-var VComponent_1 = VComponent$2;
+inherit$3(VComponent$1, VNode$2);
+var VComponent_1 = VComponent$1;
 var domData$3 = domData$6;
 var keysByDOMNode$1 = domData$3.ag_;
 var vElementByDOMNode$1 = domData$3.ae_;
 var VNode$1 = VNode_1;
 var inherit$2 = inherit_1;
 var createFragmentNode$2 = fragment$1.ao_;
-function VFragment$2(key, ownerComponent, preserve) {
-  this.bz_(null, ownerComponent);
-  this.bA_ = key;
+function VFragment$1(key, ownerComponent, preserve) {
+  this.by_(null, ownerComponent);
+  this.bz_ = key;
   this.n_ = preserve;
 }
-VFragment$2.prototype = {
-  bB_: 12,
-  by_: function() {
+VFragment$1.prototype = {
+  bA_: 12,
+  bx_: function() {
     var fragment2 = createFragmentNode$2();
-    keysByDOMNode$1.set(fragment2, this.bA_);
+    keysByDOMNode$1.set(fragment2, this.bz_);
     vElementByDOMNode$1.set(fragment2, this);
     return fragment2;
   }
 };
-inherit$2(VFragment$2, VNode$1);
-var VFragment_1 = VFragment$2;
+inherit$2(VFragment$1, VNode$1);
+var VFragment_1 = VFragment$1;
 var parseHTML$1 = function(html) {
   var container = document.createElement("template");
   parseHTML$1 = container.content ? function(html2) {
@@ -1705,41 +1708,40 @@ var parseHtml = function(html) {
   return parseHTML$1(html).firstChild;
 };
 var VNode = VNode_1;
-var VDocumentFragment$1 = VDocumentFragment_1;
-var VElement$3 = VElement_1;
-var VText$1 = VText_1;
-var VComponent$1 = VComponent_1;
-var VFragment$1 = VFragment_1;
+var VDocumentFragment = VDocumentFragment_1;
+var VElement$1 = VElement_1;
+var VText = VText_1;
+var VComponent = VComponent_1;
+var VFragment = VFragment_1;
 var parseHTML = parseHtml;
-var defaultDocument$2 = typeof document != "undefined" && document;
 var specialHtmlRegexp = /[&<]/;
 function virtualizeChildNodes(node, vdomParent, ownerComponent) {
   var curChild = node.firstChild;
   while (curChild) {
-    vdomParent.br_(virtualize(curChild, ownerComponent));
+    vdomParent.bq_(virtualize(curChild, ownerComponent));
     curChild = curChild.nextSibling;
   }
 }
 function virtualize(node, ownerComponent) {
   switch (node.nodeType) {
     case 1:
-      return VElement$3.bN_(node, virtualizeChildNodes, ownerComponent);
+      return VElement$1.bM_(node, virtualizeChildNodes, ownerComponent);
     case 3:
-      return new VText$1(node.nodeValue, ownerComponent);
+      return new VText(node.nodeValue, ownerComponent);
     case 11:
-      var vdomDocFragment = new VDocumentFragment$1();
+      var vdomDocFragment = new VDocumentFragment();
       virtualizeChildNodes(node, vdomDocFragment, ownerComponent);
       return vdomDocFragment;
   }
 }
-function virtualizeHTML$1(html, doc, ownerComponent) {
+function virtualizeHTML(html, ownerComponent) {
   if (!specialHtmlRegexp.test(html)) {
-    return new VText$1(html, ownerComponent);
+    return new VText(html, ownerComponent);
   }
-  var vdomFragment = new VDocumentFragment$1();
+  var vdomFragment = new VDocumentFragment();
   var curChild = parseHTML(html);
   while (curChild) {
-    vdomFragment.br_(virtualize(curChild, ownerComponent));
+    vdomFragment.bq_(virtualize(curChild, ownerComponent));
     curChild = curChild.nextSibling;
   }
   return vdomFragment;
@@ -1753,34 +1755,33 @@ Node_prototype.t = function(value) {
       value = "";
     } else if (type === "object") {
       if (value.toHTML) {
-        vdomNode = virtualizeHTML$1(value.toHTML());
+        vdomNode = virtualizeHTML(value.toHTML());
       }
     }
   }
-  this.br_(vdomNode || new VText$1(value.toString()));
-  return this.bK_();
+  this.bq_(vdomNode || new VText(value.toString()));
+  return this.bJ_();
 };
-Node_prototype.bw_ = function() {
-  return this.br_(new VDocumentFragment$1());
+Node_prototype.bv_ = function() {
+  return this.bq_(new VDocumentFragment());
 };
-vdom$1.ba_ = VDocumentFragment$1;
-vdom$1.b__ = VElement$3;
-vdom$1.bb_ = VText$1;
-vdom$1.bc_ = VComponent$1;
-vdom$1.bd_ = VFragment$1;
-vdom$1.bN_ = virtualize;
-vdom$1.be_ = virtualizeHTML$1;
-vdom$1.bf_ = defaultDocument$2;
+vdom.ba_ = VDocumentFragment;
+vdom.b__ = VElement$1;
+vdom.bb_ = VText;
+vdom.bc_ = VComponent;
+vdom.bd_ = VFragment;
+vdom.bM_ = virtualize;
+vdom.be_ = virtualizeHTML;
 var specialElHandlers = specialElHandlers$1;
 var KeySequence = KeySequence_1;
-var componentsUtil$3 = indexBrowser$4;
-var existingComponentLookup = componentsUtil$3.C_;
-var destroyNodeRecursive$1 = componentsUtil$3.D_;
-var addComponentRootToKeyedElements$1 = componentsUtil$3.ap_;
-var normalizeComponentKey = componentsUtil$3.aD_;
-var VElement$2 = vdom$1.b__;
-var virtualizeElement = VElement$2.bN_;
-var morphAttrs = VElement$2.bO_;
+var componentsUtil$2 = indexBrowser$2;
+var existingComponentLookup = componentsUtil$2.C_;
+var destroyNodeRecursive$1 = componentsUtil$2.D_;
+var addComponentRootToKeyedElements$1 = componentsUtil$2.ap_;
+var normalizeComponentKey = componentsUtil$2.aD_;
+var VElement = vdom.b__;
+var virtualizeElement = VElement.bM_;
+var morphAttrs = VElement.bN_;
 var eventDelegation$2 = eventDelegation$3;
 var fragment = fragment$1;
 var helpers = helpers$3;
@@ -1791,11 +1792,11 @@ var vElementByDOMNode = domData$2.ae_;
 var detachedByDOMNode = domData$2.af_;
 var insertBefore = helpers.aF_;
 var insertAfter = helpers.aG_;
-var nextSibling = helpers.bS_;
+var nextSibling = helpers.bR_;
 var firstChild = helpers._r_;
 var removeChild = helpers.aH_;
 var createFragmentNode$1 = fragment.ao_;
-var beginFragmentNode = fragment.bZ_;
+var beginFragmentNode = fragment.bY_;
 var ELEMENT_NODE$1 = 1;
 var TEXT_NODE = 3;
 var COMMENT_NODE = 8;
@@ -1806,7 +1807,7 @@ function isAutoKey(key) {
   return key[0] !== "@";
 }
 function compareNodeNames(fromEl, toEl) {
-  return fromEl.bH_ === toEl.bH_;
+  return fromEl.bG_ === toEl.bG_;
 }
 function caseInsensitiveCompare(a, b) {
   return a.toLowerCase() === b.toLowerCase();
@@ -1816,7 +1817,7 @@ function onNodeAdded(node, componentsContext) {
     eventDelegation$2.ab_(node, componentsContext);
   }
 }
-function morphdom$2(fromNode, toNode, doc, componentsContext) {
+function morphdom$1(fromNode, toNode, host, componentsContext) {
   var globalComponentsContext;
   var isHydrate = false;
   var keySequences = Object.create(null);
@@ -1825,14 +1826,14 @@ function morphdom$2(fromNode, toNode, doc, componentsContext) {
     isHydrate = globalComponentsContext.f_;
   }
   function insertVirtualNodeBefore(vNode, key, referenceEl, parentEl, ownerComponent, parentComponent) {
-    var realNode = vNode.by_(doc, parentEl.namespaceURI);
+    var realNode = vNode.bx_(host, parentEl.namespaceURI);
     insertBefore(realNode, referenceEl, parentEl);
-    if (vNode.bB_ === ELEMENT_NODE$1 || vNode.bB_ === FRAGMENT_NODE) {
+    if (vNode.bA_ === ELEMENT_NODE$1 || vNode.bA_ === FRAGMENT_NODE) {
       if (key) {
         keysByDOMNode.set(realNode, key);
         (isAutoKey(key) ? parentComponent : ownerComponent).k_[key] = realNode;
       }
-      if (vNode.bH_ !== "textarea") {
+      if (vNode.bG_ !== "textarea") {
         morphChildren(realNode, vNode, parentComponent);
       }
       onNodeAdded(realNode, componentsContext);
@@ -1878,9 +1879,9 @@ function morphdom$2(fromNode, toNode, doc, componentsContext) {
     var fromComponent;
     outer:
       while (curToNodeChild) {
-        toNextSibling = curToNodeChild.bS_;
-        curToNodeType = curToNodeChild.bB_;
-        curToNodeKey = curToNodeChild.bA_;
+        toNextSibling = curToNodeChild.bR_;
+        curToNodeType = curToNodeChild.bA_;
+        curToNodeKey = curToNodeChild.bz_;
         if (curFromNodeChild && curFromNodeChild.nodeType === DOCTYPE_NODE) {
           curFromNodeChild = nextSibling(curFromNodeChild);
         }
@@ -1951,9 +1952,9 @@ function morphdom$2(fromNode, toNode, doc, componentsContext) {
             matchingFromEl = referenceComponent.k_[curToNodeKey];
             if (matchingFromEl === void 0 || matchingFromEl === curFromNodeChild) {
               if (isHydrate === true && curFromNodeChild) {
-                if (curFromNodeChild.nodeType === ELEMENT_NODE$1 && (curToNodeChild.n_ || caseInsensitiveCompare(curFromNodeChild.nodeName, curToNodeChild.bH_ || ""))) {
+                if (curFromNodeChild.nodeType === ELEMENT_NODE$1 && (curToNodeChild.n_ || caseInsensitiveCompare(curFromNodeChild.nodeName, curToNodeChild.bG_ || ""))) {
                   curVFromNodeChild = virtualizeElement(curFromNodeChild);
-                  curVFromNodeChild.bH_ = curToNodeChild.bH_;
+                  curVFromNodeChild.bG_ = curToNodeChild.bG_;
                   keysByDOMNode.set(curFromNodeChild, curToNodeKey);
                   referenceComponent.k_[curToNodeKey] = curFromNodeChild;
                   if (curToNodeChild.n_) {
@@ -1964,7 +1965,7 @@ function morphdom$2(fromNode, toNode, doc, componentsContext) {
                   curToNodeChild = toNextSibling;
                   curFromNodeChild = fromNextSibling;
                   continue;
-                } else if (curToNodeChild.bB_ === FRAGMENT_NODE && curFromNodeChild.nodeType === COMMENT_NODE) {
+                } else if (curToNodeChild.bA_ === FRAGMENT_NODE && curFromNodeChild.nodeType === COMMENT_NODE) {
                   var content = curFromNodeChild.nodeValue;
                   if (content == "F#" + curToNodeKeyOriginal) {
                     var endNode = curFromNodeChild.nextSibling;
@@ -2010,7 +2011,7 @@ function morphdom$2(fromNode, toNode, doc, componentsContext) {
                 curVFromNodeChild = vElementByDOMNode.get(matchingFromEl);
                 if (compareNodeNames(curVFromNodeChild, curToNodeChild)) {
                   if (fromNextSibling === matchingFromEl) {
-                    if (toNextSibling && toNextSibling.bA_ === curFromNodeKey) {
+                    if (toNextSibling && toNextSibling.bz_ === curFromNodeKey) {
                       fromNextSibling = curFromNodeChild;
                       insertBefore(matchingFromEl, curFromNodeChild, fromNode2);
                     } else {
@@ -2057,14 +2058,14 @@ function morphdom$2(fromNode, toNode, doc, componentsContext) {
               if (curVFromNodeChild === void 0) {
                 if (isHydrate === true) {
                   curVFromNodeChild = virtualizeElement(curFromNodeChild);
-                  if (caseInsensitiveCompare(curVFromNodeChild.bH_, curToNodeChild.bH_)) {
-                    curVFromNodeChild.bH_ = curToNodeChild.bH_;
+                  if (caseInsensitiveCompare(curVFromNodeChild.bG_, curToNodeChild.bG_)) {
+                    curVFromNodeChild.bG_ = curToNodeChild.bG_;
                   }
                 } else {
                   curFromNodeChild = fromNextSibling;
                   continue;
                 }
-              } else if (curFromNodeKey = curVFromNodeChild.bA_) {
+              } else if (curFromNodeKey = curVFromNodeChild.bz_) {
                 isCompatible = false;
               }
               isCompatible = isCompatible !== false && compareNodeNames(curVFromNodeChild, curToNodeChild) === true;
@@ -2073,8 +2074,11 @@ function morphdom$2(fromNode, toNode, doc, componentsContext) {
               }
             } else if (curFromNodeType === TEXT_NODE || curFromNodeType === COMMENT_NODE) {
               isCompatible = true;
-              if (curFromNodeChild.nodeValue !== curToNodeChild.bU_) {
-                curFromNodeChild.nodeValue = curToNodeChild.bU_;
+              if (isHydrate === true && toNextSibling && curFromNodeType === TEXT_NODE && toNextSibling.bA_ === TEXT_NODE) {
+                fromNextSibling = curFromNodeChild.splitText(curToNodeChild.bT_.length);
+              }
+              if (curFromNodeChild.nodeValue !== curToNodeChild.bT_) {
+                curFromNodeChild.nodeValue = curToNodeChild.bT_;
               }
             }
           }
@@ -2090,8 +2094,8 @@ function morphdom$2(fromNode, toNode, doc, componentsContext) {
         curToNodeChild = toNextSibling;
         curFromNodeChild = fromNextSibling;
       }
-    if (fromNode2.bY_) {
-      fromNode2.bY_(curFromNodeChild);
+    if (fromNode2.bX_) {
+      fromNode2.bX_(curFromNodeChild);
     } else {
       var fragmentBoundary = fromNode2.nodeType === FRAGMENT_NODE ? fromNode2.endNode : null;
       while (curFromNodeChild && curFromNodeChild !== fragmentBoundary) {
@@ -2116,9 +2120,9 @@ function morphdom$2(fromNode, toNode, doc, componentsContext) {
     }
   }
   function morphEl(fromEl, vFromEl, toEl, parentComponent) {
-    var nodeName = toEl.bH_;
-    var constId = toEl.bJ_;
-    if (constId !== void 0 && vFromEl.bJ_ === constId) {
+    var nodeName = toEl.bG_;
+    var constId = toEl.bI_;
+    if (constId !== void 0 && vFromEl.bI_ === constId) {
       return;
     }
     morphAttrs(fromEl, vFromEl, toEl);
@@ -2150,19 +2154,19 @@ function morphdom$2(fromNode, toNode, doc, componentsContext) {
     }
   });
 }
-var morphdom_1 = morphdom$2;
+var morphdom_1 = morphdom$1;
 var domInsert = domInsert$2;
-var defaultCreateOut$1 = createOut_1;
-var getComponentsContext$1 = ComponentsContext$1.exports.o_;
-var componentsUtil$2 = indexBrowser$4;
-var componentLookup$2 = componentsUtil$2.C_;
-var destroyNodeRecursive = componentsUtil$2.D_;
-var EventEmitter$1 = src;
-var RenderResult$1 = RenderResult_1;
+var defaultCreateOut = createOut_1;
+var getComponentsContext = ComponentsContext.exports.o_;
+var componentsUtil$1 = indexBrowser$2;
+var componentLookup$1 = componentsUtil$1.C_;
+var destroyNodeRecursive = componentsUtil$1.D_;
+var EventEmitter = src;
+var RenderResult = RenderResult_1;
 var SubscriptionTracker = listenerTracker.exports;
 var inherit$1 = inherit_1;
 var updateManager = updateManager$1;
-var morphdom$1 = morphdom_1;
+var morphdom = morphdom_1;
 var eventDelegation$1 = eventDelegation$3;
 var domData$1 = domData$6;
 var componentsByDOMNode$1 = domData$1.E_;
@@ -2174,7 +2178,7 @@ var COMPONENT_SUBSCRIBE_TO_OPTIONS;
 var NON_COMPONENT_SUBSCRIBE_TO_OPTIONS = {
   addDestroyListener: false
 };
-var emit = EventEmitter$1.prototype.emit;
+var emit = EventEmitter.prototype.emit;
 var ELEMENT_NODE = 1;
 function removeListener(removeEventListenerHandle) {
   removeEventListenerHandle();
@@ -2195,7 +2199,7 @@ function handleCustomEventWithMethodListener(component, targetMethodName, args, 
   if (extraArgs) {
     args = extraArgs.concat(args);
   }
-  var targetComponent = componentLookup$2[component.G_];
+  var targetComponent = componentLookup$1[component.G_];
   var targetMethod = typeof targetMethodName === "function" ? targetMethodName : targetComponent[targetMethodName];
   if (!targetMethod) {
     throw Error("Method not found: " + targetMethodName);
@@ -2257,7 +2261,7 @@ function checkInputChanged(existingComponent, oldInput, newInput) {
 }
 var componentProto;
 function Component(id) {
-  EventEmitter$1.call(this);
+  EventEmitter.call(this);
   this.id = id;
   this.J_ = null;
   this.K_ = null;
@@ -2357,7 +2361,7 @@ Component.prototype = componentProto = {
       }
     });
     root.detached = true;
-    delete componentLookup$2[this.id];
+    delete componentLookup$1[this.id];
     this.k_ = {};
   },
   Z_: function() {
@@ -2501,8 +2505,8 @@ Component.prototype = componentProto = {
   },
   _m_: function() {
     var self2 = this;
-    var renderer2 = self2._n_;
-    if (!renderer2) {
+    var renderer = self2._n_;
+    if (!renderer) {
       throw TypeError();
     }
     var input = this.P_ || this.Q_;
@@ -2512,23 +2516,23 @@ Component.prototype = componentProto = {
     this.I_();
   },
   _p_: function(input, isHydrate) {
-    var doc = this.X_;
+    var host = this.X_;
     var globalData = this.S_;
     var rootNode = this.K_;
-    var renderer2 = this._n_;
-    var createOut3 = renderer2.createOut || defaultCreateOut$1;
-    var out = createOut3(globalData);
+    var renderer = this._n_;
+    var createOut2 = renderer.createOut || defaultCreateOut;
+    var out = createOut2(globalData);
     out.sync();
     out.X_ = this.X_;
     out[CONTEXT_KEY] = this._h_;
-    var componentsContext = getComponentsContext$1(out);
+    var componentsContext = getComponentsContext(out);
     var globalComponentsContext = componentsContext.e_;
     globalComponentsContext._q_ = this;
     globalComponentsContext.f_ = isHydrate;
-    renderer2(input, out);
-    var result = new RenderResult$1(out);
+    renderer(input, out);
+    var result = new RenderResult(out);
     var targetNode = out.B_()._r_;
-    morphdom$1(rootNode, targetNode, doc, componentsContext);
+    morphdom(rootNode, targetNode, host, componentsContext);
     return result;
   },
   _s_: function() {
@@ -2598,12 +2602,12 @@ domInsert(componentProto, function getEl2(component) {
 }, function afterInsert2(component) {
   return component;
 });
-inherit$1(Component, EventEmitter$1);
+inherit$1(Component, EventEmitter);
 var Component_1 = Component;
 var BaseState = State_1;
 var BaseComponent = Component_1;
 var inherit = inherit_1;
-var defineComponent$1 = function defineComponent(def, renderer2) {
+var defineComponent$1 = function defineComponent(def, renderer) {
   if (def.Y_) {
     return def;
   }
@@ -2632,12 +2636,12 @@ var defineComponent$1 = function defineComponent(def, renderer2) {
   }
   inherit(State2, BaseState);
   proto2._c_ = State2;
-  proto2._n_ = renderer2;
+  proto2._n_ = renderer;
   return Component2;
 };
 var queueMicrotask$1 = queueMicrotask_1;
 var defineComponent2 = defineComponent$1;
-var initComponents$1 = indexBrowser$5;
+var initComponents$1 = indexBrowser$3;
 var registered = {};
 var loaded = {};
 var componentTypes = {};
@@ -2660,14 +2664,14 @@ function register(type, def) {
   }
   return type;
 }
-function addPendingDef(def, type, meta, doc, runtimeId2) {
+function addPendingDef(def, type, meta, host, runtimeId2) {
   if (!pendingDefs) {
     pendingDefs = {};
   }
   (pendingDefs[type] = pendingDefs[type] || []).push([
     def,
     meta,
-    doc,
+    host,
     runtimeId2
   ]);
 }
@@ -2706,21 +2710,20 @@ function createComponent(typeName, id) {
   var ComponentClass = getComponentClass(typeName);
   return new ComponentClass(id);
 }
-var r = indexBrowser$3.r = register;
-indexBrowser$3.av_ = getComponentClass;
-indexBrowser$3._P_ = createComponent;
-indexBrowser$3.as_ = isRegistered;
-indexBrowser$3.at_ = addPendingDef;
+indexBrowser$1.r = register;
+indexBrowser$1.av_ = getComponentClass;
+indexBrowser$1._P_ = createComponent;
+indexBrowser$1.as_ = isRegistered;
+indexBrowser$1.at_ = addPendingDef;
 var warp10Finalize = finalize2;
 var eventDelegation = eventDelegation$3;
 var win = window;
-var defaultDocument$1 = document;
 var createFragmentNode = fragment$1.ao_;
-var componentsUtil$1 = indexBrowser$4;
-var componentLookup$1 = componentsUtil$1.C_;
-var addComponentRootToKeyedElements = componentsUtil$1.ap_;
-var ComponentDef$1 = ComponentDef_1;
-var registry$2 = indexBrowser$3;
+var componentsUtil = indexBrowser$2;
+var componentLookup = componentsUtil.C_;
+var addComponentRootToKeyedElements = componentsUtil.ap_;
+var ComponentDef = ComponentDef_1;
+var registry$1 = indexBrowser$1;
 var domData = domData$6;
 var keyedElementsByComponentId = domData.F_;
 var componentsByDOMNode = domData.E_;
@@ -2762,7 +2765,7 @@ function indexServerComponentBoundaries(node, runtimeId2, stack) {
             var key = parts[2];
             ownerId = parts[1];
             componentId = parts[0];
-            if (ownerComponent = componentLookup$1[ownerId]) {
+            if (ownerComponent = componentLookup[ownerId]) {
               keyedElements = ownerComponent.k_;
             } else {
               keyedElements = keyedElementsByComponentId[ownerId] || (keyedElementsByComponentId[ownerId] = {});
@@ -2776,12 +2779,12 @@ function indexServerComponentBoundaries(node, runtimeId2, stack) {
       }
     } else if (node.nodeType === 1) {
       var markoKey = node.getAttribute("data-marko-key");
-      var markoProps = componentsUtil$1.am_(node);
+      var markoProps = componentsUtil.am_(node);
       if (markoKey) {
         var separatorIndex = markoKey.indexOf(" ");
         ownerId = markoKey.substring(separatorIndex + 1);
         markoKey = markoKey.substring(0, separatorIndex);
-        if (ownerComponent = componentLookup$1[ownerId]) {
+        if (ownerComponent = componentLookup[ownerId]) {
           keyedElements = ownerComponent.k_;
         } else {
           keyedElements = keyedElementsByComponentId[ownerId] || (keyedElementsByComponentId[ownerId] = {});
@@ -2830,10 +2833,10 @@ function addDOMEventListeners(component, el, eventType, targetMethodName, isOnce
   });
   handles.push(removeListener2);
 }
-function initComponent(componentDef, doc) {
+function initComponent(componentDef, host) {
   var component = componentDef.h_;
   component.I_();
-  component.X_ = doc;
+  component.X_ = host;
   var isExisting = componentDef._G_;
   if (isExisting) {
     component._b_();
@@ -2860,9 +2863,10 @@ function initComponent(componentDef, doc) {
     component._z_();
   }
 }
-function initClientRendered(componentDefs, doc) {
-  eventDelegation.an_(doc);
-  doc = doc || defaultDocument$1;
+function initClientRendered(componentDefs, host) {
+  if (!host)
+    host = document;
+  eventDelegation.an_(host);
   var len = componentDefs.length;
   var componentDef;
   var i;
@@ -2872,10 +2876,10 @@ function initClientRendered(componentDefs, doc) {
   }
   for (i = len; i--; ) {
     componentDef = componentDefs[i];
-    initComponent(componentDef, doc);
+    initComponent(componentDef, host);
   }
 }
-function initServerRendered(renderedComponents, doc) {
+function initServerRendered(renderedComponents, host) {
   var type = typeof renderedComponents;
   var globalKey = "$";
   var runtimeId2;
@@ -2902,10 +2906,11 @@ function initServerRendered(renderedComponents, doc) {
   renderedComponents = warp10Finalize(renderedComponents);
   if (isFromSerializedGlobals) {
     runtimeId2 = this.r;
-    doc = defaultDocument$1;
+    host = document;
   } else {
     runtimeId2 = renderedComponents.r || DEFAULT_RUNTIME_ID;
-    doc = doc || defaultDocument$1;
+    if (!host)
+      host = document;
   }
   var prefix = renderedComponents.p || "";
   var meta = serverRenderedMeta[prefix];
@@ -2920,8 +2925,8 @@ function initServerRendered(renderedComponents, doc) {
       serverRenderedMeta[prefix] = meta;
     }
   }
-  indexServerComponentBoundaries(doc, runtimeId2);
-  eventDelegation.an_(doc);
+  indexServerComponentBoundaries(host, runtimeId2);
+  eventDelegation.an_(host);
   if (renderedComponents.g) {
     meta.aq_ = renderedComponents.g;
   }
@@ -2930,22 +2935,22 @@ function initServerRendered(renderedComponents, doc) {
   }
   (renderedComponents.w || []).map(function(componentDef) {
     var typeName = meta.ar_[componentDef[1]];
-    return registry$2.as_(typeName) ? tryHydrateComponent(componentDef, meta, doc, runtimeId2) : registry$2.at_(componentDef, typeName, meta, doc, runtimeId2);
+    return registry$1.as_(typeName) ? tryHydrateComponent(componentDef, meta, host, runtimeId2) : registry$1.at_(componentDef, typeName, meta, host, runtimeId2);
   }).reverse().forEach(tryInvoke);
   return this;
 }
-function tryHydrateComponent(rawDef, meta, doc, runtimeId2) {
-  var componentDef = ComponentDef$1._O_(rawDef, meta.ar_, meta.aq_, registry$2);
-  var mount = hydrateComponentAndGetMount(componentDef, doc);
+function tryHydrateComponent(rawDef, meta, host, runtimeId2) {
+  var componentDef = ComponentDef._O_(rawDef, meta.ar_, meta.aq_, registry$1);
+  var mount = hydrateComponentAndGetMount(componentDef, host);
   if (!mount) {
     if (deferredDefs) {
       deferredDefs.push(componentDef);
     } else {
       deferredDefs = [componentDef];
-      doc.addEventListener("DOMContentLoaded", function() {
-        indexServerComponentBoundaries(doc, runtimeId2);
+      document.addEventListener("DOMContentLoaded", function() {
+        indexServerComponentBoundaries(host, runtimeId2);
         deferredDefs.map(function(componentDef2) {
-          return hydrateComponentAndGetMount(componentDef2, doc);
+          return hydrateComponentAndGetMount(componentDef2, host);
         }).reverse().forEach(tryInvoke);
         deferredDefs = void 0;
       });
@@ -2953,7 +2958,7 @@ function tryHydrateComponent(rawDef, meta, doc, runtimeId2) {
   }
   return mount;
 }
-function hydrateComponentAndGetMount(componentDef, doc) {
+function hydrateComponentAndGetMount(componentDef, host) {
   var componentId = componentDef.id;
   var component = componentDef.h_;
   var rootNode = serverComponentRootNodes[componentId];
@@ -2963,718 +2968,42 @@ function hydrateComponentAndGetMount(componentDef, doc) {
     component.K_ = rootNode;
     componentsByDOMNode.set(rootNode, component);
     if (componentDef._I_ & FLAG_WILL_RERENDER_IN_BROWSER) {
-      component.X_ = doc;
+      component.X_ = host;
       renderResult = component._p_(component.Q_, true);
       trackComponent(componentDef);
       return function mount() {
-        renderResult.afterInsert(doc);
+        renderResult.afterInsert(host);
       };
     } else {
       trackComponent(componentDef);
     }
     return function mount() {
-      initComponent(componentDef, doc);
+      initComponent(componentDef, host);
     };
   }
 }
 function trackComponent(componentDef) {
   var component = componentDef.h_;
   if (component) {
-    componentLookup$1[component.id] = component;
+    componentLookup[component.id] = component;
   }
 }
 function tryInvoke(fn) {
   if (fn)
     fn();
 }
-indexBrowser$5._R_ = initClientRendered;
-indexBrowser$5.ai_ = initServerRendered;
-indexBrowser$5.au_ = tryHydrateComponent;
-var initComponents = indexBrowser$5;
-ComponentsContext$1.exports._R_ = initComponents._R_;
-indexBrowser$6.getComponentForEl = indexBrowser$4.ah_;
-indexBrowser$6.init = window.$initComponents = initComponents.ai_;
-var registry$1 = indexBrowser$3;
-indexBrowser$6.register = function(id, component) {
-  registry$1.r(id, function() {
+indexBrowser$3._R_ = initClientRendered;
+indexBrowser$3.ai_ = initServerRendered;
+indexBrowser$3.au_ = tryHydrateComponent;
+var initComponents = indexBrowser$3;
+ComponentsContext.exports._R_ = initComponents._R_;
+indexBrowser$4.getComponentForEl = indexBrowser$2.ah_;
+indexBrowser$4.init = window.$initComponents = initComponents.ai_;
+var registry = indexBrowser$1;
+indexBrowser$4.register = function(id, component) {
+  registry.r(id, function() {
     return component;
   });
 };
-var components = indexBrowser$6;
-var classValue = function classHelper(arg) {
-  switch (typeof arg) {
-    case "string":
-      return arg || null;
-    case "object":
-      var result = "";
-      var sep = "";
-      if (Array.isArray(arg)) {
-        for (var i = 0, len = arg.length; i < len; i++) {
-          var value = classHelper(arg[i]);
-          if (value) {
-            result += sep + value;
-            sep = " ";
-          }
-        }
-      } else {
-        for (var key in arg) {
-          if (arg[key]) {
-            result += sep + key;
-            sep = " ";
-          }
-        }
-      }
-      return result || null;
-    default:
-      return null;
-  }
-};
-var _changeCase = {};
-var camelToDashLookup = Object.create(null);
-var dashToCamelLookup = Object.create(null);
-_changeCase.aI_ = function camelToDashCase(name) {
-  var nameDashed = camelToDashLookup[name];
-  if (!nameDashed) {
-    nameDashed = camelToDashLookup[name] = name.replace(/([A-Z])/g, "-$1").toLowerCase();
-    if (nameDashed !== name) {
-      dashToCamelLookup[nameDashed] = name;
-    }
-  }
-  return nameDashed;
-};
-_changeCase.aJ_ = function dashToCamelCase(name) {
-  var nameCamel = dashToCamelLookup[name];
-  if (!nameCamel) {
-    nameCamel = dashToCamelLookup[name] = name.replace(/-([a-z])/g, matchToUpperCase);
-    if (nameCamel !== name) {
-      camelToDashLookup[nameCamel] = name;
-    }
-  }
-  return nameCamel;
-};
-function matchToUpperCase(_, char) {
-  return char.toUpperCase();
-}
-var changeCase = _changeCase;
-var styleValue = function styleHelper(style) {
-  if (!style) {
-    return null;
-  }
-  var type = typeof style;
-  if (type !== "string") {
-    var styles = "";
-    if (Array.isArray(style)) {
-      for (var i = 0, len = style.length; i < len; i++) {
-        var next = styleHelper(style[i]);
-        if (next)
-          styles += next + (next[next.length - 1] !== ";" ? ";" : "");
-      }
-    } else if (type === "object") {
-      for (var name in style) {
-        var value = style[name];
-        if (value != null && value !== false) {
-          if (typeof value === "number" && value) {
-            value += "px";
-          }
-          styles += changeCase.aI_(name) + ":" + value + ";";
-        }
-      }
-    }
-    return styles || null;
-  }
-  return style;
-};
-var classHelper2 = classValue;
-var styleHelper2 = styleValue;
-var attrs = function(attributes) {
-  if (attributes != null) {
-    var newAttributes = {};
-    for (var attrName in attributes) {
-      var val = attributes[attrName];
-      if (attrName === "renderBody") {
-        continue;
-      }
-      if (attrName === "class") {
-        val = classHelper2(val);
-      } else if (attrName === "style") {
-        val = styleHelper2(val);
-      }
-      newAttributes[attrName] = val;
-    }
-    return newAttributes;
-  }
-  return attributes;
-};
-var EventEmitter = src;
-var vdom = vdom$1;
-var VElement$1 = vdom.b__;
-var VDocumentFragment = vdom.ba_;
-var VText = vdom.bb_;
-var VComponent = vdom.bc_;
-var VFragment = vdom.bd_;
-var virtualizeHTML = vdom.be_;
-var RenderResult = RenderResult_1;
-var defaultDocument = vdom.bf_;
-var morphdom = morphdom_1;
-var attrsHelper = attrs;
-var EVENT_UPDATE = "update";
-var EVENT_FINISH = "finish";
-function State(tree) {
-  this.bg_ = new EventEmitter();
-  this.bh_ = tree;
-  this.bi_ = false;
-}
-function AsyncVDOMBuilder$1(globalData, parentNode, parentOut) {
-  if (!parentNode) {
-    parentNode = new VDocumentFragment();
-  }
-  var state;
-  if (parentOut) {
-    state = parentOut.J_;
-  } else {
-    state = new State(parentNode);
-  }
-  this.bj_ = 1;
-  this.bk_ = 0;
-  this.bl_ = null;
-  this.bm_ = parentOut;
-  this.data = {};
-  this.J_ = state;
-  this.l_ = parentNode;
-  this.global = globalData || {};
-  this.bn_ = [parentNode];
-  this.bo_ = false;
-  this.bp_ = void 0;
-  this.b_ = null;
-  this.g_ = null;
-  this.i_ = null;
-  this.ax_ = null;
-}
-var proto = AsyncVDOMBuilder$1.prototype = {
-  aP_: true,
-  X_: defaultDocument,
-  bc: function(component, key, ownerComponent) {
-    var vComponent = new VComponent(component, key, ownerComponent);
-    return this.bq_(vComponent, 0, true);
-  },
-  ay_: function(component, key, ownerComponent) {
-    var vComponent = new VComponent(component, key, ownerComponent, true);
-    this.bq_(vComponent, 0);
-  },
-  bq_: function(child, childCount, pushToStack) {
-    this.l_.br_(child);
-    if (pushToStack === true) {
-      this.bn_.push(child);
-      this.l_ = child;
-    }
-    return childCount === 0 ? this : child;
-  },
-  element: function(tagName, attrs2, key, component, childCount, flags, props) {
-    var element = new VElement$1(tagName, attrs2, key, component, childCount, flags, props);
-    return this.bq_(element, childCount);
-  },
-  aM_: function(tagName, attrs2, key, componentDef, props) {
-    return this.element(tagName, attrsHelper(attrs2), key, componentDef.h_, 0, 0, props);
-  },
-  n: function(node, component) {
-    var clone = node.bs_();
-    this.node(clone);
-    clone.aA_ = component;
-    return this;
-  },
-  node: function(node) {
-    this.l_.br_(node);
-    return this;
-  },
-  text: function(text, ownerComponent) {
-    var type = typeof text;
-    if (type != "string") {
-      if (text == null) {
-        return;
-      } else if (type === "object") {
-        if (text.toHTML) {
-          return this.h(text.toHTML(), ownerComponent);
-        }
-      }
-      text = text.toString();
-    }
-    this.l_.br_(new VText(text, ownerComponent));
-    return this;
-  },
-  html: function(html, ownerComponent) {
-    if (html != null) {
-      var vdomNode = virtualizeHTML(html, this.X_ || document, ownerComponent);
-      this.node(vdomNode);
-    }
-    return this;
-  },
-  beginElement: function(tagName, attrs2, key, component, childCount, flags, props) {
-    var element = new VElement$1(tagName, attrs2, key, component, childCount, flags, props);
-    this.bq_(element, childCount, true);
-    return this;
-  },
-  aK_: function(tagName, attrs2, key, componentDef, props) {
-    return this.beginElement(tagName, attrsHelper(attrs2), key, componentDef.h_, 0, 0, props);
-  },
-  bf: function(key, component, preserve) {
-    var fragment2 = new VFragment(key, component, preserve);
-    this.bq_(fragment2, null, true);
-    return this;
-  },
-  ef: function() {
-    this.endElement();
-  },
-  endElement: function() {
-    var stack = this.bn_;
-    stack.pop();
-    this.l_ = stack[stack.length - 1];
-  },
-  end: function() {
-    this.l_ = void 0;
-    var remaining = --this.bj_;
-    var parentOut = this.bm_;
-    if (remaining === 0) {
-      if (parentOut) {
-        parentOut.bt_();
-      } else {
-        this.bu_();
-      }
-    } else if (remaining - this.bk_ === 0) {
-      this.bv_();
-    }
-    return this;
-  },
-  bt_: function() {
-    var remaining = --this.bj_;
-    if (remaining === 0) {
-      var parentOut = this.bm_;
-      if (parentOut) {
-        parentOut.bt_();
-      } else {
-        this.bu_();
-      }
-    } else if (remaining - this.bk_ === 0) {
-      this.bv_();
-    }
-  },
-  bu_: function() {
-    var state = this.J_;
-    state.bi_ = true;
-    state.bg_.emit(EVENT_FINISH, this.aQ_());
-  },
-  bv_: function() {
-    var lastArray = this._last;
-    var i = 0;
-    function next() {
-      if (i === lastArray.length) {
-        return;
-      }
-      var lastCallback = lastArray[i++];
-      lastCallback(next);
-      if (!lastCallback.length) {
-        next();
-      }
-    }
-    next();
-  },
-  error: function(e) {
-    try {
-      this.emit("error", e);
-    } finally {
-      this.end();
-    }
-    return this;
-  },
-  beginAsync: function(options) {
-    if (this.bo_) {
-      throw Error("Tried to render async while in sync mode. Note: Client side await is not currently supported in re-renders (Issue: #942).");
-    }
-    var state = this.J_;
-    if (options) {
-      if (options.last) {
-        this.bk_++;
-      }
-    }
-    this.bj_++;
-    var documentFragment = this.l_.bw_();
-    var asyncOut = new AsyncVDOMBuilder$1(this.global, documentFragment, this);
-    state.bg_.emit("beginAsync", {
-      out: asyncOut,
-      parentOut: this
-    });
-    return asyncOut;
-  },
-  createOut: function() {
-    return new AsyncVDOMBuilder$1(this.global);
-  },
-  flush: function() {
-    var events = this.J_.bg_;
-    if (events.listenerCount(EVENT_UPDATE)) {
-      events.emit(EVENT_UPDATE, new RenderResult(this));
-    }
-  },
-  B_: function() {
-    return this.J_.bh_;
-  },
-  aQ_: function() {
-    return this.bx_ || (this.bx_ = new RenderResult(this));
-  },
-  on: function(event, callback) {
-    var state = this.J_;
-    if (event === EVENT_FINISH && state.bi_) {
-      callback(this.aQ_());
-    } else if (event === "last") {
-      this.onLast(callback);
-    } else {
-      state.bg_.on(event, callback);
-    }
-    return this;
-  },
-  once: function(event, callback) {
-    var state = this.J_;
-    if (event === EVENT_FINISH && state.bi_) {
-      callback(this.aQ_());
-    } else if (event === "last") {
-      this.onLast(callback);
-    } else {
-      state.bg_.once(event, callback);
-    }
-    return this;
-  },
-  emit: function(type, arg) {
-    var events = this.J_.bg_;
-    switch (arguments.length) {
-      case 1:
-        events.emit(type);
-        break;
-      case 2:
-        events.emit(type, arg);
-        break;
-      default:
-        events.emit.apply(events, arguments);
-        break;
-    }
-    return this;
-  },
-  removeListener: function() {
-    var events = this.J_.bg_;
-    events.removeListener.apply(events, arguments);
-    return this;
-  },
-  sync: function() {
-    this.bo_ = true;
-  },
-  isSync: function() {
-    return this.bo_;
-  },
-  onLast: function(callback) {
-    var lastArray = this._last;
-    if (lastArray === void 0) {
-      this._last = [callback];
-    } else {
-      lastArray.push(callback);
-    }
-    return this;
-  },
-  A_: function(doc) {
-    var node = this.bp_;
-    if (!node) {
-      var vdomTree = this.B_();
-      doc = doc || this.X_ || document;
-      this.bp_ = node = vdomTree.by_(doc, null);
-      morphdom(node, vdomTree, doc, this.b_);
-    }
-    return node;
-  },
-  toString: function(doc) {
-    var docFragment = this.A_(doc);
-    var html = "";
-    var child = docFragment.firstChild;
-    while (child) {
-      var nextSibling2 = child.nextSibling;
-      if (child.nodeType != 1) {
-        var container = docFragment.ownerDocument.createElement("div");
-        container.appendChild(child.cloneNode());
-        html += container.innerHTML;
-      } else {
-        html += child.outerHTML;
-      }
-      child = nextSibling2;
-    }
-    return html;
-  },
-  then: function(fn, fnErr) {
-    var out = this;
-    var promise2 = new Promise(function(resolve2, reject) {
-      out.on("error", reject).on(EVENT_FINISH, function(result) {
-        resolve2(result);
-      });
-    });
-    return Promise.resolve(promise2).then(fn, fnErr);
-  },
-  catch: function(fnErr) {
-    return this.then(void 0, fnErr);
-  },
-  isVDOM: true,
-  c: function(componentDef, key, customEvents) {
-    this.g_ = componentDef;
-    this.i_ = key;
-    this.ax_ = customEvents;
-  }
-};
-proto.e = proto.element;
-proto.be = proto.beginElement;
-proto.ee = proto.aL_ = proto.endElement;
-proto.t = proto.text;
-proto.h = proto.w = proto.write = proto.html;
-var AsyncVDOMBuilder_1 = AsyncVDOMBuilder$1;
-var defaultCreateOut = createOut_1;
-var setImmediate = indexBrowser$2;
-var extend2 = extend$5;
-function safeRender(renderFunc, finalData, finalOut, shouldEnd) {
-  try {
-    renderFunc(finalData, finalOut);
-    if (shouldEnd) {
-      finalOut.end();
-    }
-  } catch (err) {
-    var actualEnd = finalOut.end;
-    finalOut.end = function() {
-    };
-    setImmediate(function() {
-      finalOut.end = actualEnd;
-      finalOut.error(err);
-    });
-  }
-  return finalOut;
-}
-var renderable = function(target, renderer2) {
-  var renderFunc = renderer2 && (renderer2.renderer || renderer2.render || renderer2);
-  var createOut3 = target.createOut || renderer2.createOut || defaultCreateOut;
-  return extend2(target, {
-    createOut: createOut3,
-    renderToString: function(data, callback) {
-      var localData = data || {};
-      var render = renderFunc || this._;
-      var globalData = localData.$global;
-      var out = createOut3(globalData);
-      out.global.template = this;
-      if (globalData) {
-        localData.$global = void 0;
-      }
-      if (callback) {
-        out.on("finish", function() {
-          callback(null, out.toString(), out);
-        }).once("error", callback);
-        return safeRender(render, localData, out, true);
-      } else {
-        out.sync();
-        render(localData, out);
-        return out.toString();
-      }
-    },
-    renderSync: function(data) {
-      var localData = data || {};
-      var render = renderFunc || this._;
-      var globalData = localData.$global;
-      var out = createOut3(globalData);
-      out.sync();
-      out.global.template = this;
-      if (globalData) {
-        localData.$global = void 0;
-      }
-      render(localData, out);
-      return out.aQ_();
-    },
-    render: function(data, out) {
-      var callback;
-      var finalOut;
-      var finalData;
-      var globalData;
-      var render = renderFunc || this._;
-      var shouldBuffer = this.aS_;
-      var shouldEnd = true;
-      if (data) {
-        finalData = data;
-        if (globalData = data.$global) {
-          finalData.$global = void 0;
-        }
-      } else {
-        finalData = {};
-      }
-      if (out && out.aP_) {
-        finalOut = out;
-        shouldEnd = false;
-        extend2(out.global, globalData);
-      } else if (typeof out == "function") {
-        finalOut = createOut3(globalData);
-        callback = out;
-      } else {
-        finalOut = createOut3(globalData, out, void 0, shouldBuffer);
-      }
-      if (callback) {
-        finalOut.on("finish", function() {
-          callback(null, finalOut.aQ_());
-        }).once("error", callback);
-      }
-      globalData = finalOut.global;
-      globalData.template = globalData.template || this;
-      return safeRender(render, finalData, finalOut, shouldEnd);
-    }
-  });
-};
-var t = function createTemplate(typeName) {
-  return new Template(typeName);
-};
-function Template(typeName) {
-  this.aZ_ = typeName;
-}
-var AsyncVDOMBuilder = AsyncVDOMBuilder_1;
-createOut_1.aE_(Template.prototype.createOut = function createOut2(globalData, parent, parentOut) {
-  return new AsyncVDOMBuilder(globalData, parent, parentOut);
-});
-renderable(Template.prototype);
-var VElement = vdom$1.b__;
-var vElement = function(tagName, attrs2, key, component, childCount, flags, props) {
-  return new VElement(tagName, attrs2, key, component, childCount, flags, props);
-};
-var ComponentDef = ComponentDef_1;
-var indexBrowser$1 = function beginComponent(componentsContext, component, key, ownerComponentDef) {
-  var componentId = component.id;
-  var componentDef = componentsContext.j_ = new ComponentDef(component, componentId, componentsContext);
-  componentsContext.e_._U_[componentId] = true;
-  componentsContext.b_.push(componentDef);
-  var out = componentsContext.y_;
-  out.bc(component, key, ownerComponentDef && ownerComponentDef.h_);
-  return componentDef;
-};
-var indexBrowser = function endComponent(out) {
-  out.ee();
-};
-var componentsUtil = indexBrowser$4;
-var componentLookup = componentsUtil.C_;
-var ComponentsContext = ComponentsContext$1.exports;
-var getComponentsContext = ComponentsContext.o_;
-var registry = indexBrowser$3;
-var copyProps2 = copyProps$2;
-var isServer = componentsUtil.aw_ === true;
-var beginComponent2 = indexBrowser$1;
-var endComponent2 = indexBrowser;
-var COMPONENT_BEGIN_ASYNC_ADDED_KEY = "$wa";
-function resolveComponentKey(key, parentComponentDef) {
-  if (key[0] === "#") {
-    return key.substring(1);
-  } else {
-    return parentComponentDef.id + "-" + parentComponentDef._L_(key);
-  }
-}
-function trackAsyncComponents(out) {
-  if (out.isSync() || out.global[COMPONENT_BEGIN_ASYNC_ADDED_KEY]) {
-    return;
-  }
-  out.on("beginAsync", handleBeginAsync);
-  out.on("beginDetachedAsync", handleBeginDetachedAsync);
-  out.global[COMPONENT_BEGIN_ASYNC_ADDED_KEY] = true;
-}
-function handleBeginAsync(event) {
-  var parentOut = event.parentOut;
-  var asyncOut = event.out;
-  var componentsContext = parentOut.b_;
-  if (componentsContext !== void 0) {
-    asyncOut.b_ = new ComponentsContext(asyncOut, componentsContext);
-  }
-  asyncOut.c(parentOut.g_, parentOut.i_, parentOut.ax_);
-}
-function handleBeginDetachedAsync(event) {
-  var asyncOut = event.out;
-  handleBeginAsync(event);
-  asyncOut.on("beginAsync", handleBeginAsync);
-  asyncOut.on("beginDetachedAsync", handleBeginDetachedAsync);
-}
-function createRendererFunc(templateRenderFunc, componentProps, renderingLogic) {
-  var onInput = renderingLogic && renderingLogic.onInput;
-  var typeName = componentProps.t;
-  var isSplit = componentProps.s === true;
-  componentProps.i === true;
-  var shouldApplySplitMixins = renderingLogic && isSplit;
-  if (componentProps.d) {
-    throw new Error("Runtime/NODE_ENV Mismatch");
-  }
-  return function renderer2(input, out) {
-    trackAsyncComponents(out);
-    var componentsContext = getComponentsContext(out);
-    var globalComponentsContext = componentsContext.e_;
-    var component = globalComponentsContext._q_;
-    var isRerender = component !== void 0;
-    var id;
-    var isExisting;
-    var customEvents;
-    var parentComponentDef = componentsContext.j_;
-    var ownerComponentDef = out.g_;
-    var ownerComponentId = ownerComponentDef && ownerComponentDef.id;
-    var key = out.i_;
-    if (component) {
-      id = component.id;
-      isExisting = true;
-      globalComponentsContext._q_ = null;
-    } else {
-      if (parentComponentDef) {
-        customEvents = out.ax_;
-        if (key != null) {
-          id = resolveComponentKey(key.toString(), parentComponentDef);
-        } else {
-          id = parentComponentDef._M_();
-        }
-      } else {
-        id = globalComponentsContext._M_();
-      }
-    }
-    if (isServer) {
-      component = registry._P_(renderingLogic, id, input, out, typeName, customEvents, ownerComponentId);
-      input = component._X_;
-    } else {
-      if (!component) {
-        if (isRerender && (component = componentLookup[id]) && component._N_ !== typeName) {
-          component.destroy();
-          component = void 0;
-        }
-        if (component) {
-          isExisting = true;
-        } else {
-          isExisting = false;
-          component = registry._P_(typeName, id);
-          if (shouldApplySplitMixins === true) {
-            shouldApplySplitMixins = false;
-            var renderingLogicProps = typeof renderingLogic == "function" ? renderingLogic.prototype : renderingLogic;
-            copyProps2(renderingLogicProps, component.constructor.prototype);
-          }
-        }
-        component.U_ = true;
-        if (customEvents !== void 0) {
-          component._v_(customEvents, ownerComponentId);
-        }
-        if (isExisting === false) {
-          component._x_(input, out);
-        }
-        input = component._g_(input, onInput, out);
-        if (isExisting === true) {
-          if (component._j_ === false || component.shouldUpdate(input, component.J_) === false) {
-            out.ay_(component);
-            globalComponentsContext._U_[id] = true;
-            component.I_();
-            return;
-          }
-        }
-      }
-      component.S_ = out.global;
-      component._y_(out);
-    }
-    var componentDef = beginComponent2(componentsContext, component, key, ownerComponentDef);
-    componentDef._G_ = isExisting;
-    templateRenderFunc(input, out, componentDef, component, component._t_);
-    endComponent2(out);
-    componentsContext.j_ = parentComponentDef;
-  };
-}
-var renderer = createRendererFunc;
-export { renderer as a, components as c, defineComponent$1 as d, r, t, vElement as v };
+var components = indexBrowser$4;
+export { components as c };

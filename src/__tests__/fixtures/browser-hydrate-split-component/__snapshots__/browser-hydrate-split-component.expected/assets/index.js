@@ -1,4 +1,4 @@
-import { t, v as vElement, r, a as renderer, d as defineComponent, c as components } from "./vendor.6f686af0.js";
+import { c as components } from "./vendor.js";
 const p = function polyfill() {
   const relList = document.createElement("link").relList;
   if (relList && relList.supports && relList.supports("modulepreload")) {
@@ -41,21 +41,11 @@ const p = function polyfill() {
   }
 };
 p();
-var template_marko = "\n  div { color: green }\n";
-const _marko_componentType = "1BSUdNzk", _marko_template = t(_marko_componentType);
-const _marko_node = vElement("div", {
-  "id": "class"
-}, "0", null, 0, 1);
-r(_marko_componentType, () => _marko_template);
-const _marko_component = {
+var index_marko = "";
+var component_0 = {
   onMount() {
     console.log("mounted");
   }
 };
-_marko_template._ = renderer(function(input, out, _componentDef, _component, state) {
-  out.n(_marko_node, _component);
-}, {
-  t: _marko_componentType
-}, _marko_component);
-_marko_template.Component = defineComponent(_marko_component, _marko_template._);
+components.register("iKnY83y7", component_0);
 components.init();

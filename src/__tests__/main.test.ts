@@ -54,8 +54,13 @@ fs.readdirSync(FIXTURES).forEach((fixture) => {
       for (const chunk of (bundle as RollupOutput).output) {
         const source = (chunk.type === "chunk" ? chunk.code : chunk.source)
           .toString()
-          .replace(/@marko\/vite\$\d\.\d\.\d/g, "@marko/vite$latest");
-        await snap(source, chunk.fileName);
+          .replace(/@marko\/vite\$\d\.\d\.\d/g, "@marko/vite$latest")
+          .replace(/\.[a-z0-9]+(?=\.(?:js|css))/gi, "");
+        await snap(
+          source,
+          chunk.fileName.replace(/\.[a-z0-9]+(?=\.(?:js|css))/gi, ""),
+          dir
+        );
       }
     }
   });

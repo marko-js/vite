@@ -1,5 +1,5 @@
 {
-  "*.ts": ["eslint -f codeframe --fix", "prettier --write"],
+  "*.ts": ["eslint -f visualstudio --fix", "prettier --write"],
   "*{.js,.json,.md,.yml,rc}": ["prettier --write"],
   "./package.json": ["fixpack"]
 }
