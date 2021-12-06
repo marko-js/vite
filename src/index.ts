@@ -247,40 +247,46 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
       },
       async resolveId(importee, importer, _importOpts, ssr) {
         const importeeIsAbsolute = path.isAbsolute(importee);
-        if (!importeeIsAbsolute || importee.startsWith(root)) {
-          let importeeQuery = getMarkoQuery(importee);
+        let importeeQuery = getMarkoQuery(importee);
 
-          if (importeeQuery) {
-            importee = importee.slice(0, -importeeQuery.length);
-          } else if (
-            ssr &&
-            linked &&
-            importer &&
-            isMarkoFile(importee) &&
-            !isMarkoFile(importer.replace(queryReg, ""))
-          ) {
-            importeeQuery = serverEntryQuery;
-          } else if (virtualFiles.has(importee)) {
-            return importee;
-          }
+        if (importeeIsAbsolute && !importee.startsWith(root)) {
+          importee = (await this.resolve(importee, importer, resolveOpts))!.id;
+        }
 
-          if (importeeQuery) {
-            const resolved = importeeIsAbsolute
-              ? { id: importee }
-              : importee[0] === "."
-              ? {
-                  id: importer
-                    ? path.resolve(importer, "..", importee)
-                    : path.resolve(root, importee),
-                }
-              : await this.resolve(importee, importer, resolveOpts);
-
-            if (resolved) {
-              resolved.id += importeeQuery;
+        if (importeeQuery) {
+          importee = importee.slice(0, -importeeQuery.length);
+        } else if (virtualFiles.has(importee)) {
+          return importee;
+        } else if (isMarkoFile(importee)) {
+          if (ssr) {
+            if (
+              linked &&
+              importer &&
+              !isMarkoFile(importer.replace(queryReg, ""))
+            ) {
+              importeeQuery = serverEntryQuery;
             }
-
-            return resolved;
+          } else if (!importer || this.getModuleInfo(importer)?.isEntry) {
+            importeeQuery = browserEntryQuery;
           }
+        }
+
+        if (importeeQuery) {
+          const resolved = importeeIsAbsolute
+            ? { id: importee }
+            : importee[0] === "."
+            ? {
+                id: importer
+                  ? path.resolve(importer, "..", importee)
+                  : path.resolve(root, importee),
+              }
+            : await this.resolve(importee, importer, resolveOpts);
+
+          if (resolved) {
+            resolved.id += importeeQuery;
+          }
+
+          return resolved;
         }
 
         return null;
@@ -312,9 +318,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
                   await generateDocManifest(
                     await devServer.transformIndexHtml(
                       "/",
-                      generateInputDoc(
-                        fileNameToURL(fileName, root) + browserEntryQuery
-                      )
+                      generateInputDoc(fileNameToURL(fileName, root))
                     )
                   )
                 );
@@ -486,7 +490,7 @@ function toHTMLEntries(root: string, serverEntries: ServerManifest["entries"]) {
     const markoFile = path.join(root, serverEntries[id]);
     const htmlFile = markoFile + htmlExt;
     virtualFiles.set(htmlFile, {
-      code: generateInputDoc(markoFile + browserEntryQuery),
+      code: generateInputDoc(markoFile),
     });
     result.push(htmlFile);
   }

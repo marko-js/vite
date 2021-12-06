@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node: [12.x, 14.x, 16.x]
+        node: [14.x, 16.x]
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
@@ -28,4 +28,4 @@ jobs:
       - name: Run tests
         run: npm run ci:test
       - name: Report code coverage
-        run: npm run ci:report
+        uses: codecov/codecov-action@v2
