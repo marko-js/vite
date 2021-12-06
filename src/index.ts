@@ -245,42 +245,47 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           }
         }
       },
-      async resolveId(importee, importer, _importOpts, ssr) {
-        const importeeIsAbsolute = path.isAbsolute(importee);
-        let importeeQuery = getMarkoQuery(importee);
-
-        if (importeeIsAbsolute && !importee.startsWith(root)) {
-          importee = (await this.resolve(importee, importer, resolveOpts))!.id;
+      async resolveId(
+        importee,
+        importer,
+        importOpts,
+        ssr = (importOpts as any).ssr
+      ) {
+        if (virtualFiles.has(importee)) {
+          return importee;
         }
+
+        let importeeQuery = getMarkoQuery(importee);
 
         if (importeeQuery) {
           importee = importee.slice(0, -importeeQuery.length);
-        } else if (virtualFiles.has(importee)) {
-          return importee;
-        } else if (isMarkoFile(importee)) {
-          if (ssr) {
-            if (
-              linked &&
-              importer &&
-              !isMarkoFile(importer.replace(queryReg, ""))
-            ) {
-              importeeQuery = serverEntryQuery;
-            }
-          } else if (!importer || this.getModuleInfo(importer)?.isEntry) {
-            importeeQuery = browserEntryQuery;
-          }
+        } else if (
+          ssr &&
+          linked &&
+          importer &&
+          isMarkoFile(importee) &&
+          !isMarkoFile(importer.replace(queryReg, ""))
+        ) {
+          importeeQuery = serverEntryQuery;
+        } else if (
+          !ssr &&
+          isBuild &&
+          importer &&
+          isMarkoFile(importee) &&
+          this.getModuleInfo(importer)!.isEntry
+        ) {
+          importeeQuery = browserEntryQuery;
         }
 
         if (importeeQuery) {
-          const resolved = importeeIsAbsolute
-            ? { id: importee }
-            : importee[0] === "."
-            ? {
-                id: importer
-                  ? path.resolve(importer, "..", importee)
-                  : path.resolve(root, importee),
-              }
-            : await this.resolve(importee, importer, resolveOpts);
+          const resolved =
+            importee[0] === "."
+              ? {
+                  id: importer
+                    ? path.resolve(importer, "..", importee)
+                    : path.resolve(root, importee),
+                }
+              : await this.resolve(importee, importer, resolveOpts);
 
           if (resolved) {
             resolved.id += importeeQuery;
@@ -340,6 +345,16 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
 
         return virtualFiles.get(id) || null;
       },
+      async transformIndexHtml(html) {
+        if (isBuild) {
+          return html;
+        }
+
+        return html.replace(
+          /src\s*=\s*(['"])(\\.|(?!\1).)*\.marko\1/gim,
+          (m) => m.slice(0, -1) + browserEntryQuery + m.slice(-1)
+        );
+      },
       async transform(source, id, ssr) {
         const query = getMarkoQuery(id);
 
@@ -358,7 +373,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         const compiled = await compiler.compile(
           source,
           id,
-          ssr
+          (typeof ssr === "object" ? (ssr as any).ssr : ssr)
             ? ssrConfig
             : query === browserEntryQuery
             ? hydrateConfig
