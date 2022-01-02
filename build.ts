@@ -26,7 +26,7 @@ import { build, BuildOptions } from "esbuild";
     entryPoints,
     outbase: srcdir,
     platform: "node",
-    target: ["node12"],
+    target: ["node14"],
   };
 
   await Promise.all([
