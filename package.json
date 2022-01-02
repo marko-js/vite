@@ -39,7 +39,9 @@
     ".": {
       "import": "./dist/index.mjs",
       "default": "./dist/index.js"
-    }
+    },
+    "./dist/components/vite.marko": "./dist/components/vite.marko",
+    "./dist/components/vite-watch.marko": "./dist/components/vite-watch.marko"
   },
   "files": [
     "dist",
