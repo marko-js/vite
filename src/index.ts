@@ -196,7 +196,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           // use in conjunction with the `.marko` files. To support this
           // we tell Vite to ignore all `.marko` files in node_modules for the server.
           // and instead use the require hook.
-          (await import("@marko/compiler/register")).default({
+          (await import("@marko/compiler/register.js")).default({
             ...ssrConfig,
             sourceMaps: "inline",
             modules: "cjs",
