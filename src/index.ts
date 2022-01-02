@@ -5,8 +5,8 @@ import os from "os";
 import fs from "fs";
 import path from "path";
 import crypto from "crypto";
-import { pathToFileURL } from "url";
 import anyMatch from "anymatch";
+import { pathToFileURL, fileURLToPath } from "url";
 import getServerEntryTemplate from "./server-entry-template";
 import {
   generateInputDoc,
@@ -46,6 +46,8 @@ const virtualFileQuery = "?marko-virtual";
 const markoExt = ".marko";
 const htmlExt = ".html";
 const resolveOpts = { skipSelf: true };
+const thisFile =
+  typeof __filename === "string" ? __filename : fileURLToPath(import.meta.url);
 let tempDir: Promise<string> | undefined;
 
 export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
@@ -125,11 +127,11 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         if (!registeredTag) {
           // Here we inject either the watchMode vite tag, or the build one.
           const transformer = path.resolve(
-            import.meta.url,
+            thisFile,
             "../render-assets-transform"
           );
           registeredTag = path.resolve(
-            import.meta.url,
+            thisFile,
             "../components",
             isBuild ? "vite.marko" : "vite-watch.marko"
           );

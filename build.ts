@@ -33,7 +33,6 @@ import { build, BuildOptions } from "esbuild";
     build({
       ...opts,
       format: "cjs",
-      define: { "import.meta.url": "__filename" },
     }),
     build({
       ...opts,
