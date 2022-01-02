@@ -1,11 +1,12 @@
+import type * as vite from "vite";
+import type * as Compiler from "@marko/compiler";
+
 import os from "os";
 import fs from "fs";
 import path from "path";
 import crypto from "crypto";
 import { pathToFileURL } from "url";
-import * as vite from "vite";
 import anyMatch from "anymatch";
-import type * as Compiler from "@marko/compiler";
 import getServerEntryTemplate from "./server-entry-template";
 import {
   generateInputDoc,
@@ -272,7 +273,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           isBuild &&
           importer &&
           isMarkoFile(importee) &&
-          this.getModuleInfo(importer)!.isEntry
+          this.getModuleInfo(importer)?.isEntry
         ) {
           importeeQuery = browserEntryQuery;
         }

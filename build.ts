@@ -38,10 +38,23 @@ import { build, BuildOptions } from "esbuild";
     build({
       ...opts,
       format: "esm",
+      bundle: true,
+      splitting: true,
       outExtension: { ".js": ".mjs" },
+      plugins: [
+        {
+          name: "external-modules",
+          setup(build) {
+            build.onResolve(
+              { filter: /^[^./]|^\.[^./]|^\.\.[^/]/ },
+              ({ path }) => ({
+                path,
+                external: true,
+              })
+            );
+          },
+        },
+      ],
     }),
   ]);
-})().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+})();
