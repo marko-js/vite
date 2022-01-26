@@ -132,64 +132,64 @@ var vdom$1 = {};
 function VNode$6() {
 }
 VNode$6.prototype = {
-  by_: function(finalChildCount, ownerComponent) {
-    this.bO_ = finalChildCount;
-    this.bP_ = 0;
+  bA_: function(finalChildCount, ownerComponent) {
+    this.bQ_ = finalChildCount;
+    this.bR_ = 0;
+    this.bG_ = null;
+    this.bS_ = null;
+    this.bD_ = null;
     this.bE_ = null;
-    this.bQ_ = null;
-    this.bB_ = null;
-    this.bC_ = null;
-    this.aA_ = ownerComponent;
+    this.aB_ = ownerComponent;
   },
   get _r_() {
-    var firstChild2 = this.bE_;
-    if (firstChild2 && firstChild2.bD_) {
+    var firstChild2 = this.bG_;
+    if (firstChild2 && firstChild2.bF_) {
       var nestedFirstChild = firstChild2._r_;
-      return nestedFirstChild || firstChild2.bR_;
+      return nestedFirstChild || firstChild2.bT_;
     }
     return firstChild2;
   },
-  get bR_() {
-    var nextSibling2 = this.bC_;
+  get bT_() {
+    var nextSibling2 = this.bE_;
     if (nextSibling2) {
-      if (nextSibling2.bD_) {
+      if (nextSibling2.bF_) {
         var firstChild2 = nextSibling2._r_;
-        return firstChild2 || nextSibling2.bR_;
+        return firstChild2 || nextSibling2.bT_;
       }
     } else {
-      var parentNode = this.bB_;
-      if (parentNode && parentNode.bD_) {
-        return parentNode.bR_;
+      var parentNode = this.bD_;
+      if (parentNode && parentNode.bF_) {
+        return parentNode.bT_;
       }
     }
     return nextSibling2;
   },
-  bq_: function(child) {
-    this.bP_++;
-    if (this.bG_ === "textarea") {
-      if (child.bS_) {
-        var childValue = child.bT_;
-        this.bH_ = (this.bH_ || "") + childValue;
+  bs_: function(child) {
+    this.bR_++;
+    if (this.bI_ === "textarea") {
+      if (child.bU_) {
+        var childValue = child.bV_;
+        this.bJ_ = (this.bJ_ || "") + childValue;
       } else if (child.n_ || child.m_) {
-        this.bU_ = true;
+        this.bW_ = true;
       } else {
         throw TypeError();
       }
     } else {
-      var lastChild = this.bQ_;
-      child.bB_ = this;
+      var lastChild = this.bS_;
+      child.bD_ = this;
       if (lastChild) {
-        lastChild.bC_ = child;
+        lastChild.bE_ = child;
       } else {
-        this.bE_ = child;
+        this.bG_ = child;
       }
-      this.bQ_ = child;
+      this.bS_ = child;
     }
     return child;
   },
-  bJ_: function finishChild() {
-    if (this.bP_ === this.bO_ && this.bB_) {
-      return this.bB_.bJ_();
+  bL_: function finishChild() {
+    if (this.bR_ === this.bQ_ && this.bD_) {
+      return this.bD_.bL_();
     } else {
       return this;
     }
@@ -239,20 +239,20 @@ var inherit$6 = inherit_1;
 var extend$4 = extend$5;
 function VDocumentFragmentClone(other) {
   extend$4(this, other);
-  this.bB_ = null;
-  this.bC_ = null;
+  this.bD_ = null;
+  this.bE_ = null;
 }
 function VDocumentFragment$2(out) {
-  this.by_(null);
+  this.bA_(null);
   this.y_ = out;
 }
 VDocumentFragment$2.prototype = {
-  bA_: 11,
-  bD_: true,
-  br_: function() {
+  bC_: 11,
+  bF_: true,
+  bt_: function() {
     return new VDocumentFragmentClone(this);
   },
-  bx_: function(host) {
+  bz_: function(host) {
     return (host.ownerDocument || host).createDocumentFragment();
   }
 };
@@ -290,7 +290,7 @@ function getComponentForEl(el, host) {
         component = componentsByDOMNode$2.get(node);
       }
     } else if (vElement2 = vElementsByDOMNode.get(node)) {
-      component = vElement2.aA_;
+      component = vElement2.aB_;
     }
     if (component) {
       return component;
@@ -345,7 +345,7 @@ function getMarkoPropsFromEl$1(el) {
   var vElement2 = vElementsByDOMNode.get(el);
   var virtualProps;
   if (vElement2) {
-    virtualProps = vElement2.aB_;
+    virtualProps = vElement2.aC_;
   } else {
     virtualProps = vPropsByDOMNode.get(el);
     if (!virtualProps) {
@@ -372,13 +372,13 @@ function addComponentRootToKeyedElements$2(keyedElements, key, rootNode, compone
 indexBrowser$5.al_ = runtimeId$1;
 indexBrowser$5.C_ = componentLookup$4;
 indexBrowser$5.ah_ = getComponentForEl;
-indexBrowser$5.aC_ = destroyComponentForNode$1;
+indexBrowser$5.aD_ = destroyComponentForNode$1;
 indexBrowser$5.D_ = destroyNodeRecursive$3;
 indexBrowser$5._T_ = nextComponentIdProvider$1;
 indexBrowser$5._C_ = attachBubblingEvent$1;
 indexBrowser$5.am_ = getMarkoPropsFromEl$1;
 indexBrowser$5.ap_ = addComponentRootToKeyedElements$2;
-indexBrowser$5.aD_ = normalizeComponentKey$1;
+indexBrowser$5.aE_ = normalizeComponentKey$1;
 var domData$4 = domData$6;
 var componentsUtil$6 = indexBrowser$5;
 var vElementByDOMNode$2 = domData$4.ae_;
@@ -433,55 +433,55 @@ function removeAttribute(el, namespaceURI, name) {
   }
 }
 function VElementClone(other) {
-  this.bE_ = other.bE_;
-  this.bB_ = null;
-  this.bC_ = null;
-  this.bz_ = other.bz_;
-  this.bF_ = other.bF_;
-  this.aB_ = other.aB_;
   this.bG_ = other.bG_;
-  this._I_ = other._I_;
+  this.bD_ = null;
+  this.bE_ = null;
+  this.bB_ = other.bB_;
   this.bH_ = other.bH_;
+  this.aC_ = other.aC_;
   this.bI_ = other.bI_;
+  this._I_ = other._I_;
+  this.bJ_ = other.bJ_;
+  this.bK_ = other.bK_;
 }
 function VElement$4(tagName, attrs2, key, ownerComponent, childCount, flags, props) {
-  this.by_(childCount, ownerComponent);
+  this.bA_(childCount, ownerComponent);
   var constId;
   if (props) {
     constId = props.i;
   }
-  this.bz_ = key;
+  this.bB_ = key;
   this._I_ = flags || 0;
-  this.bF_ = attrs2 || EMPTY_OBJECT$1;
-  this.aB_ = props || EMPTY_OBJECT$1;
-  this.bG_ = tagName;
-  this.bH_ = null;
-  this.bI_ = constId;
+  this.bH_ = attrs2 || EMPTY_OBJECT$1;
+  this.aC_ = props || EMPTY_OBJECT$1;
+  this.bI_ = tagName;
+  this.bJ_ = null;
+  this.bK_ = constId;
   this.n_ = false;
   this.m_ = false;
 }
 VElement$4.prototype = {
-  bA_: 1,
-  br_: function() {
+  bC_: 1,
+  bt_: function() {
     return new VElementClone(this);
   },
   e: function(tagName, attrs2, key, ownerComponent, childCount, flags, props) {
-    var child = this.bq_(new VElement$4(tagName, attrs2, key, ownerComponent, childCount, flags, props));
+    var child = this.bs_(new VElement$4(tagName, attrs2, key, ownerComponent, childCount, flags, props));
     if (childCount === 0) {
-      return this.bJ_();
+      return this.bL_();
     } else {
       return child;
     }
   },
   n: function(node, ownerComponent) {
-    node = node.br_();
-    node.aA_ = ownerComponent;
-    this.bq_(node);
-    return this.bJ_();
+    node = node.bt_();
+    node.aB_ = ownerComponent;
+    this.bs_(node);
+    return this.bL_();
   },
-  bx_: function(host, parentNamespaceURI) {
-    var tagName = this.bG_;
-    var attributes = this.bF_;
+  bz_: function(host, parentNamespaceURI) {
+    var tagName = this.bI_;
+    var attributes = this.bH_;
     var namespaceURI = DEFAULT_NS[tagName] || parentNamespaceURI || NS_HTML;
     var flags = this._I_;
     var el = (host.ownerDocument || host).createElementNS(namespaceURI, tagName);
@@ -509,8 +509,8 @@ VElement$4.prototype = {
     vElementByDOMNode$2.set(el, this);
     return el;
   },
-  bK_: function(name) {
-    var value = this.bF_[name];
+  bM_: function(name) {
+    var value = this.bH_[name];
     return value != null && value !== false;
   }
 };
@@ -519,21 +519,21 @@ var proto$2 = VElementClone.prototype = VElement$4.prototype;
 ["checked", "selected", "disabled"].forEach(function(name) {
   defineProperty(proto$2, name, {
     get: function() {
-      var value = this.bF_[name];
+      var value = this.bH_[name];
       return value !== false && value != null;
     }
   });
 });
 defineProperty(proto$2, "q_", {
   get: function() {
-    var value = this.bH_;
+    var value = this.bJ_;
     if (value == null) {
-      value = this.bF_.value;
+      value = this.bH_.value;
     }
-    return value != null && value !== false ? value + "" : this.bF_.type === "checkbox" || this.bF_.type === "radio" ? "on" : "";
+    return value != null && value !== false ? value + "" : this.bH_.type === "checkbox" || this.bH_.type === "radio" ? "on" : "";
   }
 });
-VElement$4.bL_ = function(attrs2) {
+VElement$4.bN_ = function(attrs2) {
   return attrs2;
 };
 function virtualizeElement$1(node, virtualizeChildNodes2, ownerComponent) {
@@ -562,26 +562,26 @@ function virtualizeElement$1(node, virtualizeChildNodes2, ownerComponent) {
     tagName = tagName.toLowerCase();
   }
   var vdomEl = new VElement$4(tagName, attrs2, null, ownerComponent, 0, 0, props);
-  if (vdomEl.bG_ === "textarea") {
-    vdomEl.bH_ = node.value;
+  if (vdomEl.bI_ === "textarea") {
+    vdomEl.bJ_ = node.value;
   } else if (virtualizeChildNodes2) {
     virtualizeChildNodes2(node, vdomEl, ownerComponent);
   }
   return vdomEl;
 }
-VElement$4.bM_ = virtualizeElement$1;
-VElement$4.bN_ = function(fromEl, vFromEl, toEl) {
-  var removePreservedAttributes = VElement$4.bL_;
+VElement$4.bO_ = virtualizeElement$1;
+VElement$4.bP_ = function(fromEl, vFromEl, toEl) {
+  var removePreservedAttributes = VElement$4.bN_;
   var fromFlags = vFromEl._I_;
   var toFlags = toEl._I_;
   vElementByDOMNode$2.set(fromEl, toEl);
-  var attrs2 = toEl.bF_;
-  var props = toEl.aB_;
+  var attrs2 = toEl.bH_;
+  var props = toEl.aC_;
   if (toFlags & FLAG_CUSTOM_ELEMENT) {
     return assign(fromEl, attrs2);
   }
   var attrName;
-  var oldAttrs = vFromEl.bF_;
+  var oldAttrs = vFromEl.bH_;
   if (oldAttrs) {
     if (oldAttrs === attrs2) {
       return;
@@ -621,7 +621,7 @@ VElement$4.bN_ = function(fromEl, vFromEl, toEl) {
       setAttribute(fromEl, namespaceURI, attrName, attrValue);
     }
   }
-  if (toEl.bz_ === null || fromFlags & FLAG_SPREAD_ATTRS) {
+  if (toEl.bB_ === null || fromFlags & FLAG_SPREAD_ATTRS) {
     for (attrName in oldAttrs) {
       if (!(attrName in attrs2)) {
         if (attrName === ATTR_XLINK_HREF) {
@@ -637,17 +637,17 @@ var VElement_1 = VElement$4;
 var VNode$3 = VNode_1;
 var inherit$4 = inherit_1;
 function VText$2(value, ownerComponent) {
-  this.by_(-1, ownerComponent);
-  this.bT_ = value;
+  this.bA_(-1, ownerComponent);
+  this.bV_ = value;
 }
 VText$2.prototype = {
-  bS_: true,
-  bA_: 3,
-  bx_: function(host) {
-    return (host.ownerDocument || host).createTextNode(this.bT_);
+  bU_: true,
+  bC_: 3,
+  bz_: function(host) {
+    return (host.ownerDocument || host).createTextNode(this.bV_);
   },
-  br_: function() {
-    return new VText$2(this.bT_);
+  bt_: function() {
+    return new VText$2(this.bV_);
   }
 };
 inherit$4(VText$2, VNode$3);
@@ -655,13 +655,13 @@ var VText_1 = VText$2;
 var VNode$2 = VNode_1;
 var inherit$3 = inherit_1;
 function VComponent$2(component, key, ownerComponent, preserve) {
-  this.by_(null, ownerComponent);
-  this.bz_ = key;
+  this.bA_(null, ownerComponent);
+  this.bB_ = key;
   this.h_ = component;
   this.n_ = preserve;
 }
 VComponent$2.prototype = {
-  bA_: 2
+  bC_: 2
 };
 inherit$3(VComponent$2, VNode$2);
 var VComponent_1 = VComponent$2;
@@ -694,13 +694,13 @@ function removeChild$2(node) {
   else
     node.parentNode.removeChild(node);
 }
-helpers$3.aF_ = insertBefore$3;
-helpers$3.aG_ = insertAfter$2;
-helpers$3.bR_ = nextSibling$1;
+helpers$3.aG_ = insertBefore$3;
+helpers$3.aH_ = insertAfter$2;
+helpers$3.bT_ = nextSibling$1;
 helpers$3._r_ = firstChild$1;
-helpers$3.aH_ = removeChild$2;
+helpers$3.aI_ = removeChild$2;
 var helpers$2 = helpers$3;
-var insertBefore$2 = helpers$2.aF_;
+var insertBefore$2 = helpers$2.aG_;
 var fragmentPrototype = {
   nodeType: 12,
   get firstChild() {
@@ -762,14 +762,14 @@ function createFragmentNode$3(startNode, nextNode, parentNode) {
 }
 function beginFragmentNode$1(startNode, parentNode) {
   var fragment2 = createFragmentNode$3(startNode, null, parentNode);
-  fragment2.bX_ = function(nextNode) {
-    fragment2.bX_ = null;
+  fragment2.bZ_ = function(nextNode) {
+    fragment2.bZ_ = null;
     insertBefore$2(fragment2.endNode, nextNode, parentNode || startNode.parentNode);
   };
   return fragment2;
 }
 fragment$1.ao_ = createFragmentNode$3;
-fragment$1.bY_ = beginFragmentNode$1;
+fragment$1.c__ = beginFragmentNode$1;
 var domData$3 = domData$6;
 var keysByDOMNode$1 = domData$3.ag_;
 var vElementByDOMNode$1 = domData$3.ae_;
@@ -777,15 +777,15 @@ var VNode$1 = VNode_1;
 var inherit$2 = inherit_1;
 var createFragmentNode$2 = fragment$1.ao_;
 function VFragment$2(key, ownerComponent, preserve) {
-  this.by_(null, ownerComponent);
-  this.bz_ = key;
+  this.bA_(null, ownerComponent);
+  this.bB_ = key;
   this.n_ = preserve;
 }
 VFragment$2.prototype = {
-  bA_: 12,
-  bx_: function() {
+  bC_: 12,
+  bz_: function() {
     var fragment2 = createFragmentNode$2();
-    keysByDOMNode$1.set(fragment2, this.bz_);
+    keysByDOMNode$1.set(fragment2, this.bB_);
     vElementByDOMNode$1.set(fragment2, this);
     return fragment2;
   }
@@ -817,14 +817,14 @@ var specialHtmlRegexp = /[&<]/;
 function virtualizeChildNodes(node, vdomParent, ownerComponent) {
   var curChild = node.firstChild;
   while (curChild) {
-    vdomParent.bq_(virtualize(curChild, ownerComponent));
+    vdomParent.bs_(virtualize(curChild, ownerComponent));
     curChild = curChild.nextSibling;
   }
 }
 function virtualize(node, ownerComponent) {
   switch (node.nodeType) {
     case 1:
-      return VElement$3.bM_(node, virtualizeChildNodes, ownerComponent);
+      return VElement$3.bO_(node, virtualizeChildNodes, ownerComponent);
     case 3:
       return new VText$1(node.nodeValue, ownerComponent);
     case 11:
@@ -840,7 +840,7 @@ function virtualizeHTML$1(html, ownerComponent) {
   var vdomFragment = new VDocumentFragment$1();
   var curChild = parseHTML(html);
   while (curChild) {
-    vdomFragment.bq_(virtualize(curChild, ownerComponent));
+    vdomFragment.bs_(virtualize(curChild, ownerComponent));
     curChild = curChild.nextSibling;
   }
   return vdomFragment;
@@ -858,27 +858,27 @@ Node_prototype.t = function(value) {
       }
     }
   }
-  this.bq_(vdomNode || new VText$1(value.toString()));
-  return this.bJ_();
+  this.bs_(vdomNode || new VText$1(value.toString()));
+  return this.bL_();
 };
-Node_prototype.bv_ = function() {
-  return this.bq_(new VDocumentFragment$1());
+Node_prototype.bx_ = function() {
+  return this.bs_(new VDocumentFragment$1());
 };
-vdom$1.ba_ = VDocumentFragment$1;
-vdom$1.b__ = VElement$3;
-vdom$1.bb_ = VText$1;
-vdom$1.bc_ = VComponent$1;
-vdom$1.bd_ = VFragment$1;
-vdom$1.bM_ = virtualize;
-vdom$1.be_ = virtualizeHTML$1;
+vdom$1.bc_ = VDocumentFragment$1;
+vdom$1.bb_ = VElement$3;
+vdom$1.bd_ = VText$1;
+vdom$1.be_ = VComponent$1;
+vdom$1.bf_ = VFragment$1;
+vdom$1.bO_ = virtualize;
+vdom$1.bg_ = virtualizeHTML$1;
 var extend$3 = extend$5;
 var componentsUtil$5 = indexBrowser$5;
-var destroyComponentForNode = componentsUtil$5.aC_;
+var destroyComponentForNode = componentsUtil$5.aD_;
 var destroyNodeRecursive$2 = componentsUtil$5.D_;
 var helpers$1 = helpers$3;
-var insertBefore$1 = helpers$1.aF_;
-var insertAfter$1 = helpers$1.aG_;
-var removeChild$1 = helpers$1.aH_;
+var insertBefore$1 = helpers$1.aG_;
+var insertAfter$1 = helpers$1.aH_;
+var removeChild$1 = helpers$1.aI_;
 function resolveEl(el) {
   if (typeof el == "string") {
     var elId = el;
@@ -1028,12 +1028,12 @@ function syncBooleanAttrProp(fromEl, toEl, name) {
 function forEachOption(el, fn, i) {
   var curChild = el._r_;
   while (curChild) {
-    if (curChild.bG_ === "option") {
+    if (curChild.bI_ === "option") {
       fn(curChild, ++i);
     } else {
       i = forEachOption(curChild, fn, i);
     }
-    curChild = curChild.bR_;
+    curChild = curChild.bT_;
   }
   return i;
 }
@@ -1052,12 +1052,12 @@ SpecialElHandlers.prototype = {
     if (fromEl.value != toEl.q_) {
       fromEl.value = toEl.q_;
     }
-    if (fromEl.hasAttribute("value") && !toEl.bK_("value")) {
+    if (fromEl.hasAttribute("value") && !toEl.bM_("value")) {
       fromEl.removeAttribute("value");
     }
   },
   textarea: function(fromEl, toEl) {
-    if (toEl.bU_) {
+    if (toEl.bW_) {
       return;
     }
     var newValue = toEl.q_;
@@ -1074,10 +1074,10 @@ SpecialElHandlers.prototype = {
     }
   },
   select: function(fromEl, toEl) {
-    if (!toEl.bK_("multiple")) {
+    if (!toEl.bM_("multiple")) {
       var selected = 0;
       forEachOption(toEl, function(option, i) {
-        if (option.bK_("selected")) {
+        if (option.bM_("selected")) {
           selected = i;
         }
       }, -1);
@@ -1201,10 +1201,10 @@ var componentsUtil$3 = indexBrowser$5;
 var existingComponentLookup = componentsUtil$3.C_;
 var destroyNodeRecursive$1 = componentsUtil$3.D_;
 var addComponentRootToKeyedElements$1 = componentsUtil$3.ap_;
-var normalizeComponentKey = componentsUtil$3.aD_;
-var VElement$2 = vdom$1.b__;
-var virtualizeElement = VElement$2.bM_;
-var morphAttrs = VElement$2.bN_;
+var normalizeComponentKey = componentsUtil$3.aE_;
+var VElement$2 = vdom$1.bb_;
+var virtualizeElement = VElement$2.bO_;
+var morphAttrs = VElement$2.bP_;
 var eventDelegation$2 = eventDelegation$3;
 var fragment = fragment$1;
 var helpers = helpers$3;
@@ -1213,13 +1213,13 @@ var keysByDOMNode = domData$2.ag_;
 var componentByDOMNode = domData$2.E_;
 var vElementByDOMNode = domData$2.ae_;
 var detachedByDOMNode = domData$2.af_;
-var insertBefore = helpers.aF_;
-var insertAfter = helpers.aG_;
-var nextSibling = helpers.bR_;
+var insertBefore = helpers.aG_;
+var insertAfter = helpers.aH_;
+var nextSibling = helpers.bT_;
 var firstChild = helpers._r_;
-var removeChild = helpers.aH_;
+var removeChild = helpers.aI_;
 var createFragmentNode$1 = fragment.ao_;
-var beginFragmentNode = fragment.bY_;
+var beginFragmentNode = fragment.c__;
 var ELEMENT_NODE$1 = 1;
 var TEXT_NODE = 3;
 var COMMENT_NODE = 8;
@@ -1230,7 +1230,7 @@ function isAutoKey(key) {
   return key[0] !== "@";
 }
 function compareNodeNames(fromEl, toEl) {
-  return fromEl.bG_ === toEl.bG_;
+  return fromEl.bI_ === toEl.bI_;
 }
 function caseInsensitiveCompare(a, b) {
   return a.toLowerCase() === b.toLowerCase();
@@ -1249,14 +1249,14 @@ function morphdom$2(fromNode, toNode, host, componentsContext) {
     isHydrate = globalComponentsContext.f_;
   }
   function insertVirtualNodeBefore(vNode, key, referenceEl, parentEl, ownerComponent, parentComponent) {
-    var realNode = vNode.bx_(host, parentEl.namespaceURI);
+    var realNode = vNode.bz_(host, parentEl.namespaceURI);
     insertBefore(realNode, referenceEl, parentEl);
-    if (vNode.bA_ === ELEMENT_NODE$1 || vNode.bA_ === FRAGMENT_NODE) {
+    if (vNode.bC_ === ELEMENT_NODE$1 || vNode.bC_ === FRAGMENT_NODE) {
       if (key) {
         keysByDOMNode.set(realNode, key);
         (isAutoKey(key) ? parentComponent : ownerComponent).k_[key] = realNode;
       }
-      if (vNode.bG_ !== "textarea") {
+      if (vNode.bI_ !== "textarea") {
         morphChildren(realNode, vNode, parentComponent);
       }
       onNodeAdded(realNode, componentsContext);
@@ -1302,13 +1302,13 @@ function morphdom$2(fromNode, toNode, host, componentsContext) {
     var fromComponent;
     outer:
       while (curToNodeChild) {
-        toNextSibling = curToNodeChild.bR_;
-        curToNodeType = curToNodeChild.bA_;
-        curToNodeKey = curToNodeChild.bz_;
+        toNextSibling = curToNodeChild.bT_;
+        curToNodeType = curToNodeChild.bC_;
+        curToNodeKey = curToNodeChild.bB_;
         if (curFromNodeChild && curFromNodeChild.nodeType === DOCTYPE_NODE) {
           curFromNodeChild = nextSibling(curFromNodeChild);
         }
-        var ownerComponent = curToNodeChild.aA_ || parentComponent;
+        var ownerComponent = curToNodeChild.aB_ || parentComponent;
         var referenceComponent;
         if (curToNodeType === COMPONENT_NODE) {
           var component = curToNodeChild.h_;
@@ -1375,9 +1375,9 @@ function morphdom$2(fromNode, toNode, host, componentsContext) {
             matchingFromEl = referenceComponent.k_[curToNodeKey];
             if (matchingFromEl === void 0 || matchingFromEl === curFromNodeChild) {
               if (isHydrate === true && curFromNodeChild) {
-                if (curFromNodeChild.nodeType === ELEMENT_NODE$1 && (curToNodeChild.n_ || caseInsensitiveCompare(curFromNodeChild.nodeName, curToNodeChild.bG_ || ""))) {
+                if (curFromNodeChild.nodeType === ELEMENT_NODE$1 && (curToNodeChild.n_ || caseInsensitiveCompare(curFromNodeChild.nodeName, curToNodeChild.bI_ || ""))) {
                   curVFromNodeChild = virtualizeElement(curFromNodeChild);
-                  curVFromNodeChild.bG_ = curToNodeChild.bG_;
+                  curVFromNodeChild.bI_ = curToNodeChild.bI_;
                   keysByDOMNode.set(curFromNodeChild, curToNodeKey);
                   referenceComponent.k_[curToNodeKey] = curFromNodeChild;
                   if (curToNodeChild.n_) {
@@ -1388,7 +1388,7 @@ function morphdom$2(fromNode, toNode, host, componentsContext) {
                   curToNodeChild = toNextSibling;
                   curFromNodeChild = fromNextSibling;
                   continue;
-                } else if (curToNodeChild.bA_ === FRAGMENT_NODE && curFromNodeChild.nodeType === COMMENT_NODE) {
+                } else if (curToNodeChild.bC_ === FRAGMENT_NODE && curFromNodeChild.nodeType === COMMENT_NODE) {
                   var content = curFromNodeChild.nodeValue;
                   if (content == "F#" + curToNodeKeyOriginal) {
                     var endNode = curFromNodeChild.nextSibling;
@@ -1434,7 +1434,7 @@ function morphdom$2(fromNode, toNode, host, componentsContext) {
                 curVFromNodeChild = vElementByDOMNode.get(matchingFromEl);
                 if (compareNodeNames(curVFromNodeChild, curToNodeChild)) {
                   if (fromNextSibling === matchingFromEl) {
-                    if (toNextSibling && toNextSibling.bz_ === curFromNodeKey) {
+                    if (toNextSibling && toNextSibling.bB_ === curFromNodeKey) {
                       fromNextSibling = curFromNodeChild;
                       insertBefore(matchingFromEl, curFromNodeChild, fromNode2);
                     } else {
@@ -1481,14 +1481,14 @@ function morphdom$2(fromNode, toNode, host, componentsContext) {
               if (curVFromNodeChild === void 0) {
                 if (isHydrate === true) {
                   curVFromNodeChild = virtualizeElement(curFromNodeChild);
-                  if (caseInsensitiveCompare(curVFromNodeChild.bG_, curToNodeChild.bG_)) {
-                    curVFromNodeChild.bG_ = curToNodeChild.bG_;
+                  if (caseInsensitiveCompare(curVFromNodeChild.bI_, curToNodeChild.bI_)) {
+                    curVFromNodeChild.bI_ = curToNodeChild.bI_;
                   }
                 } else {
                   curFromNodeChild = fromNextSibling;
                   continue;
                 }
-              } else if (curFromNodeKey = curVFromNodeChild.bz_) {
+              } else if (curFromNodeKey = curVFromNodeChild.bB_) {
                 isCompatible = false;
               }
               isCompatible = isCompatible !== false && compareNodeNames(curVFromNodeChild, curToNodeChild) === true;
@@ -1497,11 +1497,11 @@ function morphdom$2(fromNode, toNode, host, componentsContext) {
               }
             } else if (curFromNodeType === TEXT_NODE || curFromNodeType === COMMENT_NODE) {
               isCompatible = true;
-              if (isHydrate === true && toNextSibling && curFromNodeType === TEXT_NODE && toNextSibling.bA_ === TEXT_NODE) {
-                fromNextSibling = curFromNodeChild.splitText(curToNodeChild.bT_.length);
+              if (isHydrate === true && toNextSibling && curFromNodeType === TEXT_NODE && toNextSibling.bC_ === TEXT_NODE) {
+                fromNextSibling = curFromNodeChild.splitText(curToNodeChild.bV_.length);
               }
-              if (curFromNodeChild.nodeValue !== curToNodeChild.bT_) {
-                curFromNodeChild.nodeValue = curToNodeChild.bT_;
+              if (curFromNodeChild.nodeValue !== curToNodeChild.bV_) {
+                curFromNodeChild.nodeValue = curToNodeChild.bV_;
               }
             }
           }
@@ -1517,8 +1517,8 @@ function morphdom$2(fromNode, toNode, host, componentsContext) {
         curToNodeChild = toNextSibling;
         curFromNodeChild = fromNextSibling;
       }
-    if (fromNode2.bX_) {
-      fromNode2.bX_(curFromNodeChild);
+    if (fromNode2.bZ_) {
+      fromNode2.bZ_(curFromNodeChild);
     } else {
       var fragmentBoundary = fromNode2.nodeType === FRAGMENT_NODE ? fromNode2.endNode : null;
       while (curFromNodeChild && curFromNodeChild !== fragmentBoundary) {
@@ -1535,7 +1535,7 @@ function morphdom$2(fromNode, toNode, host, componentsContext) {
         if (!curFromNodeKey || isAutoKey(curFromNodeKey)) {
           referenceComponent = parentComponent;
         } else {
-          referenceComponent = curVFromNodeChild && curVFromNodeChild.aA_;
+          referenceComponent = curVFromNodeChild && curVFromNodeChild.aB_;
         }
         detachNode(curFromNodeChild, fromNode2, referenceComponent);
         curFromNodeChild = fromNextSibling;
@@ -1543,9 +1543,9 @@ function morphdom$2(fromNode, toNode, host, componentsContext) {
     }
   }
   function morphEl(fromEl, vFromEl, toEl, parentComponent) {
-    var nodeName = toEl.bG_;
-    var constId = toEl.bI_;
-    if (constId !== void 0 && vFromEl.bI_ === constId) {
+    var nodeName = toEl.bI_;
+    var constId = toEl.bK_;
+    if (constId !== void 0 && vFromEl.bK_ === constId) {
       return;
     }
     morphAttrs(fromEl, vFromEl, toEl);
@@ -1609,7 +1609,7 @@ var classValue = function classHelper(arg) {
 var _changeCase = {};
 var camelToDashLookup = Object.create(null);
 var dashToCamelLookup = Object.create(null);
-_changeCase.aI_ = function camelToDashCase(name) {
+_changeCase.aJ_ = function camelToDashCase(name) {
   var nameDashed = camelToDashLookup[name];
   if (!nameDashed) {
     nameDashed = camelToDashLookup[name] = name.replace(/([A-Z])/g, "-$1").toLowerCase();
@@ -1619,7 +1619,7 @@ _changeCase.aI_ = function camelToDashCase(name) {
   }
   return nameDashed;
 };
-_changeCase.aJ_ = function dashToCamelCase(name) {
+_changeCase.aK_ = function dashToCamelCase(name) {
   var nameCamel = dashToCamelLookup[name];
   if (!nameCamel) {
     nameCamel = dashToCamelLookup[name] = name.replace(/-([a-z])/g, matchToUpperCase);
@@ -1653,7 +1653,7 @@ var styleValue = function styleHelper(style) {
           if (typeof value === "number" && value) {
             value += "px";
           }
-          styles += changeCase.aI_(name) + ":" + value + ";";
+          styles += changeCase.aJ_(name) + ":" + value + ";";
         }
       }
     }
@@ -1684,21 +1684,21 @@ var attrs = function(attributes) {
 };
 var EventEmitter$1 = src;
 var vdom = vdom$1;
-var VElement$1 = vdom.b__;
-var VDocumentFragment = vdom.ba_;
-var VText = vdom.bb_;
-var VComponent = vdom.bc_;
-var VFragment = vdom.bd_;
-var virtualizeHTML = vdom.be_;
+var VElement$1 = vdom.bb_;
+var VDocumentFragment = vdom.bc_;
+var VText = vdom.bd_;
+var VComponent = vdom.be_;
+var VFragment = vdom.bf_;
+var virtualizeHTML = vdom.bg_;
 var RenderResult$1 = RenderResult_1;
 var morphdom$1 = morphdom_1;
 var attrsHelper = attrs;
 var EVENT_UPDATE = "update";
 var EVENT_FINISH = "finish";
 function State$1(tree) {
-  this.bf_ = new EventEmitter$1();
-  this.bg_ = tree;
-  this.bh_ = false;
+  this.bh_ = new EventEmitter$1();
+  this.bi_ = tree;
+  this.bj_ = false;
 }
 function AsyncVDOMBuilder$1(globalData, parentNode, parentOut) {
   if (!parentNode) {
@@ -1710,56 +1710,56 @@ function AsyncVDOMBuilder$1(globalData, parentNode, parentOut) {
   } else {
     state = new State$1(parentNode);
   }
-  this.bi_ = 1;
-  this.bj_ = 0;
-  this.bk_ = null;
-  this.bl_ = parentOut;
+  this.bk_ = 1;
+  this.bl_ = 0;
+  this.bm_ = null;
+  this.bn_ = parentOut;
   this.data = {};
   this.J_ = state;
   this.l_ = parentNode;
   this.global = globalData || {};
-  this.bm_ = [parentNode];
-  this.bn_ = false;
-  this.bo_ = void 0;
+  this.bo_ = [parentNode];
+  this.bp_ = false;
+  this.bq_ = void 0;
   this.b_ = null;
   this.g_ = null;
   this.i_ = null;
   this.ax_ = null;
 }
 var proto = AsyncVDOMBuilder$1.prototype = {
-  aP_: true,
+  aQ_: true,
   X_: typeof window === "object" && document,
   bc: function(component, key, ownerComponent) {
     var vComponent = new VComponent(component, key, ownerComponent);
-    return this.bp_(vComponent, 0, true);
+    return this.br_(vComponent, 0, true);
   },
   ay_: function(component, key, ownerComponent) {
     var vComponent = new VComponent(component, key, ownerComponent, true);
-    this.bp_(vComponent, 0);
+    this.br_(vComponent, 0);
   },
-  bp_: function(child, childCount, pushToStack) {
-    this.l_.bq_(child);
+  br_: function(child, childCount, pushToStack) {
+    this.l_.bs_(child);
     if (pushToStack === true) {
-      this.bm_.push(child);
+      this.bo_.push(child);
       this.l_ = child;
     }
     return childCount === 0 ? this : child;
   },
   element: function(tagName, attrs2, key, component, childCount, flags, props) {
     var element = new VElement$1(tagName, attrs2, key, component, childCount, flags, props);
-    return this.bp_(element, childCount);
+    return this.br_(element, childCount);
   },
-  aM_: function(tagName, attrs2, key, componentDef, props) {
+  aN_: function(tagName, attrs2, key, componentDef, props) {
     return this.element(tagName, attrsHelper(attrs2), key, componentDef.h_, 0, 0, props);
   },
   n: function(node, component) {
-    var clone = node.br_();
+    var clone = node.bt_();
     this.node(clone);
-    clone.aA_ = component;
+    clone.aB_ = component;
     return this;
   },
   node: function(node) {
-    this.l_.bq_(node);
+    this.l_.bs_(node);
     return this;
   },
   text: function(text, ownerComponent) {
@@ -1774,7 +1774,7 @@ var proto = AsyncVDOMBuilder$1.prototype = {
       }
       text = text.toString();
     }
-    this.l_.bq_(new VText(text, ownerComponent));
+    this.l_.bs_(new VText(text, ownerComponent));
     return this;
   },
   html: function(html, ownerComponent) {
@@ -1786,59 +1786,59 @@ var proto = AsyncVDOMBuilder$1.prototype = {
   },
   beginElement: function(tagName, attrs2, key, component, childCount, flags, props) {
     var element = new VElement$1(tagName, attrs2, key, component, childCount, flags, props);
-    this.bp_(element, childCount, true);
+    this.br_(element, childCount, true);
     return this;
   },
-  aK_: function(tagName, attrs2, key, componentDef, props) {
+  aL_: function(tagName, attrs2, key, componentDef, props) {
     return this.beginElement(tagName, attrsHelper(attrs2), key, componentDef.h_, 0, 0, props);
   },
   bf: function(key, component, preserve) {
     var fragment2 = new VFragment(key, component, preserve);
-    this.bp_(fragment2, null, true);
+    this.br_(fragment2, null, true);
     return this;
   },
   ef: function() {
     this.endElement();
   },
   endElement: function() {
-    var stack = this.bm_;
+    var stack = this.bo_;
     stack.pop();
     this.l_ = stack[stack.length - 1];
   },
   end: function() {
     this.l_ = void 0;
-    var remaining = --this.bi_;
-    var parentOut = this.bl_;
+    var remaining = --this.bk_;
+    var parentOut = this.bn_;
     if (remaining === 0) {
       if (parentOut) {
-        parentOut.bs_();
+        parentOut.bu_();
       } else {
-        this.bt_();
+        this.bv_();
       }
-    } else if (remaining - this.bj_ === 0) {
-      this.bu_();
+    } else if (remaining - this.bl_ === 0) {
+      this.bw_();
     }
     return this;
   },
-  bs_: function() {
-    var remaining = --this.bi_;
+  bu_: function() {
+    var remaining = --this.bk_;
     if (remaining === 0) {
-      var parentOut = this.bl_;
+      var parentOut = this.bn_;
       if (parentOut) {
-        parentOut.bs_();
+        parentOut.bu_();
       } else {
-        this.bt_();
+        this.bv_();
       }
-    } else if (remaining - this.bj_ === 0) {
-      this.bu_();
+    } else if (remaining - this.bl_ === 0) {
+      this.bw_();
     }
   },
-  bt_: function() {
+  bv_: function() {
     var state = this.J_;
-    state.bh_ = true;
-    state.bf_.emit(EVENT_FINISH, this.aQ_());
+    state.bj_ = true;
+    state.bh_.emit(EVENT_FINISH, this.aR_());
   },
-  bu_: function() {
+  bw_: function() {
     var lastArray = this._last;
     var i = 0;
     function next() {
@@ -1862,19 +1862,19 @@ var proto = AsyncVDOMBuilder$1.prototype = {
     return this;
   },
   beginAsync: function(options) {
-    if (this.bn_) {
+    if (this.bp_) {
       throw Error("Tried to render async while in sync mode. Note: Client side await is not currently supported in re-renders (Issue: #942).");
     }
     var state = this.J_;
     if (options) {
       if (options.last) {
-        this.bj_++;
+        this.bl_++;
       }
     }
-    this.bi_++;
-    var documentFragment = this.l_.bv_();
+    this.bk_++;
+    var documentFragment = this.l_.bx_();
     var asyncOut = new AsyncVDOMBuilder$1(this.global, documentFragment, this);
-    state.bf_.emit("beginAsync", {
+    state.bh_.emit("beginAsync", {
       out: asyncOut,
       parentOut: this
     });
@@ -1884,41 +1884,41 @@ var proto = AsyncVDOMBuilder$1.prototype = {
     return new AsyncVDOMBuilder$1(this.global);
   },
   flush: function() {
-    var events = this.J_.bf_;
+    var events = this.J_.bh_;
     if (events.listenerCount(EVENT_UPDATE)) {
       events.emit(EVENT_UPDATE, new RenderResult$1(this));
     }
   },
   B_: function() {
-    return this.J_.bg_;
+    return this.J_.bi_;
   },
-  aQ_: function() {
-    return this.bw_ || (this.bw_ = new RenderResult$1(this));
+  aR_: function() {
+    return this.by_ || (this.by_ = new RenderResult$1(this));
   },
   on: function(event, callback) {
     var state = this.J_;
-    if (event === EVENT_FINISH && state.bh_) {
-      callback(this.aQ_());
+    if (event === EVENT_FINISH && state.bj_) {
+      callback(this.aR_());
     } else if (event === "last") {
       this.onLast(callback);
     } else {
-      state.bf_.on(event, callback);
+      state.bh_.on(event, callback);
     }
     return this;
   },
   once: function(event, callback) {
     var state = this.J_;
-    if (event === EVENT_FINISH && state.bh_) {
-      callback(this.aQ_());
+    if (event === EVENT_FINISH && state.bj_) {
+      callback(this.aR_());
     } else if (event === "last") {
       this.onLast(callback);
     } else {
-      state.bf_.once(event, callback);
+      state.bh_.once(event, callback);
     }
     return this;
   },
   emit: function(type, arg) {
-    var events = this.J_.bf_;
+    var events = this.J_.bh_;
     switch (arguments.length) {
       case 1:
         events.emit(type);
@@ -1933,15 +1933,15 @@ var proto = AsyncVDOMBuilder$1.prototype = {
     return this;
   },
   removeListener: function() {
-    var events = this.J_.bf_;
+    var events = this.J_.bh_;
     events.removeListener.apply(events, arguments);
     return this;
   },
   sync: function() {
-    this.bn_ = true;
+    this.bp_ = true;
   },
   isSync: function() {
-    return this.bn_;
+    return this.bp_;
   },
   onLast: function(callback) {
     var lastArray = this._last;
@@ -1953,12 +1953,12 @@ var proto = AsyncVDOMBuilder$1.prototype = {
     return this;
   },
   A_: function(host) {
-    var node = this.bo_;
+    var node = this.bq_;
     if (!node) {
       var vdomTree = this.B_();
       if (!host)
         host = this.X_;
-      this.bo_ = node = vdomTree.bx_(host, null);
+      this.bq_ = node = vdomTree.bz_(host, null);
       morphdom$1(node, vdomTree, host, this.b_);
     }
     return node;
@@ -2001,7 +2001,7 @@ var proto = AsyncVDOMBuilder$1.prototype = {
 };
 proto.e = proto.element;
 proto.be = proto.beginElement;
-proto.ee = proto.aL_ = proto.endElement;
+proto.ee = proto.aM_ = proto.endElement;
 proto.t = proto.text;
 proto.h = proto.w = proto.write = proto.html;
 var AsyncVDOMBuilder_1 = AsyncVDOMBuilder$1;
@@ -2012,8 +2012,9 @@ function setCreateOut(createOutFunc) {
 function createOut(globalData) {
   return actualCreateOut(globalData);
 }
-createOut.aE_ = setCreateOut;
+createOut.aF_ = setCreateOut;
 var createOut_1 = createOut;
+var indexBrowser$4 = {};
 var queue = [];
 var msg = "" + Math.random();
 window.addEventListener("message", function(ev) {
@@ -2025,13 +2026,13 @@ window.addEventListener("message", function(ev) {
     }
   }
 });
-var indexBrowser$4 = function(callback) {
+indexBrowser$4.az_ = function(callback) {
   if (queue.push(callback) === 1) {
     window.postMessage(msg, "*");
   }
 };
 var defaultCreateOut$1 = createOut_1;
-var setImmediate$1 = indexBrowser$4;
+var setImmediate$1 = indexBrowser$4.az_;
 var extend$2 = extend$5;
 function safeRender(renderFunc, finalData, finalOut, shouldEnd) {
   try {
@@ -2086,7 +2087,7 @@ var renderable = function(target, renderer2) {
         localData.$global = void 0;
       }
       render(localData, out);
-      return out.aQ_();
+      return out.aR_();
     },
     render: function(data, out) {
       var callback;
@@ -2094,7 +2095,7 @@ var renderable = function(target, renderer2) {
       var finalData;
       var globalData;
       var render = renderFunc || this._;
-      var shouldBuffer = this.aS_;
+      var shouldBuffer = this.aU_;
       var shouldEnd = true;
       if (data) {
         finalData = data;
@@ -2104,7 +2105,7 @@ var renderable = function(target, renderer2) {
       } else {
         finalData = {};
       }
-      if (out && out.aP_) {
+      if (out && out.aQ_) {
         finalOut = out;
         shouldEnd = false;
         extend$2(out.global, globalData);
@@ -2116,7 +2117,7 @@ var renderable = function(target, renderer2) {
       }
       if (callback) {
         finalOut.on("finish", function() {
-          callback(null, finalOut.aQ_());
+          callback(null, finalOut.aR_());
         }).once("error", callback);
       }
       globalData = finalOut.global;
@@ -2129,14 +2130,14 @@ var t = function createTemplate(typeName) {
   return new Template(typeName);
 };
 function Template(typeName) {
-  this.aZ_ = typeName;
+  this.ba_ = typeName;
 }
 var AsyncVDOMBuilder = AsyncVDOMBuilder_1;
-createOut_1.aE_(Template.prototype.createOut = function createOut2(globalData, parent, parentOut) {
+createOut_1.aF_(Template.prototype.createOut = function createOut2(globalData, parent, parentOut) {
   return new AsyncVDOMBuilder(globalData, parent, parentOut);
 });
 renderable(Template.prototype);
-var VElement = vdom$1.b__;
+var VElement = vdom$1.bb_;
 var vElement = function(tagName, attrs2, key, component, childCount, flags, props) {
   return new VElement(tagName, attrs2, key, component, childCount, flags, props);
 };
@@ -2471,7 +2472,7 @@ var updateManager$1 = {};
 var updatesScheduled = false;
 var batchStack = [];
 var unbatchedQueue = [];
-var setImmediate = indexBrowser$4;
+var setImmediate = indexBrowser$4.az_;
 function updateUnbatchedComponents() {
   if (unbatchedQueue.length) {
     try {
@@ -2497,15 +2498,15 @@ function updateComponents(queue2) {
 }
 function batchUpdate(func) {
   var batch = {
-    az_: null
+    aA_: null
   };
   batchStack.push(batch);
   try {
     func();
   } finally {
     try {
-      if (batch.az_) {
-        updateComponents(batch.az_);
+      if (batch.aA_) {
+        updateComponents(batch.aA_);
       }
     } finally {
       batchStack.length--;
@@ -2516,10 +2517,10 @@ function queueComponentUpdate(component) {
   var batchStackLen = batchStack.length;
   if (batchStackLen) {
     var batch = batchStack[batchStackLen - 1];
-    if (batch.az_) {
-      batch.az_.push(component);
+    if (batch.aA_) {
+      batch.aA_.push(component);
     } else {
-      batch.az_ = [component];
+      batch.aA_ = [component];
     }
   } else {
     scheduleUpdates();
