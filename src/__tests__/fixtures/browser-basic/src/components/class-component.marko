@@ -1,7 +1,20 @@
 class {
+  onCreate() {
+    this.state = {
+      clickCount: 0,
+      mounted: false
+    };
+  }
   onMount() {
-    console.log("mounted");
+    this.state.mounted = true;
+  }
+
+  handleClick() {
+    this.state.clickCount++;
   }
 }
 
-<div#class/>
+<div#clickable onClick("handleClick")>
+  Mounted: ${state.mounted}
+  Clicks: ${state.clickCount}
+</div>

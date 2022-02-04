@@ -1,7 +1,8 @@
 {
+  "exit": true,
   "timeout": 10000,
   "extension": ["js", "ts"],
   "enable-source-maps": true,
-  "watchFiles": ["src/**/*.ts"],
+  "watchFiles": ["src/**/*.ts", "src/**/*.marko"],
   "require": ["esbuild-register", "mocha-snap"]
 }

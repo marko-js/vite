@@ -1,0 +1,7 @@
+{
+  "type": "module",
+  "scripts": {
+    "dev": "node dev-server.js",
+    "start": "vite build --ssr src/index.js && vite build && node server.js"
+  }
+}
