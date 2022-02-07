@@ -1,6 +1,8 @@
 {
-  "exclude": ["**/__tests__"],
+  "all": true,
   "reporter": ["text", "lcov"],
-  "include": ["src/**/*.ts", "src/**/*.marko"],
+  "extensions": [".js", ".ts", ".marko"],
+  "include": ["src/**/*.{js,ts,marko}"],
+  "exclude": ["**/__tests__"],
   "parserPlugins": ["objectRestSpread", "typescript"]
 }

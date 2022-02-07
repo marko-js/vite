@@ -1,9 +1,9 @@
 // In production, simply start up the http server.
-import { createServer } from "http";
-import serve from "serve-handler";
-import { handler } from "./dist/index.js";
-createServer(async (req, res) => {
+const { createServer } = require("http");
+const serve = require("serve-handler");
+const { handler } = require("./dist");
+module.exports = createServer(async (req, res) => {
   await handler(req, res);
   if (res.headersSent) return;
   await serve(req, res, { public: "dist" });
-}).listen(process.env.PORT || 3000);
+});

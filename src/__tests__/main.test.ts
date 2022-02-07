@@ -1,14 +1,15 @@
+import type http from "http";
 import type { AddressInfo } from "net";
 
 import fs from "fs";
-import http from "http";
 import path from "path";
-import cp from "child_process";
-import timers from "timers/promises";
+import { once } from "events";
+import * as vite from "vite";
 import snap from "mocha-snap";
 import { JSDOM } from "jsdom";
 import * as playwright from "playwright";
 import { defaultNormalizer, defaultSerializer } from "@marko/fixture-snapshots";
+import markoPlugin from "..";
 
 declare global {
   const page: playwright.Page;
@@ -28,7 +29,6 @@ type Step = () => Promise<unknown> | unknown;
 
 let browser: playwright.Browser;
 let changes: string[] = [];
-let proc: cp.ChildProcess;
 
 before(async () => {
   browser = await playwright.chromium.launch();
@@ -72,13 +72,7 @@ before(async () => {
   ]);
 });
 
-afterEach(() => {
-  if (proc) {
-    proc.unref();
-    proc.kill();
-  }
-});
-after(async () => await browser.close());
+after(() => browser.close());
 
 const FIXTURES = path.join(__dirname, "fixtures");
 
@@ -87,6 +81,7 @@ for (const fixture of fs.readdirSync(FIXTURES)) {
     const dir = path.join(FIXTURES, fixture);
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const config = require(path.join(dir, "test.config.ts")) as {
+      ssr: boolean;
       steps?: Step | Step[];
     };
     const steps: Step[] = config.steps
@@ -95,42 +90,108 @@ for (const fixture of fs.readdirSync(FIXTURES)) {
         : [config.steps]
       : [];
 
-    it("dev", async () => {
-      const port = await getAvailablePort();
-      proc = cp.spawn("npm", ["run", "dev"], {
-        cwd: dir,
-        // stdio: "inherit",
-        shell: process.env.SHELL,
-        env: { ...process.env, PORT: `${port}` },
+    if (config.ssr) {
+      it("dev", async () => {
+        await testPage(
+          dir,
+          steps,
+          (
+            await (
+              await import(path.join(dir, "dev-server.js"))
+            ).default
+          ).listen(0)
+        );
       });
 
-      await testPage(dir, steps, port);
-    });
+      it("build", async () => {
+        await vite.build({
+          root: dir,
+          logLevel: "silent",
+          plugins: [markoPlugin()],
+          build: {
+            write: true,
+            minify: false,
+            emptyOutDir: false, // Avoid server / client deleting files from each other.
+            ssr: path.join(dir, "src/index.js"),
+          },
+        });
 
-    it("build", async () => {
-      const port = await getAvailablePort();
-      proc = cp.spawn("npm", ["run", "start"], {
-        cwd: dir,
-        // stdio: "inherit",
-        shell: process.env.SHELL,
-        env: { ...process.env, PORT: `${port}`, NODE_ENV: "production" },
+        await vite.build({
+          root: dir,
+          logLevel: "silent",
+          plugins: [markoPlugin()],
+          build: {
+            write: true,
+            minify: false,
+            emptyOutDir: false, // Avoid server / client deleting files from each other.
+            rollupOptions: {
+              output: {
+                // Output ESM for the server build also.
+                // Remove when https://github.com/vitejs/vite/issues/2152 is resolved.
+                format: "es",
+              },
+            },
+          },
+        });
+
+        await testPage(
+          dir,
+          steps,
+          (await import(path.join(dir, "server.js"))).default.listen(0)
+        );
+      });
+    } else {
+      it("dev", async () => {
+        const devServer = await vite.createServer({
+          root: dir,
+          logLevel: "silent",
+          server: { force: true },
+          plugins: [markoPlugin({ linked: false })],
+        });
+
+        devServer.listen();
+        devServer.httpServer!.once("close", () => devServer.close());
+        await testPage(dir, steps, devServer.httpServer!);
       });
 
-      await testPage(dir, steps, port);
-    });
+      it("build", async () => {
+        await vite.build({
+          root: dir,
+          logLevel: "silent",
+          plugins: [markoPlugin({ linked: false })],
+          build: {
+            write: true,
+            minify: false,
+          },
+        });
+
+        await testPage(
+          dir,
+          steps,
+          (
+            await vite.preview({ root: dir })
+          ).httpServer
+        );
+      });
+    }
   });
 }
 
-async function testPage(dir: string, steps: Step[], port: number) {
-  const href = `http://localhost:${port}`;
-  await waitForAddress(href);
-  await page.goto(href, { waitUntil: "networkidle" });
-  await page.waitForSelector("#app");
-  await forEachChange((html, i) => snap(html, `.loading.${i}.html`, dir));
+async function testPage(dir: string, steps: Step[], server: http.Server) {
+  try {
+    if (!server.listening) await once(server, "listening");
 
-  for (const [i, step] of steps.entries()) {
-    await step();
-    await forEachChange((html, j) => snap(html, `.step-${i}.${j}.html`, dir));
+    const href = `http://localhost:${(server.address() as AddressInfo).port}`;
+    await page.goto(href, { waitUntil: "networkidle" });
+    await page.waitForSelector("#app");
+    await forEachChange((html, i) => snap(html, `.loading.${i}.html`, dir));
+
+    for (const [i, step] of steps.entries()) {
+      await step();
+      await forEachChange((html, j) => snap(html, `.step-${i}.${j}.html`, dir));
+    }
+  } finally {
+    server.close();
   }
 }
 
@@ -148,42 +209,4 @@ async function forEachChange<F extends (html: string, i: number) => unknown>(
   }
 
   changes = [];
-}
-
-function waitForAddress(href: string) {
-  let tries = 20;
-  return new Promise<void>(function check(resolve, reject) {
-    http
-      .get(
-        href,
-        {
-          headers: {
-            Accept: "text/html",
-          },
-        },
-        (res) => {
-          if (res.statusCode === 200) resolve();
-          else retry();
-          res.destroy();
-        }
-      )
-      .once("error", retry);
-
-    function retry() {
-      if (--tries) setTimeout(check, 500, resolve, reject);
-      else reject(new Error(`Timeout connecting to ${href}`));
-    }
-  });
-}
-
-async function getAvailablePort() {
-  return new Promise<number>((resolve) => {
-    const server = http
-      .createServer()
-      .unref()
-      .listen(0, () => {
-        const { port } = server.address() as AddressInfo;
-        server.close(() => resolve(port));
-      });
-  });
 }

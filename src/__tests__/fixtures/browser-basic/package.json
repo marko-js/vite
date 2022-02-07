@@ -1,6 +1,0 @@
-{
-  "scripts": {
-    "dev": "vite --force --port $PORT",
-    "start": "vite build && serve --listen $PORT dist"
-  }
-}
