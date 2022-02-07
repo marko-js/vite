@@ -104,6 +104,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
   };
 
   let root: string;
+  let devEntryFile: string;
   let isBuild = false;
   let isSSRBuild = false;
   let devServer: vite.ViteDevServer;
@@ -121,6 +122,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           opts.compiler || "@marko/compiler"
         )) as typeof Compiler;
         root = config.root || process.cwd();
+        devEntryFile = path.join(root, "index.html");
         isBuild = env.command === "build";
         isSSRBuild = isBuild && linked && Boolean(config.build!.ssr);
 
@@ -266,6 +268,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           ssr &&
           linked &&
           importer &&
+          importer !== devEntryFile && // Vite tries to resolve against an `index.html` in some cases, we ignore it here.
           isMarkoFile(importee) &&
           !isMarkoFile(importer.replace(queryReg, ""))
         ) {

@@ -124,13 +124,6 @@ for (const fixture of fs.readdirSync(FIXTURES)) {
             write: true,
             minify: false,
             emptyOutDir: false, // Avoid server / client deleting files from each other.
-            rollupOptions: {
-              output: {
-                // Output ESM for the server build also.
-                // Remove when https://github.com/vitejs/vite/issues/2152 is resolved.
-                format: "es",
-              },
-            },
           },
         });
 
