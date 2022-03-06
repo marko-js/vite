@@ -1,7 +1,7 @@
 import type http from "http";
-import type { AddressInfo } from "net";
 
 import fs from "fs";
+import net from "net";
 import path from "path";
 import { once } from "events";
 import * as vite from "vite";
@@ -38,6 +38,7 @@ before(async () => {
    * We add a mutation observer to track all mutations (batched)
    * Then we report the list of mutations in a normalized way and snapshot it.
    */
+  console.log("page");
   await Promise.all([
     context.exposeFunction("__track__", (html: string) => {
       const formatted = defaultSerializer(
@@ -162,7 +163,10 @@ for (const fixture of fs.readdirSync(FIXTURES)) {
           dir,
           steps,
           (
-            await vite.preview({ root: dir })
+            await vite.preview({
+              root: dir,
+              preview: { port: await getAvailablePort() },
+            })
           ).httpServer
         );
       });
@@ -174,7 +178,9 @@ async function testPage(dir: string, steps: Step[], server: http.Server) {
   try {
     if (!server.listening) await once(server, "listening");
 
-    const href = `http://localhost:${(server.address() as AddressInfo).port}`;
+    const href = `http://localhost:${
+      (server.address() as net.AddressInfo).port
+    }`;
     await page.goto(href, { waitUntil: "networkidle" });
     await page.waitForSelector("#app");
     await forEachChange((html, i) => snap(html, `.loading.${i}.html`, dir));
@@ -202,4 +208,13 @@ async function forEachChange<F extends (html: string, i: number) => unknown>(
   }
 
   changes = [];
+}
+
+async function getAvailablePort() {
+  return new Promise<number>((resolve) => {
+    const server = net.createServer().listen(0, () => {
+      const { port } = server.address() as net.AddressInfo;
+      server.close(() => resolve(port));
+    });
+  });
 }
