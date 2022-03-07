@@ -6,6 +6,7 @@ import fs from "fs";
 import path from "path";
 import crypto from "crypto";
 import anyMatch from "anymatch";
+import { normalizePath } from "@rollup/pluginutils";
 import { pathToFileURL, fileURLToPath } from "url";
 import getServerEntryTemplate from "./server-entry-template";
 import {
@@ -80,8 +81,10 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
   const domConfig: Compiler.Config = {
     ...baseConfig,
     resolveVirtualDependency(from, dep) {
-      const query = `${virtualFileQuery}&id=${dep.virtualPath}`;
-      const id = from + query;
+      const query = `${virtualFileQuery}&id=${encodeURIComponent(
+        dep.virtualPath
+      )}`;
+      const id = normalizePath(from) + query;
 
       if (devServer) {
         const prev = virtualFiles.get(id);
@@ -121,7 +124,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         compiler ??= (await import(
           opts.compiler || "@marko/compiler"
         )) as typeof Compiler;
-        root = config.root || process.cwd();
+        root = normalizePath(config.root || process.cwd());
         devEntryFile = path.join(root, "index.html");
         isBuild = env.command === "build";
         isSSRBuild = isBuild && linked && Boolean(config.build!.ssr);
@@ -132,10 +135,12 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
             thisFile,
             "../render-assets-transform"
           );
-          registeredTag = path.resolve(
-            thisFile,
-            "../components",
-            isBuild ? "vite.marko" : "vite-watch.marko"
+          registeredTag = normalizePath(
+            path.resolve(
+              thisFile,
+              "../components",
+              isBuild ? "vite.marko" : "vite-watch.marko"
+            )
           );
           compiler.taglib.register("@marko/vite", {
             "<_vite>": { template: registeredTag },
@@ -287,9 +292,11 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           const resolved =
             importee[0] === "."
               ? {
-                  id: importer
-                    ? path.resolve(importer, "..", importee)
-                    : path.resolve(root, importee),
+                  id: normalizePath(
+                    importer
+                      ? path.resolve(importer, "..", importee)
+                      : path.resolve(root, importee)
+                  ),
                 }
               : await this.resolve(importee, importer, resolveOpts);
 
@@ -303,50 +310,42 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         return null;
       },
       async load(id) {
-        const query = getMarkoQuery(id);
+        switch (getMarkoQuery(id)) {
+          case serverEntryQuery: {
+            const fileName = id.slice(0, -serverEntryQuery.length);
+            let entryData: string;
 
-        if (query) {
-          if (!id.startsWith(root)) {
-            id = path.join(root, id);
-          }
-
-          switch (query) {
-            case serverEntryQuery: {
-              const fileName = id.slice(0, -serverEntryQuery.length);
-              let entryData: string;
-
-              if (isBuild) {
-                const relativeFileName = path.relative(root, fileName);
-                const entryId = toEntryId(relativeFileName);
-                serverManifest ??= {
-                  entries: {},
-                  chunksNeedingAssets: [],
-                };
-                serverManifest.entries[entryId] = relativeFileName;
-                entryData = JSON.stringify(entryId);
-              } else {
-                entryData = JSON.stringify(
-                  await generateDocManifest(
-                    await devServer.transformIndexHtml(
-                      "/",
-                      generateInputDoc(fileNameToURL(fileName, root))
-                    )
+            if (isBuild) {
+              const relativeFileName = path.posix.relative(root, fileName);
+              const entryId = toEntryId(relativeFileName);
+              serverManifest ??= {
+                entries: {},
+                chunksNeedingAssets: [],
+              };
+              serverManifest.entries[entryId] = relativeFileName;
+              entryData = JSON.stringify(entryId);
+            } else {
+              entryData = JSON.stringify(
+                await generateDocManifest(
+                  await devServer.transformIndexHtml(
+                    "/",
+                    generateInputDoc(fileNameToURL(fileName, root))
                   )
-                );
-              }
-
-              return getServerEntryTemplate({
-                fileName,
-                entryData,
-                runtimeId,
-              });
-            }
-            case browserEntryQuery:
-              return fs.promises.readFile(
-                id.slice(0, -browserEntryQuery.length),
-                "utf-8"
+                )
               );
+            }
+
+            return getServerEntryTemplate({
+              fileName,
+              entryData,
+              runtimeId,
+            });
           }
+          case browserEntryQuery:
+            return fs.promises.readFile(
+              id.slice(0, -browserEntryQuery.length),
+              "utf-8"
+            );
         }
 
         return virtualFiles.get(id) || null;
@@ -508,7 +507,7 @@ function toHTMLEntries(root: string, serverEntries: ServerManifest["entries"]) {
   const result: string[] = [];
 
   for (const id in serverEntries) {
-    const markoFile = path.join(root, serverEntries[id]);
+    const markoFile = path.posix.join(root, serverEntries[id]);
     const htmlFile = markoFile + htmlExt;
     virtualFiles.set(htmlFile, {
       code: generateInputDoc(markoFile),
