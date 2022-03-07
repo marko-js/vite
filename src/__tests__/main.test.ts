@@ -7,6 +7,7 @@ import { once } from "events";
 import * as vite from "vite";
 import snap from "mocha-snap";
 import { JSDOM } from "jsdom";
+import { pathToFileURL } from "url";
 import * as playwright from "playwright";
 import { defaultNormalizer, defaultSerializer } from "@marko/fixture-snapshots";
 import markoPlugin from "..";
@@ -98,7 +99,9 @@ for (const fixture of fs.readdirSync(FIXTURES)) {
           steps,
           (
             await (
-              await import(path.join(dir, "dev-server.js"))
+              await import(
+                pathToFileURL(path.join(dir, "dev-server.js")).toString()
+              )
             ).default
           ).listen(0)
         );
@@ -131,7 +134,9 @@ for (const fixture of fs.readdirSync(FIXTURES)) {
         await testPage(
           dir,
           steps,
-          (await import(path.join(dir, "server.js"))).default.listen(0)
+          (
+            await import(pathToFileURL(path.join(dir, "server.js")).toString())
+          ).default.listen(0)
         );
       });
     } else {
