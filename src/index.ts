@@ -6,7 +6,6 @@ import fs from "fs";
 import path from "path";
 import crypto from "crypto";
 import anyMatch from "anymatch";
-import { normalizePath } from "@rollup/pluginutils";
 import { pathToFileURL, fileURLToPath } from "url";
 import getServerEntryTemplate from "./server-entry-template";
 import {
@@ -39,6 +38,10 @@ interface ServerManifest {
   chunksNeedingAssets: string[];
 }
 
+const normalizePath =
+  path.sep === "/"
+    ? (id: string) => id
+    : (id: string) => id.replaceAll(path.sep, "/");
 const virtualFiles = new Map<string, { code: string; map?: any }>();
 const queryReg = /\?marko-.+$/;
 const browserEntryQuery = "?marko-browser-entry";
