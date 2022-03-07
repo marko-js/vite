@@ -39,7 +39,6 @@ before(async () => {
    * We add a mutation observer to track all mutations (batched)
    * Then we report the list of mutations in a normalized way and snapshot it.
    */
-  console.log("page");
   await Promise.all([
     context.exposeFunction("__track__", (html: string) => {
       const formatted = defaultSerializer(
