@@ -39,9 +39,9 @@ interface ServerManifest {
 }
 
 const normalizePath =
-  path.sep === "/"
-    ? (id: string) => id
-    : (id: string) => id.replaceAll(path.sep, "/");
+  path.sep === "\\"
+    ? (id: string) => id.replace(/\\/g, "/")
+    : (id: string) => id;
 const virtualFiles = new Map<string, { code: string; map?: any }>();
 const queryReg = /\?marko-.+$/;
 const browserEntryQuery = "?marko-browser-entry";
