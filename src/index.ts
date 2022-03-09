@@ -357,16 +357,11 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           return html;
         }
 
-        html = html.replace(
-          /src\s*=\s*(['"])(\\.|(?!\1).)*\.marko\1/gim,
-          (m) => m.slice(0, -1) + browserEntryQuery + m.slice(-1)
+        return html.replace(
+          /(src\s*=\s*(['"])(?:(?!\2).)*\.marko)(?:\?((?:(?!\2).)*))?\2/gim,
+          (_, prefix, quote, query) =>
+            prefix + browserEntryQuery + (query ? "&" + query : "") + quote
         );
-        html = html.replace(
-          /src\s*=\s*(['"])(\\.|(?!\1).)*\.marko(\?t=[0-9]+)\1/gim,
-          (m) =>
-            m.slice(0, -1) + browserEntryQuery.replace("?", "&") + m.slice(-1)
-        );
-        return html;
       },
       async transform(source, id, ssr) {
         const query = getMarkoQuery(id);
