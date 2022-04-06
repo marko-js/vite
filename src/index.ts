@@ -469,8 +469,15 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
 
           for (const entryId in serverManifest.entries) {
             const fileName = serverManifest.entries[entryId];
-            const chunkId = fileName + htmlExt;
-            const chunk = bundle[chunkId];
+            let chunkId = fileName + htmlExt;
+            let chunk = bundle[chunkId];
+
+            if (!chunk) {
+              // In vite 2.8.x it gave us back posix paths, but in 2.9 we can get windows paths.
+              // so we have to check for both.
+              chunkId = chunkId.replace(/\//g, "\\");
+              chunk = bundle[chunkId];
+            }
 
             if (chunk?.type === "asset") {
               browserManifest[entryId] = await generateDocManifest(
