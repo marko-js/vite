@@ -109,6 +109,7 @@ for (const fixture of fs.readdirSync(FIXTURES)) {
       it("build", async () => {
         await vite.build({
           root: dir,
+          configFile: false,
           logLevel: "silent",
           plugins: [markoPlugin()],
           build: {
@@ -121,6 +122,7 @@ for (const fixture of fs.readdirSync(FIXTURES)) {
 
         await vite.build({
           root: dir,
+          configFile: false,
           logLevel: "silent",
           plugins: [markoPlugin()],
           build: {
@@ -142,6 +144,7 @@ for (const fixture of fs.readdirSync(FIXTURES)) {
       it("dev", async () => {
         const devServer = await vite.createServer({
           root: dir,
+          configFile: false,
           logLevel: "silent",
           server: { force: true },
           plugins: [markoPlugin({ linked: false })],
@@ -155,6 +158,7 @@ for (const fixture of fs.readdirSync(FIXTURES)) {
       it("build", async () => {
         await vite.build({
           root: dir,
+          configFile: false,
           logLevel: "silent",
           plugins: [markoPlugin({ linked: false })],
           build: {
@@ -169,6 +173,7 @@ for (const fixture of fs.readdirSync(FIXTURES)) {
           (
             await vite.preview({
               root: dir,
+              configFile: false,
               preview: { port: await getAvailablePort() },
             })
           ).httpServer
