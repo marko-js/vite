@@ -1,11 +1,11 @@
-static function renderAssets(out, slot) {
+static function renderAssets(slot) {
   const entries = this.___viteEntries;
+  let html = "";
 
   if (entries) {
     const slotWrittenEntriesKey = `___viteWrittenEntries-${slot}`;
     const lastWrittenEntry = this[slotWrittenEntriesKey] || 0;
     const writtenEntries = this[slotWrittenEntriesKey] = entries.length;
-    let html = "";
   
     for (let i = lastWrittenEntry; i < writtenEntries; i++) {
       const slotParts = entries[i][slot];
@@ -15,9 +15,9 @@ static function renderAssets(out, slot) {
         html += slotHtml;
       }
     }
-
-    out.write(html);
   }
+
+  return html;
 }
 
 $ const $global = out.global;
@@ -27,5 +27,5 @@ $ if (!$global.___viteRenderAssets) {
 }
 
 <__flush_here_and_after__>
-  $ $global.___viteRenderAssets(out, input.slot);
+  $!{$global.___viteRenderAssets(input.slot)}
 </>
