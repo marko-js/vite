@@ -74,15 +74,6 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         ...opts.babelConfig?.caller,
       },
     },
-  };
-
-  const ssrConfig: Compiler.Config = {
-    ...baseConfig,
-    output: "html",
-  };
-
-  const domConfig: Compiler.Config = {
-    ...baseConfig,
     resolveVirtualDependency(from, dep) {
       const query = `${virtualFileQuery}&id=${encodeURIComponent(
         dep.virtualPath
@@ -101,6 +92,15 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
       virtualFiles.set(id, dep);
       return `./${path.basename(from) + query}`;
     },
+  };
+
+  const ssrConfig: Compiler.Config = {
+    ...baseConfig,
+    output: "html",
+  };
+
+  const domConfig: Compiler.Config = {
+    ...baseConfig,
     output: "dom",
   };
 
