@@ -1,0 +1,10 @@
+{
+  "name": "isomorphic-marko-dep",
+  "scripts": {
+    "dev": "node dev-server.js",
+    "start": "vite build --ssr src/index.js && vite build && node server.js"
+  },
+  "dependencies": {
+    "test-marko-dep": "0.0.0"
+  }
+}
