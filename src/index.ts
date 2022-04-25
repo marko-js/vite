@@ -7,12 +7,14 @@ import path from "path";
 import crypto from "crypto";
 import anyMatch from "anymatch";
 import { pathToFileURL, fileURLToPath } from "url";
+
 import getServerEntryTemplate from "./server-entry-template";
 import {
   generateInputDoc,
   generateDocManifest,
   DocManifest,
 } from "./manifest-generator";
+import esbuildPlugin from "./marko-plugin";
 
 export interface Options {
   // Defaults to true, set to false to disable automatic component discovery and hydration.
@@ -170,7 +172,6 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
             }
           }
         }
-
         const domDeps = Array.from(
           new Set(
             compiler
@@ -181,36 +182,26 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
 
         const optimizeDeps = (config.optimizeDeps ??= {});
         optimizeDeps.include ??= [];
-        optimizeDeps.include = optimizeDeps.include.concat(
-          domDeps.filter((dep) => path.extname(dep) !== markoExt)
-        );
-
-        optimizeDeps.exclude ??= [];
-        optimizeDeps.exclude = optimizeDeps.exclude.concat(
-          domDeps.filter((dep) => path.extname(dep) === markoExt)
-        );
+        optimizeDeps.include = optimizeDeps.include.concat(domDeps);
 
         if (!isBuild) {
           const serverDeps = Array.from(
-            new Set(
-              compiler
-                .getRuntimeEntryFiles("html", opts.translator)
-                .concat(taglibDeps)
-            )
+            new Set(compiler.getRuntimeEntryFiles("html", opts.translator))
           );
           const ssr = ((config as any).ssr ??= {});
           ssr.external ??= [];
           ssr.external = ssr.external.concat(serverDeps);
-          // Vite cannot handle commonjs modules, which many Marko component libraries
-          // use in conjunction with the `.marko` files. To support this
-          // we tell Vite to ignore all `.marko` files in node_modules for the server.
-          // and instead use the require hook.
-          (await import("@marko/compiler/register.js")).default({
-            ...ssrConfig,
-            sourceMaps: "inline",
-            modules: "cjs",
-          });
         }
+        return {
+          ...config,
+          optimizeDeps: {
+            ...config.optimizeDeps,
+            extensions: [...(config?.optimizeDeps?.extensions || []), ".marko"],
+            esbuildOptions: {
+              plugins: [esbuildPlugin()],
+            } as any,
+          },
+        };
       },
       configureServer(_server) {
         ssrConfig.hot = domConfig.hot = true;
@@ -415,7 +406,6 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
 
           transformWatchFiles.set(id, meta.watchFiles!);
         }
-
         return { code, map };
       },
     },
