@@ -14,7 +14,7 @@ import {
   generateDocManifest,
   DocManifest,
 } from "./manifest-generator";
-import esbuildPlugin from "./marko-plugin";
+import esbuildPlugin from "./esbuild-plugin";
 
 export interface Options {
   // Defaults to true, set to false to disable automatic component discovery and hydration.
@@ -52,6 +52,7 @@ const virtualFileQuery = "?marko-virtual";
 const markoExt = ".marko";
 const htmlExt = ".html";
 const resolveOpts = { skipSelf: true };
+const cache = new Map<string, Compiler.CompileResult>();
 const thisFile =
   typeof __filename === "string" ? __filename : fileURLToPath(import.meta.url);
 let tempDir: Promise<string> | undefined;
@@ -61,10 +62,10 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
   const { runtimeId, linked = true } = opts;
 
   const baseConfig: Compiler.Config = {
+    cache,
     runtimeId,
     sourceMaps: true,
     writeVersionComment: false,
-    cache: new Map<string, Compiler.CompileResult>(),
     babelConfig: {
       ...opts.babelConfig,
       caller: {
@@ -76,38 +77,45 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         ...opts.babelConfig?.caller,
       },
     },
-    resolveVirtualDependency(from, dep) {
-      const query = `${virtualFileQuery}&id=${encodeURIComponent(
-        dep.virtualPath
-      )}`;
-      const id = normalizePath(from) + query;
+  };
 
-      if (devServer) {
-        const prev = virtualFiles.get(id);
-        if (prev && prev.code !== dep.code) {
-          devServer.moduleGraph.invalidateModule(
-            devServer.moduleGraph.getModuleById(id)!
-          );
-        }
+  const resolveViteVirtualDep: Compiler.Config["resolveVirtualDependency"] = (
+    from,
+    dep
+  ) => {
+    const query = `${virtualFileQuery}&id=${encodeURIComponent(
+      dep.virtualPath
+    )}`;
+    const id = normalizePath(from) + query;
+
+    if (devServer) {
+      const prev = virtualFiles.get(id);
+      if (prev && prev.code !== dep.code) {
+        devServer.moduleGraph.invalidateModule(
+          devServer.moduleGraph.getModuleById(id)!
+        );
       }
+    }
 
-      virtualFiles.set(id, dep);
-      return `./${path.basename(from) + query}`;
-    },
+    virtualFiles.set(id, dep);
+    return `./${path.basename(from) + query}`;
   };
 
   const ssrConfig: Compiler.Config = {
     ...baseConfig,
+    resolveVirtualDependency: resolveViteVirtualDep,
     output: "html",
   };
 
   const domConfig: Compiler.Config = {
     ...baseConfig,
+    resolveVirtualDependency: resolveViteVirtualDep,
     output: "dom",
   };
 
   const hydrateConfig: Compiler.Config = {
-    ...domConfig,
+    ...baseConfig,
+    resolveVirtualDependency: resolveViteVirtualDep,
     output: "hydrate",
   };
 
@@ -196,10 +204,16 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           ...config,
           optimizeDeps: {
             ...config.optimizeDeps,
-            extensions: [...(config?.optimizeDeps?.extensions || []), ".marko"],
+            extensions: [
+              ".marko",
+              ...((config.optimizeDeps as any)?.extensions || []),
+            ],
             esbuildOptions: {
-              plugins: [esbuildPlugin()],
-            } as any,
+              plugins: [
+                esbuildPlugin(compiler, baseConfig),
+                ...(config.optimizeDeps?.esbuildOptions?.plugins || []),
+              ],
+            },
           },
         };
       },
