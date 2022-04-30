@@ -7,12 +7,14 @@ import path from "path";
 import crypto from "crypto";
 import anyMatch from "anymatch";
 import { pathToFileURL, fileURLToPath } from "url";
+
 import getServerEntryTemplate from "./server-entry-template";
 import {
   generateInputDoc,
   generateDocManifest,
   DocManifest,
 } from "./manifest-generator";
+import esbuildPlugin from "./esbuild-plugin";
 
 export interface Options {
   // Defaults to true, set to false to disable automatic component discovery and hydration.
@@ -50,6 +52,7 @@ const virtualFileQuery = "?marko-virtual";
 const markoExt = ".marko";
 const htmlExt = ".html";
 const resolveOpts = { skipSelf: true };
+const cache = new Map<string, Compiler.CompileResult>();
 const thisFile =
   typeof __filename === "string" ? __filename : fileURLToPath(import.meta.url);
 let tempDir: Promise<string> | undefined;
@@ -59,10 +62,10 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
   const { runtimeId, linked = true } = opts;
 
   const baseConfig: Compiler.Config = {
+    cache,
     runtimeId,
     sourceMaps: true,
     writeVersionComment: false,
-    cache: new Map<string, Compiler.CompileResult>(),
     babelConfig: {
       ...opts.babelConfig,
       caller: {
@@ -74,38 +77,45 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         ...opts.babelConfig?.caller,
       },
     },
-    resolveVirtualDependency(from, dep) {
-      const query = `${virtualFileQuery}&id=${encodeURIComponent(
-        dep.virtualPath
-      )}`;
-      const id = normalizePath(from) + query;
+  };
 
-      if (devServer) {
-        const prev = virtualFiles.get(id);
-        if (prev && prev.code !== dep.code) {
-          devServer.moduleGraph.invalidateModule(
-            devServer.moduleGraph.getModuleById(id)!
-          );
-        }
+  const resolveViteVirtualDep: Compiler.Config["resolveVirtualDependency"] = (
+    from,
+    dep
+  ) => {
+    const query = `${virtualFileQuery}&id=${encodeURIComponent(
+      dep.virtualPath
+    )}`;
+    const id = normalizePath(from) + query;
+
+    if (devServer) {
+      const prev = virtualFiles.get(id);
+      if (prev && prev.code !== dep.code) {
+        devServer.moduleGraph.invalidateModule(
+          devServer.moduleGraph.getModuleById(id)!
+        );
       }
+    }
 
-      virtualFiles.set(id, dep);
-      return `./${path.basename(from) + query}`;
-    },
+    virtualFiles.set(id, dep);
+    return `./${path.basename(from) + query}`;
   };
 
   const ssrConfig: Compiler.Config = {
     ...baseConfig,
+    resolveVirtualDependency: resolveViteVirtualDep,
     output: "html",
   };
 
   const domConfig: Compiler.Config = {
     ...baseConfig,
+    resolveVirtualDependency: resolveViteVirtualDep,
     output: "dom",
   };
 
   const hydrateConfig: Compiler.Config = {
-    ...domConfig,
+    ...baseConfig,
+    resolveVirtualDependency: resolveViteVirtualDep,
     output: "hydrate",
   };
 
@@ -170,7 +180,6 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
             }
           }
         }
-
         const domDeps = Array.from(
           new Set(
             compiler
@@ -181,36 +190,32 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
 
         const optimizeDeps = (config.optimizeDeps ??= {});
         optimizeDeps.include ??= [];
-        optimizeDeps.include = optimizeDeps.include.concat(
-          domDeps.filter((dep) => path.extname(dep) !== markoExt)
-        );
-
-        optimizeDeps.exclude ??= [];
-        optimizeDeps.exclude = optimizeDeps.exclude.concat(
-          domDeps.filter((dep) => path.extname(dep) === markoExt)
-        );
+        optimizeDeps.include = optimizeDeps.include.concat(domDeps);
 
         if (!isBuild) {
           const serverDeps = Array.from(
-            new Set(
-              compiler
-                .getRuntimeEntryFiles("html", opts.translator)
-                .concat(taglibDeps)
-            )
+            new Set(compiler.getRuntimeEntryFiles("html", opts.translator))
           );
           const ssr = ((config as any).ssr ??= {});
           ssr.external ??= [];
           ssr.external = ssr.external.concat(serverDeps);
-          // Vite cannot handle commonjs modules, which many Marko component libraries
-          // use in conjunction with the `.marko` files. To support this
-          // we tell Vite to ignore all `.marko` files in node_modules for the server.
-          // and instead use the require hook.
-          (await import("@marko/compiler/register.js")).default({
-            ...ssrConfig,
-            sourceMaps: "inline",
-            modules: "cjs",
-          });
         }
+        return {
+          ...config,
+          optimizeDeps: {
+            ...config.optimizeDeps,
+            extensions: [
+              ".marko",
+              ...((config.optimizeDeps as any)?.extensions || []),
+            ],
+            esbuildOptions: {
+              plugins: [
+                esbuildPlugin(compiler, baseConfig),
+                ...(config.optimizeDeps?.esbuildOptions?.plugins || []),
+              ],
+            },
+          },
+        };
       },
       configureServer(_server) {
         ssrConfig.hot = domConfig.hot = true;
@@ -415,7 +420,6 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
 
           transformWatchFiles.set(id, meta.watchFiles!);
         }
-
         return { code, map };
       },
     },
