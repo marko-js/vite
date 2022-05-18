@@ -38,14 +38,9 @@ export default function esbuildPlugin(
             loader: path.extname(args.path).slice(1) as esbuild.Loader,
           })
         );
-
-        build.onResolve({ filter: /\.marko$/ }, async (args) => ({
-          namespace: "file",
-          path: path.resolve(args.resolveDir, args.path),
-        }));
       }
 
-      build.onLoad({ filter: /\.marko$/, namespace: "file" }, async (args) => {
+      build.onLoad({ filter: /\.marko$/ }, async (args) => {
         try {
           const { code, meta } = await compiler.compileFile(
             args.path,
