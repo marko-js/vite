@@ -7,9 +7,14 @@ export default (tag: types.NodePath<types.MarkoTag>, t: typeof types) => {
 };
 
 function renderAssetsCall(t: typeof types, slot: string) {
-  return t.markoTag(
-    t.stringLiteral("_vite"),
-    [t.markoAttribute("slot", t.stringLiteral(slot))],
-    t.markoTagBody()
+  return t.markoPlaceholder(
+    t.callExpression(
+      t.memberExpression(
+        t.memberExpression(t.identifier("out"), t.identifier("global")),
+        t.identifier("___viteRenderAssets")
+      ),
+      [t.stringLiteral(slot)]
+    ),
+    false
   );
 }
