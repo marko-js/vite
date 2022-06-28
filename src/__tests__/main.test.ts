@@ -7,7 +7,7 @@ import { once } from "events";
 import * as vite from "vite";
 import snap from "mocha-snap";
 import { JSDOM } from "jsdom";
-import { pathToFileURL } from "url";
+import { createRequire } from "module";
 import * as playwright from "playwright";
 import { defaultNormalizer, defaultSerializer } from "@marko/fixture-snapshots";
 import markoPlugin from "..";
@@ -28,6 +28,7 @@ declare namespace globalThis {
 declare const __track__: (html: string) => void;
 type Step = () => Promise<unknown> | unknown;
 
+const requireCwd = createRequire(process.cwd());
 let browser: playwright.Browser;
 let changes: string[] = [];
 
@@ -81,7 +82,7 @@ for (const fixture of fs.readdirSync(FIXTURES)) {
   describe(fixture, () => {
     const dir = path.join(FIXTURES, fixture);
     // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const config = require(path.join(dir, "test.config.ts")) as {
+    const config = requireCwd(path.join(dir, "test.config.ts")) as {
       ssr: boolean;
       steps?: Step | Step[];
     };
@@ -96,13 +97,7 @@ for (const fixture of fs.readdirSync(FIXTURES)) {
         await testPage(
           dir,
           steps,
-          (
-            await (
-              await import(
-                pathToFileURL(path.join(dir, "dev-server.js")).toString()
-              )
-            ).default
-          ).listen(0)
+          (await requireCwd(path.join(dir, "dev-server.js"))).listen(0)
         );
       });
 
@@ -135,9 +130,7 @@ for (const fixture of fs.readdirSync(FIXTURES)) {
         await testPage(
           dir,
           steps,
-          (
-            await import(pathToFileURL(path.join(dir, "server.js")).toString())
-          ).default.listen(0)
+          requireCwd(path.join(dir, "server.js")).listen(0)
         );
       });
     } else {
