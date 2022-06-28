@@ -178,26 +178,26 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
             }
           }
         }
-        const domDeps = Array.from(
-          new Set(
-            compiler
-              .getRuntimeEntryFiles("dom", opts.translator)
-              .concat(taglibDeps)
-          )
-        );
 
         const optimizeDeps = (config.optimizeDeps ??= {});
-        optimizeDeps.include ??= [];
-        optimizeDeps.include = optimizeDeps.include.concat(domDeps);
+        optimizeDeps.include = Array.from(
+          new Set([
+            ...(optimizeDeps.include || []),
+            ...compiler.getRuntimeEntryFiles("dom", opts.translator),
+            ...compiler.getRuntimeEntryFiles("html", opts.translator),
+            ...taglibDeps,
+          ])
+        );
 
-        if (!isBuild) {
-          const serverDeps = Array.from(
-            new Set(compiler.getRuntimeEntryFiles("html", opts.translator))
+        const ssr = (config.ssr ??= {});
+        if (ssr.noExternal !== true) {
+          ssr.noExternal = Array.from(
+            new Set(
+              (taglibDeps as (string | RegExp)[]).concat(ssr.noExternal || [])
+            )
           );
-          const ssr = ((config as any).ssr ??= {});
-          ssr.external ??= [];
-          ssr.external = ssr.external.concat(serverDeps);
         }
+
         return {
           ...config,
           optimizeDeps: {

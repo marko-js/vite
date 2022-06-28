@@ -146,7 +146,7 @@ for (const fixture of fs.readdirSync(FIXTURES)) {
           root: dir,
           configFile: false,
           logLevel: "silent",
-          server: { force: true },
+          optimizeDeps: { force: true },
           plugins: [markoPlugin({ linked: false })],
         });
 
