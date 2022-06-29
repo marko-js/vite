@@ -7,6 +7,7 @@ import path from "path";
 import crypto from "crypto";
 import anyMatch from "anymatch";
 import { pathToFileURL, fileURLToPath } from "url";
+import { relativeImportPath } from "relative-import-path";
 
 import getServerEntryTemplate from "./server-entry-template";
 import {
@@ -165,15 +166,16 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
 
         for (const name in lookup.taglibsById) {
           const taglib = lookup.taglibsById[name];
-          if (/[\\/]node_modules[\\/](?!@marko[\\/])/.test(taglib.dirname)) {
+          if (
+            !/^marko-(.+-)?core$/.test(taglib.id) &&
+            /[\\/]node_modules[\\/]/.test(taglib.dirname)
+          ) {
             for (const tagName in taglib.tags) {
               const tag = taglib.tags[tagName];
               const entry = tag.template || tag.renderer;
 
               if (entry) {
-                taglibDeps.push(
-                  entry.replace(/^.*?[\\/]node_modules[\\/]/, "")
-                );
+                taglibDeps.push(relativeImportPath(devEntryFile, entry));
               }
             }
           }
@@ -202,10 +204,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           ...config,
           optimizeDeps: {
             ...config.optimizeDeps,
-            extensions: [
-              ".marko",
-              ...((config.optimizeDeps as any)?.extensions || []),
-            ],
+            extensions: [".marko", ...(config.optimizeDeps?.extensions || [])],
             esbuildOptions: {
               plugins: [
                 esbuildPlugin(compiler, baseConfig),

@@ -6,7 +6,8 @@
 *.DS_Store
 
 # NPM
-node_modules
+**/node_modules/*
+!**/node_modules/test-package
 npm-debug.log
 
 # Build

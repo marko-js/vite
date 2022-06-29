@@ -8,7 +8,8 @@
     "anymatch": "^3.1.2",
     "domelementtype": "^2.3.0",
     "domhandler": "^5.0.3",
-    "htmlparser2": "^8.0.1"
+    "htmlparser2": "^8.0.1",
+    "relative-import-path": "^1.0.0"
   },
   "devDependencies": {
     "@changesets/changelog-github": "^0.4.5",

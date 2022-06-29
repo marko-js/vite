@@ -8,12 +8,11 @@ const markoPlugin = require("../../..").default;
 module.exports = (async () => {
   const devServer = await createServer({
     root: __dirname,
+    appType: "custom",
     logLevel: "silent",
     plugins: [markoPlugin()],
-    server: {
-      force: true,
-      middlewareMode: "ssr",
-    },
+    optimizeDeps: { force: true },
+    server: { middlewareMode: true },
   });
   return devServer.middlewares.use(async (req, res, next) => {
     try {

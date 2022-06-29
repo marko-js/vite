@@ -1,6 +1,6 @@
 {
   "name": "browser-marko-dep",
   "dependencies": {
-    "test-marko-dep": "0.0.0"
+    "test-package": "0.0.0"
   }
 }
