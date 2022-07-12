@@ -81,7 +81,6 @@ const FIXTURES = path.join(__dirname, "fixtures");
 for (const fixture of fs.readdirSync(FIXTURES)) {
   describe(fixture, () => {
     const dir = path.join(FIXTURES, fixture);
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
     const config = requireCwd(path.join(dir, "test.config.ts")) as {
       ssr: boolean;
       steps?: Step | Step[];
@@ -138,12 +137,21 @@ for (const fixture of fs.readdirSync(FIXTURES)) {
         const devServer = await vite.createServer({
           root: dir,
           configFile: false,
+          server: {
+            watch: {
+              ignored: [
+                "**/node_modules/**",
+                "**/dist/**",
+                "**/__snapshots__/**",
+              ],
+            },
+          },
           logLevel: "silent",
           optimizeDeps: { force: true },
           plugins: [markoPlugin({ linked: false })],
         });
 
-        devServer.listen();
+        devServer.listen(await getAvailablePort());
         devServer.httpServer!.once("close", () => devServer.close());
         await testPage(dir, steps, devServer.httpServer!);
       });
@@ -167,6 +175,15 @@ for (const fixture of fs.readdirSync(FIXTURES)) {
             await vite.preview({
               root: dir,
               configFile: false,
+              server: {
+                watch: {
+                  ignored: [
+                    "**/node_modules/**",
+                    "**/dist/**",
+                    "**/__snapshots__/**",
+                  ],
+                },
+              },
               preview: { port: await getAvailablePort() },
             })
           ).httpServer
@@ -183,12 +200,12 @@ async function testPage(dir: string, steps: Step[], server: http.Server) {
     const href = `http://localhost:${
       (server.address() as net.AddressInfo).port
     }`;
-    await page.goto(href, { waitUntil: "networkidle" });
+    await waitForPendingRequests(page, () => page.goto(href));
     await page.waitForSelector("#app");
     await forEachChange((html, i) => snap(html, `.loading.${i}.html`, dir));
 
     for (const [i, step] of steps.entries()) {
-      await step();
+      await waitForPendingRequests(page, step);
       await forEachChange((html, j) => snap(html, `.step-${i}.${j}.html`, dir));
     }
   } finally {
@@ -210,6 +227,37 @@ async function forEachChange<F extends (html: string, i: number) => unknown>(
   }
 
   changes = [];
+}
+
+/**
+ * Utility to run a function against the current page and wait until every
+ * in flight network request has completed before continuing.
+ */
+async function waitForPendingRequests(page: playwright.Page, step: Step) {
+  let remaining = 0;
+  let resolve!: () => void;
+  const addOne = () => remaining++;
+  const finishOne = async () => {
+    // wait a tick to see if new requests start from this one.
+    await page.evaluate(() => {});
+    if (!--remaining) resolve();
+  };
+  const pending = new Promise<void>((_resolve) => (resolve = _resolve));
+
+  page.on("request", addOne);
+  page.on("requestfinished", finishOne);
+  page.on("requestfailed", finishOne);
+
+  try {
+    addOne();
+    await step();
+    finishOne();
+    await pending;
+  } finally {
+    page.off("request", addOne);
+    page.off("requestfinished", finishOne);
+    page.off("requestfailed", finishOne);
+  }
 }
 
 async function getAvailablePort() {

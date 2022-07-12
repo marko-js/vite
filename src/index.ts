@@ -141,18 +141,14 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         isBuild = env.command === "build";
         isSSRBuild = isBuild && linked && Boolean(config.build!.ssr);
 
-        if (!registeredTag) {
+        if (linked && !registeredTag) {
           // Here we inject either the watchMode vite tag, or the build one.
           const transformer = path.resolve(
             thisFile,
             "../render-assets-transform"
           );
           registeredTag = normalizePath(
-            path.resolve(
-              thisFile,
-              "../components",
-              isBuild ? "vite.marko" : "vite-watch.marko"
-            )
+            path.resolve(thisFile, "../components", "vite.marko")
           );
           compiler.taglib.register("@marko/vite", {
             "<_vite>": { template: registeredTag },

@@ -9,10 +9,15 @@ module.exports = (async () => {
   const devServer = await createServer({
     root: __dirname,
     appType: "custom",
-    logLevel: "info",
+    logLevel: "silent",
     plugins: [markoPlugin()],
     optimizeDeps: { force: true },
-    server: { middlewareMode: true },
+    server: {
+      middlewareMode: true,
+      watch: {
+        ignored: ["**/node_modules/**", "**/dist/**", "**/__snapshots__/**"],
+      },
+    },
   });
   return devServer.middlewares.use(async (req, res, next) => {
     try {

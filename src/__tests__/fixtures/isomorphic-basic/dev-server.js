@@ -12,7 +12,12 @@ module.exports = (async () => {
     logLevel: "silent",
     plugins: [markoPlugin()],
     optimizeDeps: { force: true },
-    server: { middlewareMode: true },
+    server: {
+      middlewareMode: true,
+      watch: {
+        ignored: ["**/node_modules/**", "**/dist/**", "**/__snapshots__/**"],
+      },
+    },
   });
   return devServer.middlewares.use(async (req, res, next) => {
     try {
