@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.3.4
+
+### Patch Changes
+
+- [#23](https://github.com/marko-js/vite/pull/23) [`2ad1d18`](https://github.com/marko-js/vite/commit/2ad1d1880a15cf94880fcce520b1fc4a2b6232d5) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Fix package.json version in repo.
+
 ## 2.0.3
 
 ### Patch Changes
