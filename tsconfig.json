@@ -1,7 +1,8 @@
 {
   "include": ["src/**/*"],
   "compilerOptions": {
-    "lib": ["dom", "ESNext"],
+    "rootDir": "src",
+    "lib": ["DOM", "ESNext"],
     "strict": true,
     "outDir": "dist",
     "target": "ESNext",

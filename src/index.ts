@@ -7,6 +7,7 @@ import path from "path";
 import crypto from "crypto";
 import anyMatch from "anymatch";
 import { pathToFileURL, fileURLToPath } from "url";
+import { relativeImportPath } from "relative-import-path";
 
 import getServerEntryTemplate from "./server-entry-template";
 import {
@@ -140,18 +141,14 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         isBuild = env.command === "build";
         isSSRBuild = isBuild && linked && Boolean(config.build!.ssr);
 
-        if (!registeredTag) {
+        if (linked && !registeredTag) {
           // Here we inject either the watchMode vite tag, or the build one.
           const transformer = path.resolve(
             thisFile,
             "../render-assets-transform"
           );
           registeredTag = normalizePath(
-            path.resolve(
-              thisFile,
-              "../components",
-              isBuild ? "vite.marko" : "vite-watch.marko"
-            )
+            path.resolve(thisFile, "../components", "vite.marko")
           );
           compiler.taglib.register("@marko/vite", {
             "<_vite>": { template: registeredTag },
@@ -165,47 +162,45 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
 
         for (const name in lookup.taglibsById) {
           const taglib = lookup.taglibsById[name];
-          if (/[\\/]node_modules[\\/](?!@marko[\\/])/.test(taglib.dirname)) {
+          if (
+            !/^marko-(.+-)?core$/.test(taglib.id) &&
+            /[\\/]node_modules[\\/]/.test(taglib.dirname)
+          ) {
             for (const tagName in taglib.tags) {
               const tag = taglib.tags[tagName];
               const entry = tag.template || tag.renderer;
 
               if (entry) {
-                taglibDeps.push(
-                  entry.replace(/^.*?[\\/]node_modules[\\/]/, "")
-                );
+                taglibDeps.push(relativeImportPath(devEntryFile, entry));
               }
             }
           }
         }
-        const domDeps = Array.from(
-          new Set(
-            compiler
-              .getRuntimeEntryFiles("dom", opts.translator)
-              .concat(taglibDeps)
-          )
-        );
 
         const optimizeDeps = (config.optimizeDeps ??= {});
-        optimizeDeps.include ??= [];
-        optimizeDeps.include = optimizeDeps.include.concat(domDeps);
+        optimizeDeps.include = Array.from(
+          new Set([
+            ...(optimizeDeps.include || []),
+            ...compiler.getRuntimeEntryFiles("dom", opts.translator),
+            ...compiler.getRuntimeEntryFiles("html", opts.translator),
+            ...taglibDeps,
+          ])
+        );
 
-        if (!isBuild) {
-          const serverDeps = Array.from(
-            new Set(compiler.getRuntimeEntryFiles("html", opts.translator))
+        const ssr = (config.ssr ??= {});
+        if (ssr.noExternal !== true) {
+          ssr.noExternal = Array.from(
+            new Set(
+              (taglibDeps as (string | RegExp)[]).concat(ssr.noExternal || [])
+            )
           );
-          const ssr = ((config as any).ssr ??= {});
-          ssr.external ??= [];
-          ssr.external = ssr.external.concat(serverDeps);
         }
+
         return {
           ...config,
           optimizeDeps: {
             ...config.optimizeDeps,
-            extensions: [
-              ".marko",
-              ...((config.optimizeDeps as any)?.extensions || []),
-            ],
+            extensions: [".marko", ...(config.optimizeDeps?.extensions || [])],
             esbuildOptions: {
               plugins: [
                 esbuildPlugin(compiler, baseConfig),
