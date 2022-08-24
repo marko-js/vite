@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.3.5
+
+### Patch Changes
+
+- [#26](https://github.com/marko-js/vite/pull/26) [`4bbfafc`](https://github.com/marko-js/vite/commit/4bbfafc919deff2fc51f28317aae329905502330) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Avoid using fs readFile for browser entry. This allows virtual files to be browser entries.
+
 ## 2.3.4
 
 ### Patch Changes
