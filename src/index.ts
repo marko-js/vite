@@ -125,6 +125,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
   let devServer: vite.ViteDevServer;
   let registeredTag: string | false = false;
   let serverManifest: ServerManifest | undefined;
+  const devEntryFileSources = new Map<string, string>();
   const transformWatchFiles = new Map<string, string[]>();
   const transformOptionalFiles = new Map<string, string[]>();
 
@@ -214,6 +215,10 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         ssrConfig.hot = domConfig.hot = true;
         devServer = _server;
         devServer.watcher.on("all", (type, filename) => {
+          if (type === "unlink") {
+            devEntryFileSources.delete(filename);
+          }
+
           for (const [id, files] of transformWatchFiles) {
             if (anyMatch(files, filename)) {
               devServer.watcher.emit("change", id);
@@ -341,11 +346,28 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
               runtimeId,
             });
           }
-          case browserEntryQuery:
-            return fs.promises.readFile(
-              id.slice(0, -browserEntryQuery.length),
-              "utf-8"
-            );
+          case browserEntryQuery: {
+            // The goal below is to use the original source content
+            // for all browser entries rather than load the content
+            // from disk again.
+            const realId = id.slice(0, -browserEntryQuery.length);
+            if (isBuild) {
+              // In build mode we can actually use the `this.load` api.
+              // https://github.com/vitejs/vite/issues/6810
+              const {
+                meta: { source },
+              } = await this.load({
+                id: realId,
+                resolveDependencies: false,
+              });
+
+              return source;
+            }
+
+            // Otherwise in dev mode we store the source content
+            // when we discover the server entry.
+            return devEntryFileSources.get(realId);
+          }
         }
 
         return virtualFiles.get(id) || null;
@@ -368,6 +390,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           id = id.slice(0, -query.length);
 
           if (query === serverEntryQuery) {
+            devEntryFileSources.set(id, source);
             id = `${id.slice(0, -markoExt.length)}.entry.marko`;
           }
         }
@@ -413,7 +436,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
 
           transformWatchFiles.set(id, meta.watchFiles!);
         }
-        return { code, map };
+        return { code, map, meta: isBuild ? { source } : undefined };
       },
     },
     {
