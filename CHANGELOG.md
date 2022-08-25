@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.3.6
+
+### Patch Changes
+
+- [#28](https://github.com/marko-js/vite/pull/28) [`e8e2f68`](https://github.com/marko-js/vite/commit/e8e2f685d8c8f3a1861bf0da341d59f924741c7c) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Fix regression that caused an issue loading assets when used in dev mode.
+
 ## 2.3.5
 
 ### Patch Changes
