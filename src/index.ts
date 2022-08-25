@@ -330,6 +330,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
               serverManifest.entries[entryId] = relativeFileName;
               entryData = JSON.stringify(entryId);
             } else {
+              devEntryFileSources.set(fileName, "");
               entryData = JSON.stringify(
                 await generateDocManifest(
                   await devServer.transformIndexHtml(
@@ -390,13 +391,16 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           id = id.slice(0, -query.length);
 
           if (query === serverEntryQuery) {
-            devEntryFileSources.set(id, source);
             id = `${id.slice(0, -markoExt.length)}.entry.marko`;
           }
         }
 
         if (!isMarkoFile(id)) {
           return null;
+        }
+
+        if (ssr && !isBuild && devEntryFileSources.has(id)) {
+          devEntryFileSources.set(id, source);
         }
 
         const compiled = await compiler.compile(
