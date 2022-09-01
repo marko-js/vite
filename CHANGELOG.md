@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.3.7
+
+### Patch Changes
+
+- [#30](https://github.com/marko-js/vite/pull/30) [`940dc22`](https://github.com/marko-js/vite/commit/940dc22bf1804723a9297b26b49b2fa112e86eab) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Avoid double resolving server entries and ensure that Marko import queries don't get passed through to other plugins
+
 ## 2.3.6
 
 ### Patch Changes
