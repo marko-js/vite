@@ -312,6 +312,20 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           return resolved;
         }
 
+        if (importer) {
+          const importerQuery = getMarkoQuery(importer);
+          if (importerQuery) {
+            importer = importer.slice(0, -importerQuery.length);
+
+            if (importee[0] === ".") {
+              const resolved = path.resolve(importer, "..", importee);
+              if (resolved === importer) return resolved;
+            }
+
+            return this.resolve(importee, importer, resolveOpts);
+          }
+        }
+
         return null;
       },
       async load(id) {
