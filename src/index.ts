@@ -38,6 +38,9 @@ interface ServerManifest {
   entries: {
     [entryId: string]: string;
   };
+  entrySources: {
+    [entryId: string]: string;
+  };
   chunksNeedingAssets: string[];
 }
 
@@ -125,7 +128,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
   let devServer: vite.ViteDevServer;
   let registeredTag: string | false = false;
   let serverManifest: ServerManifest | undefined;
-  const devEntryFileSources = new Map<string, string>();
+  const entrySources = new Map<string, string>();
   const transformWatchFiles = new Map<string, string[]>();
   const transformOptionalFiles = new Map<string, string[]>();
 
@@ -216,7 +219,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         devServer = _server;
         devServer.watcher.on("all", (type, filename) => {
           if (type === "unlink") {
-            devEntryFileSources.delete(filename);
+            entrySources.delete(filename);
           }
 
           for (const [id, files] of transformWatchFiles) {
@@ -249,6 +252,12 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
               await fs.promises.readFile(serverMetaFile, "utf-8")
             ) as ServerManifest;
             inputOptions.input = toHTMLEntries(root, serverManifest.entries);
+            for (const entry in serverManifest.entrySources) {
+              entrySources.set(
+                path.resolve(root, entry),
+                serverManifest.entrySources[entry]
+              );
+            }
           } catch (err) {
             this.error(
               `You must run the "ssr" build before the "browser" build.`
@@ -333,18 +342,19 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           case serverEntryQuery: {
             const fileName = id.slice(0, -serverEntryQuery.length);
             let entryData: string;
+            entrySources.set(fileName, "");
 
             if (isBuild) {
               const relativeFileName = path.posix.relative(root, fileName);
               const entryId = toEntryId(relativeFileName);
               serverManifest ??= {
                 entries: {},
+                entrySources: {},
                 chunksNeedingAssets: [],
               };
               serverManifest.entries[entryId] = relativeFileName;
               entryData = JSON.stringify(entryId);
             } else {
-              devEntryFileSources.set(fileName, "");
               entryData = JSON.stringify(
                 await generateDocManifest(
                   await devServer.transformIndexHtml(
@@ -364,24 +374,8 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           case browserEntryQuery: {
             // The goal below is to use the original source content
             // for all browser entries rather than load the content
-            // from disk again.
-            const realId = id.slice(0, -browserEntryQuery.length);
-            if (isBuild) {
-              // In build mode we can actually use the `this.load` api.
-              // https://github.com/vitejs/vite/issues/6810
-              const {
-                meta: { source },
-              } = await this.load({
-                id: realId,
-                resolveDependencies: false,
-              });
-
-              return source;
-            }
-
-            // Otherwise in dev mode we store the source content
-            // when we discover the server entry.
-            return devEntryFileSources.get(realId);
+            // from disk again. This is to support virtual Marko entry files.
+            return entrySources.get(id.slice(0, -browserEntryQuery.length));
           }
         }
 
@@ -413,8 +407,12 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           return null;
         }
 
-        if (ssr && !isBuild && devEntryFileSources.has(id)) {
-          devEntryFileSources.set(id, source);
+        if (ssr && entrySources.has(id)) {
+          entrySources.set(id, source);
+
+          if (serverManifest) {
+            serverManifest.entrySources[path.relative(root, id)] = source;
+          }
         }
 
         const compiled = await compiler.compile(
