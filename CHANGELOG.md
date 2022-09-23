@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.3.8
+
+### Patch Changes
+
+- [#32](https://github.com/marko-js/vite/pull/32) [`5640120`](https://github.com/marko-js/vite/commit/56401202880c62b02f2569831265e4c478482ec3) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Avoid using `.load` api since it seems to cause an issue when there are many entry Marko files.
+
 ## 2.3.7
 
 ### Patch Changes
