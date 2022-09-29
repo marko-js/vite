@@ -191,6 +191,13 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           ])
         );
 
+        const optimizeExtensions = (optimizeDeps.extensions ??= []);
+        optimizeExtensions.push(".marko");
+
+        const esbuildOptions = (optimizeDeps.esbuildOptions ??= {});
+        const esbuildPlugins = (esbuildOptions.plugins ??= []);
+        esbuildPlugins.push(esbuildPlugin(compiler, baseConfig));
+
         const ssr = (config.ssr ??= {});
         if (ssr.noExternal !== true) {
           ssr.noExternal = Array.from(
@@ -199,20 +206,6 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
             )
           );
         }
-
-        return {
-          ...config,
-          optimizeDeps: {
-            ...config.optimizeDeps,
-            extensions: [".marko", ...(config.optimizeDeps?.extensions || [])],
-            esbuildOptions: {
-              plugins: [
-                esbuildPlugin(compiler, baseConfig),
-                ...(config.optimizeDeps?.esbuildOptions?.plugins || []),
-              ],
-            },
-          },
-        };
       },
       configureServer(_server) {
         ssrConfig.hot = domConfig.hot = true;
