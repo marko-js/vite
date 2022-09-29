@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.3.9
+
+### Patch Changes
+
+- [#34](https://github.com/marko-js/vite/pull/34) [`571c993`](https://github.com/marko-js/vite/commit/571c99369d20163d8226e15f15cf9edc9a4bc63b) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Switch to purely using the mutation style for update config in the config hook.
+
 ## 2.3.8
 
 ### Patch Changes
