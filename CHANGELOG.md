@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.3.10
+
+### Patch Changes
+
+- [#38](https://github.com/marko-js/vite/pull/38) [`743f9ae`](https://github.com/marko-js/vite/commit/743f9ae81baff9b1930c934e8f9a3aca68510d40) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Include vite 4 in peerDependency range.
+
 ## 2.3.9
 
 ### Patch Changes
