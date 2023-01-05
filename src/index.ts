@@ -33,8 +33,6 @@ export interface Options {
   babelConfig?: Compiler.Config["babelConfig"];
   // Store to use between SSR and client builds, defaults to file system
   store?: BuildStore;
-  // Files to use as client entries - not supported yet
-  entries?: string[];
 }
 
 interface BrowserManifest {
@@ -157,13 +155,6 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           new FileStore(
             `marko-vite-${crypto.createHash("SHA1").update(root).digest("hex")}`
           );
-
-        // Figure out what else needs to be done to support `entries` option
-        // if (opts.entries) {
-        //   for (const entry in opts.entries) {
-        //     entrySources.set(path.resolve(root, entry), "");
-        //   }
-        // }
 
         if (linked && !registeredTag) {
           // Here we inject either the watchMode vite tag, or the build one.
