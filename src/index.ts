@@ -1,7 +1,6 @@
 import type * as vite from "vite";
 import type * as Compiler from "@marko/compiler";
 
-import os from "os";
 import fs from "fs";
 import path from "path";
 import crypto from "crypto";
@@ -16,6 +15,10 @@ import {
   DocManifest,
 } from "./manifest-generator";
 import esbuildPlugin from "./esbuild-plugin";
+import { BuildStore, FileStore } from "./store";
+
+export * from "./store";
+export type { BuildStore } from "./store";
 
 export interface Options {
   // Defaults to true, set to false to disable automatic component discovery and hydration.
@@ -28,6 +31,8 @@ export interface Options {
   translator?: string;
   // Overrides the Babel config that Marko will use.
   babelConfig?: Compiler.Config["babelConfig"];
+  // Store to use between SSR and client builds, defaults to file system
+  store?: BuildStore;
 }
 
 interface BrowserManifest {
@@ -53,13 +58,13 @@ const queryReg = /\?marko-.+$/;
 const browserEntryQuery = "?marko-browser-entry";
 const serverEntryQuery = "?marko-server-entry";
 const virtualFileQuery = "?marko-virtual";
+const manifestFileName = "manifest.json";
 const markoExt = ".marko";
 const htmlExt = ".html";
 const resolveOpts = { skipSelf: true };
 const cache = new Map<string, Compiler.CompileResult>();
 const thisFile =
   typeof __filename === "string" ? __filename : fileURLToPath(import.meta.url);
-let tempDir: Promise<string> | undefined;
 
 export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
   let compiler: typeof Compiler;
@@ -128,6 +133,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
   let devServer: vite.ViteDevServer;
   let registeredTag: string | false = false;
   let serverManifest: ServerManifest | undefined;
+  let store: BuildStore;
   const entrySources = new Map<string, string>();
   const transformWatchFiles = new Map<string, string[]>();
   const transformOptionalFiles = new Map<string, string[]>();
@@ -144,6 +150,11 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         devEntryFile = path.join(root, "index.html");
         isBuild = env.command === "build";
         isSSRBuild = isBuild && linked && Boolean(config.build!.ssr);
+        store =
+          opts.store ||
+          new FileStore(
+            `marko-vite-${crypto.createHash("SHA1").update(root).digest("hex")}`
+          );
 
         if (linked && !registeredTag) {
           // Here we inject either the watchMode vite tag, or the build one.
@@ -237,12 +248,12 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
       },
       async buildStart(inputOptions) {
         if (isBuild && linked && !isSSRBuild) {
-          const serverMetaFile = await getServerManifestFile(root);
-          this.addWatchFile(serverMetaFile);
+          // Is this needed?
+          //this.addWatchFile(serverMetaFile);
 
           try {
             serverManifest = JSON.parse(
-              await fs.promises.readFile(serverMetaFile, "utf-8")
+              (await store.get(manifestFileName))!
             ) as ServerManifest;
             inputOptions.input = toHTMLEntries(root, serverManifest.entries);
             for (const entry in serverManifest.entrySources) {
@@ -489,15 +500,12 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
             }
           }
 
-          await fs.promises.writeFile(
-            await getServerManifestFile(root),
-            JSON.stringify(serverManifest)
-          );
+          await store.set(manifestFileName, JSON.stringify(serverManifest));
         } else {
           const browserManifest: BrowserManifest = {};
 
-          for (const entryId in serverManifest.entries) {
-            const fileName = serverManifest.entries[entryId];
+          for (const entryId in serverManifest!.entries) {
+            const fileName = serverManifest!.entries[entryId];
             let chunkId = fileName + htmlExt;
             let chunk = bundle[chunkId];
 
@@ -525,7 +533,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
             browserManifest
           )};\n`;
 
-          for (const fileName of serverManifest.chunksNeedingAssets) {
+          for (const fileName of serverManifest!.chunksNeedingAssets) {
             await fs.promises.appendFile(fileName, manifestStr);
           }
         }
@@ -555,35 +563,6 @@ function toHTMLEntries(root: string, serverEntries: ServerManifest["entries"]) {
   }
 
   return result;
-}
-
-async function getServerManifestFile(root: string) {
-  return path.join(await getTempDir(root), "manifest.json");
-}
-
-function getTempDir(root: string) {
-  return (
-    tempDir ||
-    (tempDir = (async () => {
-      const dir = path.join(
-        os.tmpdir(),
-        `marko-vite-${crypto.createHash("SHA1").update(root).digest("hex")}`
-      );
-
-      try {
-        const stat = await fs.promises.stat(dir);
-
-        if (stat.isDirectory()) {
-          return dir;
-        }
-      } catch {
-        await fs.promises.mkdir(dir);
-        return dir;
-      }
-
-      throw new Error("Unable to create temp directory");
-    })())
-  );
 }
 
 function toEntryId(id: string) {

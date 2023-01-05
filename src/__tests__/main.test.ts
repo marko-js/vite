@@ -10,7 +10,7 @@ import { JSDOM } from "jsdom";
 import { createRequire } from "module";
 import * as playwright from "playwright";
 import { defaultNormalizer, defaultSerializer } from "@marko/fixture-snapshots";
-import markoPlugin from "..";
+import markoPlugin, { type Options } from "..";
 
 declare global {
   const page: playwright.Page;
@@ -84,6 +84,7 @@ for (const fixture of fs.readdirSync(FIXTURES)) {
     const config = requireCwd(path.join(dir, "test.config.ts")) as {
       ssr: boolean;
       steps?: Step | Step[];
+      options?: Options;
     };
     const steps: Step[] = config.steps
       ? Array.isArray(config.steps)
@@ -105,7 +106,7 @@ for (const fixture of fs.readdirSync(FIXTURES)) {
           root: dir,
           configFile: false,
           logLevel: "silent",
-          plugins: [markoPlugin()],
+          plugins: [markoPlugin(config.options)],
           build: {
             write: true,
             minify: false,
@@ -118,7 +119,7 @@ for (const fixture of fs.readdirSync(FIXTURES)) {
           root: dir,
           configFile: false,
           logLevel: "silent",
-          plugins: [markoPlugin()],
+          plugins: [markoPlugin(config.options)],
           build: {
             write: true,
             minify: false,
@@ -148,7 +149,7 @@ for (const fixture of fs.readdirSync(FIXTURES)) {
           },
           logLevel: "silent",
           optimizeDeps: { force: true },
-          plugins: [markoPlugin({ linked: false })],
+          plugins: [markoPlugin({ ...config.options, linked: false })],
         });
 
         devServer.listen(await getAvailablePort());
@@ -161,7 +162,7 @@ for (const fixture of fs.readdirSync(FIXTURES)) {
           root: dir,
           configFile: false,
           logLevel: "silent",
-          plugins: [markoPlugin({ linked: false })],
+          plugins: [markoPlugin({ ...config.options, linked: false })],
           build: {
             write: true,
             minify: false,

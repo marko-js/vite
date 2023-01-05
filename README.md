@@ -118,6 +118,26 @@ marko({ runtimeId: "MY_MARKO_RUNTIME_ID" });
 
 Set this to `false` to opt out of [linked mode](#linked-mode). When this is false, the plugin will only handle resolving and transforming `.marko` files.
 
+### options.store
+
+Storage mechanism to preserve data between SSR and client builds when building in linked mode. Two implementations are available:
+
+- FileStore _(default)_
+
+  ```js
+  import { FileStore } from "@marko/vite";
+  const store = new FileStore();
+  ```
+
+  Reads/writes data to the file system. Use this when running the SSR and client builds in seperate processes such as when using Vite from the command line or npm scripts.
+
+- MemoryStore
+  ```js
+  import { MemoryStore } from "@marko/vite";
+  const store = new MemoryStore();
+  ```
+  Reads/writes data to memory. This option can be used when building with Vite programatically.
+
 ## Code of Conduct
 
 This project adheres to the [eBay Code of Conduct](./.github/CODE_OF_CONDUCT.md). By participating in this project you agree to abide by its terms.
