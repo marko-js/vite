@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.3.11
+
+### Patch Changes
+
+- [#40](https://github.com/marko-js/vite/pull/40) [`427c493`](https://github.com/marko-js/vite/commit/427c493c41a31eeff238c57f8050dbaeb137ebe8) Thanks [@rturnq](https://github.com/rturnq)! - Add store option for linked mode builds
+
 ## 2.3.10
 
 ### Patch Changes
