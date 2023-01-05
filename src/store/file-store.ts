@@ -12,8 +12,8 @@ export default class FileStore implements BuildStore {
     this._cache = new Map();
   }
   async _getKeyPath(key: string) {
-    const temp = await (this._temp ??= getTempDir(this._id));
-    return path.join(temp, key);
+    this._temp ??= getTempDir(this._id);
+    return path.join(await this._temp, key);
   }
   async has(key: string) {
     if (!this._cache.has(key)) {
