@@ -49,11 +49,24 @@ interface ServerManifest {
   chunksNeedingAssets: string[];
 }
 
+interface VirtualFile {
+  code: string;
+  map?: any;
+}
+
+type DeferredPromise<T> = Promise<T> & {
+  resolve: (value: T) => void;
+  reject: (error: Error) => void;
+};
+
 const normalizePath =
   path.sep === "\\"
     ? (id: string) => id.replace(/\\/g, "/")
     : (id: string) => id;
-const virtualFiles = new Map<string, { code: string; map?: any }>();
+const virtualFiles = new Map<
+  string,
+  VirtualFile | DeferredPromise<VirtualFile>
+>();
 const queryReg = /\?marko-.+$/;
 const browserEntryQuery = "?marko-browser-entry";
 const serverEntryQuery = "?marko-server-entry";
@@ -62,14 +75,13 @@ const manifestFileName = "manifest.json";
 const markoExt = ".marko";
 const htmlExt = ".html";
 const resolveOpts = { skipSelf: true };
-const cache = new Map<string, Compiler.CompileResult>();
+const cache = new Map<unknown, unknown>();
 const thisFile =
   typeof __filename === "string" ? __filename : fileURLToPath(import.meta.url);
 
 export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
   let compiler: typeof Compiler;
   const { runtimeId, linked = true } = opts;
-
   const baseConfig: Compiler.Config = {
     cache,
     runtimeId,
@@ -97,10 +109,8 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
 
     if (devServer) {
       const prev = virtualFiles.get(id);
-      if (prev && prev.code !== dep.code) {
-        devServer.moduleGraph.invalidateModule(
-          devServer.moduleGraph.getModuleById(id)!
-        );
+      if (isDeferredPromise(prev)) {
+        prev.resolve(dep);
       }
     }
 
@@ -224,6 +234,8 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         devServer.watcher.on("all", (type, filename) => {
           if (type === "unlink") {
             entrySources.delete(filename);
+            transformWatchFiles.delete(filename);
+            transformOptionalFiles.delete(filename);
           }
 
           for (const [id, files] of transformWatchFiles) {
@@ -233,24 +245,28 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           }
 
           if (type === "add" || type === "unlink") {
-            let clearedCache = false;
             for (const [id, files] of transformOptionalFiles) {
               if (anyMatch(files, filename)) {
-                if (!clearedCache) {
-                  baseConfig.cache!.clear();
-                  clearedCache = true;
-                }
                 devServer.watcher.emit("change", id);
               }
             }
           }
         });
       },
+
+      handleHotUpdate(ctx) {
+        compiler.taglib.clearCaches();
+        baseConfig.cache!.clear();
+
+        for (const mod of ctx.modules) {
+          if (mod.id && virtualFiles.has(mod.id)) {
+            virtualFiles.set(mod.id, createDeferredPromise());
+          }
+        }
+      },
+
       async buildStart(inputOptions) {
         if (isBuild && linked && !isSSRBuild) {
-          // Is this needed?
-          //this.addWatchFile(serverMetaFile);
-
           try {
             serverManifest = JSON.parse(
               (await store.get(manifestFileName))!
@@ -433,7 +449,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         let { code } = compiled;
 
         if (query !== browserEntryQuery && devServer) {
-          code += `\nif (import.meta.hot) import.meta.hot.accept();`;
+          code += `\nif (import.meta.hot) import.meta.hot.accept(() => {});`;
         }
 
         if (devServer) {
@@ -443,7 +459,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
             path.sep +
             (templateName === "index" ? "" : `${templateName}.`);
 
-          for (const file of meta.watchFiles!) {
+          for (const file of meta.watchFiles) {
             this.addWatchFile(file);
           }
 
@@ -454,7 +470,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
             `${optionalFilePrefix}marko-tag.json`,
           ]);
 
-          transformWatchFiles.set(id, meta.watchFiles!);
+          transformWatchFiles.set(id, meta.watchFiles);
         }
         return { code, map, meta: isBuild ? { source } : undefined };
       },
@@ -602,6 +618,22 @@ function getBasenameWithoutExt(file: string): string {
   const baseStart = file.lastIndexOf(path.sep) + 1;
   const extStart = file.indexOf(".", baseStart + 1);
   return file.slice(baseStart, extStart);
+}
+
+function createDeferredPromise<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (error: Error) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  }) as DeferredPromise<T>;
+  promise.resolve = resolve;
+  promise.reject = reject;
+  return promise;
+}
+
+function isDeferredPromise<T>(obj: unknown): obj is DeferredPromise<T> {
+  return typeof (obj as Promise<T>)?.then === "function";
 }
 
 function isEmpty(obj: unknown) {
