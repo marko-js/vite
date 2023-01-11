@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.3.12
+
+### Patch Changes
+
+- [#42](https://github.com/marko-js/vite/pull/42) [`f3962a9`](https://github.com/marko-js/vite/commit/f3962a98cf645229bea150a54ce51353d1067ced) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Fix issue with hot module reloading virtual dependencies.
+
+- [#42](https://github.com/marko-js/vite/pull/42) [`f3962a9`](https://github.com/marko-js/vite/commit/f3962a98cf645229bea150a54ce51353d1067ced) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Fix issue with new tags not discovered during HMR.
+
 ## 2.3.11
 
 ### Patch Changes
