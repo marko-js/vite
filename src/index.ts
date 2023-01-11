@@ -245,13 +245,8 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           }
 
           if (type === "add" || type === "unlink") {
-            let clearedCache = false;
             for (const [id, files] of transformOptionalFiles) {
               if (anyMatch(files, filename)) {
-                if (!clearedCache) {
-                  baseConfig.cache!.clear();
-                  clearedCache = true;
-                }
                 devServer.watcher.emit("change", id);
               }
             }
@@ -260,6 +255,9 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
       },
 
       handleHotUpdate(ctx) {
+        compiler.taglib.clearCaches();
+        baseConfig.cache!.clear();
+
         for (const mod of ctx.modules) {
           if (mod.id && virtualFiles.has(mod.id)) {
             virtualFiles.set(mod.id, createDeferredPromise());
