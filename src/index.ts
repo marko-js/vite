@@ -313,7 +313,8 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           ssr &&
           linked &&
           importer &&
-          importer !== devEntryFilePosix && // Vite tries to resolve against an `index.html` in some cases, we ignore it here.
+          (importer !== devEntryFile ||
+            normalizePath(importer !== devEntryFilePosix)) && // Vite tries to resolve against an `index.html` in some cases, we ignore it here.
           isMarkoFile(importee) &&
           !isMarkoFile(importer.replace(queryReg, ""))
         ) {
@@ -356,7 +357,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
               const resolved = normalizePath(
                 path.resolve(importer, "..", importee)
               );
-              if (resolved === importer) return resolved;
+              if (resolved === normalizePath(importer)) return resolved;
             }
 
             return this.resolve(importee, importer, resolveOpts);
@@ -505,11 +506,6 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         }
 
         if (isSSRBuild) {
-          console.log("outputOptions", {
-            dir: outputOptions.dir,
-            keys: Object.keys(bundle),
-          });
-
           const dir = outputOptions.dir
             ? path.resolve(outputOptions.dir)
             : path.resolve(outputOptions.file!, "..");
