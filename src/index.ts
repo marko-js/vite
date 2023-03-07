@@ -59,9 +59,12 @@ type DeferredPromise<T> = Promise<T> & {
   reject: (error: Error) => void;
 };
 
+const POSIX_SEP = "/";
+const WINDOWS_SEP = "\\";
+
 const normalizePath =
-  path.sep === "\\"
-    ? (id: string) => id.replace(/\\/g, "/")
+  path.sep === WINDOWS_SEP
+    ? (id: string) => id.replace(/\\/g, POSIX_SEP)
     : (id: string) => id;
 const virtualFiles = new Map<
   string,
@@ -105,7 +108,8 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
     dep
   ) => {
     const query = `${virtualFileQuery}&id=${normalizePath(dep.virtualPath)}`;
-    const id = normalizePath(from) + query;
+    const normalizedFrom = normalizePath(from);
+    const id = normalizePath(normalizedFrom) + query;
 
     if (devServer) {
       const prev = virtualFiles.get(id);
@@ -115,7 +119,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
     }
 
     virtualFiles.set(id, dep);
-    return `./${path.basename(from) + query}`;
+    return `./${path.posix.basename(normalizedFrom) + query}`;
   };
 
   const ssrConfig: Compiler.Config = {
@@ -138,6 +142,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
 
   let root: string;
   let devEntryFile: string;
+  let devEntryFilePosix: string;
   let isBuild = false;
   let isSSRBuild = false;
   let devServer: vite.ViteDevServer;
@@ -158,6 +163,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         )) as typeof Compiler;
         root = normalizePath(config.root || process.cwd());
         devEntryFile = path.join(root, "index.html");
+        devEntryFilePosix = normalizePath(devEntryFile);
         isBuild = env.command === "build";
         isSSRBuild = isBuild && linked && Boolean(config.build!.ssr);
         store =
@@ -274,7 +280,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
             inputOptions.input = toHTMLEntries(root, serverManifest.entries);
             for (const entry in serverManifest.entrySources) {
               entrySources.set(
-                path.resolve(root, entry),
+                normalizePath(path.resolve(root, entry)),
                 serverManifest.entrySources[entry]
               );
             }
@@ -307,7 +313,8 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           ssr &&
           linked &&
           importer &&
-          importer !== devEntryFile && // Vite tries to resolve against an `index.html` in some cases, we ignore it here.
+          (importer !== devEntryFile ||
+            normalizePath(importer) !== devEntryFilePosix) && // Vite tries to resolve against an `index.html` in some cases, we ignore it here.
           isMarkoFile(importee) &&
           !isMarkoFile(importer.replace(queryReg, ""))
         ) {
@@ -347,8 +354,10 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
             importer = importer.slice(0, -importerQuery.length);
 
             if (importee[0] === ".") {
-              const resolved = path.resolve(importer, "..", importee);
-              if (resolved === importer) return resolved;
+              const resolved = normalizePath(
+                path.resolve(importer, "..", importee)
+              );
+              if (resolved === normalizePath(importer)) return resolved;
             }
 
             return this.resolve(importee, importer, resolveOpts);
@@ -379,7 +388,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
                 await generateDocManifest(
                   await devServer.transformIndexHtml(
                     "/",
-                    generateInputDoc(fileNameToURL(fileName, root))
+                    generateInputDoc(posixFileNameToURL(fileName, root))
                   )
                 )
               );
@@ -431,7 +440,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           entrySources.set(id, source);
 
           if (serverManifest) {
-            serverManifest.entrySources[path.relative(root, id)] = source;
+            serverManifest.entrySources[path.posix.relative(root, id)] = source;
           }
         }
 
@@ -453,7 +462,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         }
 
         if (devServer) {
-          const templateName = getBasenameWithoutExt(id);
+          const templateName = getPosixBasenameWithoutExt(id);
           const optionalFilePrefix =
             path.dirname(id) +
             path.sep +
@@ -582,12 +591,12 @@ function toHTMLEntries(root: string, serverEntries: ServerManifest["entries"]) {
 }
 
 function toEntryId(id: string) {
-  const lastSepIndex = id.lastIndexOf(path.sep);
+  const lastSepIndex = id.lastIndexOf(POSIX_SEP);
   let name = id.slice(lastSepIndex + 1, id.indexOf(".", lastSepIndex));
 
   if (name === "index" || name === "template") {
     name = id.slice(
-      id.lastIndexOf(path.sep, lastSepIndex - 1) + 1,
+      id.lastIndexOf(POSIX_SEP, lastSepIndex - 1) + 1,
       lastSepIndex
     );
   }
@@ -600,7 +609,7 @@ function toEntryId(id: string) {
     .slice(0, 4)}`;
 }
 
-function fileNameToURL(fileName: string, root: string) {
+function posixFileNameToURL(fileName: string, root: string) {
   const relativeURL = path.posix.relative(
     pathToFileURL(root).pathname,
     pathToFileURL(fileName).pathname
@@ -614,8 +623,8 @@ function fileNameToURL(fileName: string, root: string) {
   return `/${relativeURL}`;
 }
 
-function getBasenameWithoutExt(file: string): string {
-  const baseStart = file.lastIndexOf(path.sep) + 1;
+function getPosixBasenameWithoutExt(file: string): string {
+  const baseStart = file.lastIndexOf(POSIX_SEP) + 1;
   const extStart = file.indexOf(".", baseStart + 1);
   return file.slice(baseStart, extStart);
 }

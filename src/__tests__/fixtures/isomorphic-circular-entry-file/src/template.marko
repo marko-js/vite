@@ -1,0 +1,15 @@
+export const x = 1;
+
+import { x as y } from './template.marko';
+
+$ console.log(y);
+
+style {
+  div { color: green }
+}
+
+<layout-component>
+  <div#app>
+    <implicit-component/>
+  </div>
+</layout-component>
