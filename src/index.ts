@@ -314,7 +314,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           linked &&
           importer &&
           (importer !== devEntryFile ||
-            normalizePath(importer !== devEntryFilePosix)) && // Vite tries to resolve against an `index.html` in some cases, we ignore it here.
+            normalizePath(importer) !== devEntryFilePosix) && // Vite tries to resolve against an `index.html` in some cases, we ignore it here.
           isMarkoFile(importee) &&
           !isMarkoFile(importer.replace(queryReg, ""))
         ) {
