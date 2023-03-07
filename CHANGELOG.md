@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.3.13
+
+### Patch Changes
+
+- [#44](https://github.com/marko-js/vite/pull/44) [`5d7eba5`](https://github.com/marko-js/vite/commit/5d7eba562834363dff0b2bfe4efb09bf51b9fc9c) Thanks [@rturnq](https://github.com/rturnq)! - fix: windows paths
+
 ## 2.3.12
 
 ### Patch Changes
