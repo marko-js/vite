@@ -21,14 +21,13 @@ static function renderAssets(slot) {
 
   return html;
 }
-$ const $global = out.global;
-$ if (!$global.___viteRenderAssets) {
-  $global.___viteInjectAttrs = $global.cspNonce
-    ? ` nonce="${$global.cspNonce.replace(/"/g, "&#39;")}"`
+$ if (!out.global.___viteRenderAssets) {
+  out.global.___viteInjectAttrs = out.global.cspNonce
+    ? ` nonce="${out.global.cspNonce.replace(/"/g, "&#39;")}"`
     : "";
-  $global.___viteRenderAssets = renderAssets;
+  out.global.___viteRenderAssets = renderAssets;
 }
 
 <__flush_here_and_after__>
-  $!{$global.___viteRenderAssets(input.slot)}
+  $!{out.global.___viteRenderAssets(input.slot)}
 </__flush_here_and_after__>
