@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.3.14
+
+### Patch Changes
+
+- [#46](https://github.com/marko-js/vite/pull/46) [`7808941`](https://github.com/marko-js/vite/commit/78089419b1d8477e574c3e239869ce4b3f76dca4) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Avoid using $global in internal templates.
+
 ## 2.3.13
 
 ### Patch Changes
