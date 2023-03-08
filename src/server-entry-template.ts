@@ -7,12 +7,11 @@ export default async (opts: {
   const fileNameStr = JSON.stringify(`./${path.basename(opts.fileName)}`);
   return `import template from ${fileNameStr};
 export * from ${fileNameStr};
-$ const $global = out.global;
 ${
   opts.runtimeId
-    ? `$ $global.runtimeId = ${JSON.stringify(opts.runtimeId)};\n`
+    ? `$ out.global.runtimeId = ${JSON.stringify(opts.runtimeId)};\n`
     : ""
-}$ ($global.___viteEntries || ($global.___viteEntries = [])).push(${
+}$ (out.global.___viteEntries || (out.global.___viteEntries = [])).push(${
     opts.entryData
   });
 <_vite slot="head-prepend"/>
