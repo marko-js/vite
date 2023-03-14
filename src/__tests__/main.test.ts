@@ -12,6 +12,12 @@ import * as playwright from "playwright";
 import { defaultNormalizer, defaultSerializer } from "@marko/fixture-snapshots";
 import markoPlugin, { type Options } from "..";
 
+// https://github.com/esbuild-kit/tsx/issues/113
+const { toString } = Function.prototype;
+Function.prototype.toString = function () {
+  return toString.call(this).replace(/\b__name\(([^,]+),[^)]+\)/g, "$1");
+};
+
 declare global {
   const page: playwright.Page;
   namespace NodeJS {
@@ -35,11 +41,13 @@ let changes: string[] = [];
 before(async () => {
   browser = await playwright.chromium.launch();
   const context = await browser.newContext();
+  await context.addInitScript("window.__name = v=>v");
   globalThis.page = await context.newPage();
   /**
    * We add a mutation observer to track all mutations (batched)
    * Then we report the list of mutations in a normalized way and snapshot it.
    */
+
   await Promise.all([
     context.exposeFunction("__track__", (html: string) => {
       const formatted = defaultSerializer(
