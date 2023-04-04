@@ -1,0 +1,15 @@
+static {
+  if (typeof window === "object") {
+    document.body.firstElementChild.append("Loaded Layout Component");
+  }
+}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Hello World</title>
+</head>
+<body>
+  <${input.renderBody}/>
+</body>
+</html>

@@ -149,6 +149,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
   let registeredTag: string | false = false;
   let serverManifest: ServerManifest | undefined;
   let store: BuildStore;
+  let cjsImports: Set<string> | undefined;
   const entrySources = new Map<string, string>();
   const transformWatchFiles = new Map<string, string[]>();
   const transformOptionalFiles = new Map<string, string[]>();
@@ -190,6 +191,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
 
         const lookup = compiler.taglib.buildLookup(root) as any;
         const taglibDeps: string[] = [];
+        const optimizeTaglibDeps: string[] = [];
 
         for (const name in lookup.taglibsById) {
           const taglib = lookup.taglibsById[name];
@@ -197,12 +199,23 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
             !/^marko-(.+-)?core$/.test(taglib.id) &&
             /[\\/]node_modules[\\/]/.test(taglib.dirname)
           ) {
+            let isEsm: boolean | undefined;
             for (const tagName in taglib.tags) {
               const tag = taglib.tags[tagName];
               const entry = tag.template || tag.renderer;
 
               if (entry) {
-                taglibDeps.push(relativeImportPath(devEntryFile, entry));
+                const relativePath = relativeImportPath(devEntryFile, entry);
+                taglibDeps.push(relativePath);
+
+                if (
+                  isBuild ||
+                  (isEsm ??= getModuleType(taglib.path) === "esm")
+                ) {
+                  optimizeTaglibDeps.push(relativePath);
+                } else {
+                  (cjsImports ??= new Set()).add(entry);
+                }
               }
             }
           }
@@ -214,7 +227,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
             ...(optimizeDeps.include || []),
             ...compiler.getRuntimeEntryFiles("dom", opts.translator),
             ...compiler.getRuntimeEntryFiles("html", opts.translator),
-            ...taglibDeps,
+            ...optimizeTaglibDeps,
           ])
         );
 
@@ -367,6 +380,10 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         return null;
       },
       async load(id) {
+        if (cjsImports?.has(id)) {
+          return await createEsmWrapper(id);
+        }
+
         switch (getMarkoQuery(id)) {
           case serverEntryQuery: {
             const fileName = id.slice(0, -serverEntryQuery.length);
@@ -432,7 +449,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           }
         }
 
-        if (!isMarkoFile(id)) {
+        if (!isMarkoFile(id) || cjsImports?.has(id)) {
           return null;
         }
 
@@ -651,4 +668,47 @@ function isEmpty(obj: unknown) {
   }
 
   return true;
+}
+
+function findPackageJson(
+  file: string,
+  root: string = process.cwd()
+): string | null {
+  let currentDir = path.dirname(file);
+  while (currentDir !== root && currentDir.length > root.length) {
+    const pkgPath = path.join(currentDir, "package.json");
+    if (fs.existsSync(pkgPath)) {
+      return pkgPath;
+    }
+    currentDir = path.dirname(currentDir);
+  }
+  return null;
+}
+
+const moduleTypeMap = new Map<string, "esm" | "cjs">();
+function getModuleType(file: string): "esm" | "cjs" {
+  const pkgPath = findPackageJson(file);
+  if (pkgPath) {
+    let moduleType = moduleTypeMap.get(pkgPath);
+    if (!moduleType) {
+      const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8"));
+      moduleType = pkg.type === "module" || pkg.exports ? "esm" : "cjs";
+      moduleTypeMap.set(pkgPath, moduleType);
+    }
+    return moduleType;
+  }
+  return "esm";
+}
+
+let requireHookInstalled = false;
+async function createEsmWrapper(url: string): Promise<string> {
+  if (!requireHookInstalled) {
+    await import("@marko/compiler/register.js");
+    requireHookInstalled = true;
+  }
+
+  return `import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
+export default require('${url}').default;
+`;
 }
