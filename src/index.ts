@@ -230,7 +230,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
                 ) {
                   optimizeTaglibDeps.push(relativePath);
                 } else {
-                  (cjsImports ??= new Map()).set(entry, {
+                  (cjsImports ??= new Map()).set(normalizePath(entry), {
                     template: tag.template,
                   });
                 }
