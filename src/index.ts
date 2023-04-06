@@ -1,5 +1,6 @@
 import type * as vite from "vite";
 import type * as Compiler from "@marko/compiler";
+import type { TagDefinition } from "@marko/babel-utils";
 
 import fs from "fs";
 import path from "path";
@@ -19,6 +20,18 @@ import { BuildStore, FileStore } from "./store";
 
 export * from "./store";
 export type { BuildStore } from "./store";
+
+declare module "@marko/babel-utils" {
+  interface Taglib {
+    id: string;
+    dirname: string;
+    path: string;
+    tags: TagDefinition[];
+  }
+  interface TaglibLookup {
+    taglibsById: Record<string, Taglib>;
+  }
+}
 
 export interface Options {
   // Defaults to true, set to false to disable automatic component discovery and hydration.
@@ -149,7 +162,9 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
   let registeredTag: string | false = false;
   let serverManifest: ServerManifest | undefined;
   let store: BuildStore;
-  let cjsImports: Set<string> | undefined;
+  let cjsImports:
+    | Map<string, { template: string; esmWrapper?: string }>
+    | undefined;
   const entrySources = new Map<string, string>();
   const transformWatchFiles = new Map<string, string[]>();
   const transformOptionalFiles = new Map<string, string[]>();
@@ -162,6 +177,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         compiler ??= (await import(
           opts.compiler || "@marko/compiler"
         )) as typeof Compiler;
+        compiler.configure(baseConfig);
         root = normalizePath(config.root || process.cwd());
         devEntryFile = path.join(root, "index.html");
         devEntryFilePosix = normalizePath(devEntryFile);
@@ -189,7 +205,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           });
         }
 
-        const lookup = compiler.taglib.buildLookup(root) as any;
+        const lookup = compiler.taglib.buildLookup(root);
         const taglibDeps: string[] = [];
         const optimizeTaglibDeps: string[] = [];
 
@@ -201,7 +217,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           ) {
             let isEsm: boolean | undefined;
             for (const tagName in taglib.tags) {
-              const tag = taglib.tags[tagName];
+              const tag: TagDefinition = taglib.tags[tagName];
               const entry = tag.template || tag.renderer;
 
               if (entry) {
@@ -214,7 +230,9 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
                 ) {
                   optimizeTaglibDeps.push(relativePath);
                 } else {
-                  (cjsImports ??= new Set()).add(entry);
+                  (cjsImports ??= new Map()).set(entry, {
+                    template: tag.template,
+                  });
                 }
               }
             }
@@ -381,7 +399,20 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
       },
       async load(id) {
         if (cjsImports?.has(id)) {
-          return await createEsmWrapper(id);
+          const tag = cjsImports.get(id)!;
+          if (!tag.esmWrapper) {
+            const { ast } = await compiler.compileFile(tag.template, {
+              output: "source",
+              ast: true,
+              sourceMaps: false,
+              code: false,
+            });
+            tag.esmWrapper = await createEsmWrapper(
+              id,
+              getExportIdentifiers(ast)
+            );
+          }
+          return tag.esmWrapper;
         }
 
         switch (getMarkoQuery(id)) {
@@ -701,14 +732,60 @@ function getModuleType(file: string): "esm" | "cjs" {
 }
 
 let requireHookInstalled = false;
-async function createEsmWrapper(url: string): Promise<string> {
+async function createEsmWrapper(
+  url: string,
+  exports: Set<string>
+): Promise<string> {
   if (!requireHookInstalled) {
     await import("@marko/compiler/register.js");
     requireHookInstalled = true;
   }
 
-  return `import { createRequire } from 'module';
-const require = createRequire(import.meta.url);
-export default require('${url}').default;
+  let code = `import { createRequire } from 'module';
+const mod = createRequire(import.meta.url)('${url}');
 `;
+
+  let namedExports: string | undefined;
+  for (const name of exports) {
+    if (name === "default") {
+      code += "export default mod.default;\n";
+    } else if (namedExports) {
+      namedExports += `, ${name}`;
+    } else {
+      namedExports = name;
+    }
+  }
+  if (namedExports) {
+    code += `export const { ${namedExports} } = mod;\n`;
+  }
+  return code;
+}
+
+function getExportIdentifiers(ast: Compiler.types.File) {
+  const exports = new Set<string>();
+  for (const node of ast.program.body) {
+    switch (node.type) {
+      case "ExportDefaultDeclaration":
+      case "MarkoTag":
+        exports.add("default");
+        break;
+      case "ExportNamedDeclaration":
+        if (node.declaration) {
+          for (const declarator of (node.declaration as any).declarations) {
+            exports.add(declarator.id.name);
+          }
+        }
+        for (const specifier of node.specifiers) {
+          if (specifier.type !== "ExportSpecifier") {
+            exports.add(specifier.exported.name);
+          }
+        }
+        break;
+      case "ExportAllDeclaration":
+        throw new Error(
+          'Re-exporting using `export * from "..."` is not supported.'
+        );
+    }
+  }
+  return exports;
 }
