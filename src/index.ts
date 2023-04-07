@@ -29,6 +29,8 @@ export interface Options {
   runtimeId?: string;
   // Overrides the Marko translator being used.
   translator?: string;
+  // If set, will use the provided string as a variable name and prefix all assets paths with that variable.
+  basePathVar?: string;
   // Overrides the Babel config that Marko will use.
   babelConfig?: Compiler.Config["babelConfig"];
   // Store to use between SSR and client builds, defaults to file system
@@ -84,7 +86,7 @@ const thisFile =
 
 export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
   let compiler: typeof Compiler;
-  const { runtimeId, linked = true } = opts;
+  const { runtimeId, basePathVar, linked = true } = opts;
   const baseConfig: Compiler.Config = {
     cache,
     runtimeId,
@@ -149,6 +151,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
   let registeredTag: string | false = false;
   let serverManifest: ServerManifest | undefined;
   let store: BuildStore;
+  let basePath = "/";
   const entrySources = new Map<string, string>();
   const transformWatchFiles = new Map<string, string[]>();
   const transformOptionalFiles = new Map<string, string[]>();
@@ -233,6 +236,39 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
             )
           );
         }
+
+        if (basePathVar) {
+          config.experimental ??= {};
+
+          if (config.experimental.renderBuiltUrl) {
+            throw new Error(
+              "Cannot use @marko/vite `basePathVar` with Vite's `renderBuiltUrl` option."
+            );
+          }
+
+          config.experimental.renderBuiltUrl = (
+            fileName,
+            { hostType, ssr }
+          ) => {
+            switch (hostType) {
+              case "html":
+                return fileName;
+              case "js":
+                return {
+                  runtime: `${
+                    ssr
+                      ? basePathVar
+                      : `$mbp${runtimeId ? `_${runtimeId}` : ""}`
+                  }+${JSON.stringify(fileName)}`,
+                };
+              default:
+                return { relative: true };
+            }
+          };
+        }
+      },
+      configResolved(config) {
+        basePath = config.base;
       },
       configureServer(_server) {
         ssrConfig.hot = domConfig.hot = true;
@@ -386,6 +422,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
             } else {
               entryData = JSON.stringify(
                 await generateDocManifest(
+                  basePath,
                   await devServer.transformIndexHtml(
                     "/",
                     generateInputDoc(posixFileNameToURL(fileName, root))
@@ -398,6 +435,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
               fileName,
               entryData,
               runtimeId,
+              basePathVar,
             });
           }
           case browserEntryQuery: {
@@ -543,6 +581,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
 
             if (chunk?.type === "asset") {
               browserManifest[entryId] = await generateDocManifest(
+                basePath,
                 chunk.source.toString()
               );
 

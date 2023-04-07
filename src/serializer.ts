@@ -1,6 +1,11 @@
 import { ElementType } from "domelementtype";
 import type { Node, Element, Comment, Text } from "domhandler";
 
+enum InjectType {
+  AssetAttrs = 0,
+  PublicPath = 1,
+}
+
 const voidElements = new Set([
   "area",
   "base",
@@ -18,7 +23,11 @@ const voidElements = new Set([
   "wbr",
 ]);
 
-export default function serialize(nodes: Node[], parts?: string[]) {
+export default function serialize(
+  basePath: string,
+  nodes: Node[],
+  parts?: (string | InjectType)[]
+) {
   let curString = parts ? (parts.pop() as string) : "";
   parts ??= [];
 
@@ -29,38 +38,51 @@ export default function serialize(nodes: Node[], parts?: string[]) {
       case ElementType.Script: {
         const tag = node as Element;
         const { name } = tag;
+        let urlAttr: undefined | string;
         curString += `<${name}`;
 
         switch (tag.tagName) {
           case "script":
-            parts.push(curString);
+            parts.push(curString, InjectType.AssetAttrs);
+            urlAttr = "src";
             curString = "";
             break;
           case "style":
-            parts.push(curString);
+            parts.push(curString, InjectType.AssetAttrs);
             curString = "";
             break;
           case "link":
             if (tag.attribs.rel === "stylesheet") {
-              parts.push(curString);
+              urlAttr = "href";
+              parts.push(curString, InjectType.AssetAttrs);
               curString = "";
             }
             break;
         }
 
         for (const attr of tag.attributes) {
-          curString += ` ${
-            attr.value === ""
-              ? attr.name
-              : `${attr.name}="${attr.value.replace(/"/g, "&#39;")}"`
-          }`;
+          if (attr.value === "") {
+            curString += ` ${attr.name}`;
+          } else if (attr.name === urlAttr) {
+            curString += ` ${attr.name}="`;
+            parts.push(
+              curString,
+              InjectType.PublicPath,
+              stripBasePath(basePath, attr.value)
+                .replace(/"/g, "&#39;")
+                .replace(/^\.\//, "") + '"'
+            );
+            curString = "";
+          } else {
+            curString += ` ${attr.name}="${attr.value.replace(/"/g, "&#39;")}"`;
+          }
         }
 
         curString += ">";
 
         if (tag.children.length) {
           parts.push(curString);
-          serialize(tag.children, parts);
+          serialize(basePath, tag.children, parts);
           curString = parts.pop() as string;
         }
 
@@ -90,4 +112,9 @@ export default function serialize(nodes: Node[], parts?: string[]) {
   }
 
   return parts;
+}
+
+function stripBasePath(basePath: string, path: string) {
+  if (path.startsWith(basePath)) return path.slice(basePath.length);
+  return path;
 }
