@@ -13,7 +13,10 @@ export interface DocManifest {
 
 const MARKER_COMMENT = "MARKO_VITE";
 
-export function generateDocManifest(rawHtml: string): Promise<DocManifest> {
+export function generateDocManifest(
+  basePath: string,
+  rawHtml: string
+): Promise<DocManifest> {
   return new Promise((resolve, reject) => {
     const parser = new Parser(
       new DomHandler(function (err, dom) {
@@ -46,10 +49,10 @@ export function generateDocManifest(rawHtml: string): Promise<DocManifest> {
         );
 
         resolve({
-          "head-prepend": serializeOrNull(headPrepend),
-          head: serializeOrNull(head),
-          "body-prepend": serializeOrNull(bodyPrepend),
-          body: serializeOrNull(body),
+          "head-prepend": serializeOrNull(basePath, headPrepend),
+          head: serializeOrNull(basePath, head),
+          "body-prepend": serializeOrNull(basePath, bodyPrepend),
+          body: serializeOrNull(basePath, body),
         });
       })
     );
@@ -64,8 +67,8 @@ export function generateInputDoc(entry: string) {
   )}></script></body></html>`;
 }
 
-function serializeOrNull(nodes: Node[]) {
-  const result = serialize(nodes);
+function serializeOrNull(basePath: string, nodes: Node[]) {
+  const result = serialize(basePath, nodes);
   if (result.length) {
     return result;
   }

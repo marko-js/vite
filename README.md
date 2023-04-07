@@ -138,6 +138,23 @@ Storage mechanism to preserve data between SSR and client builds when building i
   ```
   Reads/writes data to memory. This option can be used when building with Vite programatically.
 
+### options.basePathVar
+
+Set this to variable/identifier which all asset base paths should be prefixed with. All asset paths used by Vite will either be relative (if possible) or prefixed with this identifier. The identifier must be defined as a string before any other server code executes.
+
+First configure `@marko/vite`.
+
+```js
+marko({ basePathVar: "__MY_ASSET_BASE_PATH__" });
+```
+
+Then ensure you set that variable at runtime.
+
+```js
+globalThis.__MY_ASSET_BASE_PATH__ = getAssetUrl(); // Note this must end with a `/`.
+require("./dist/index.mjs"); // load the built vite app.
+```
+
 ## Code of Conduct
 
 This project adheres to the [eBay Code of Conduct](./.github/CODE_OF_CONDUCT.md). By participating in this project you agree to abide by its terms.

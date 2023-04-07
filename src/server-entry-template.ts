@@ -3,23 +3,32 @@ export default async (opts: {
   fileName: string;
   entryData: string;
   runtimeId?: string;
+  basePathVar?: string;
 }): Promise<string> => {
   const fileNameStr = JSON.stringify(`./${path.basename(opts.fileName)}`);
+  const base = opts.basePathVar ? ` base=${opts.basePathVar}` : "";
   return `import template from ${fileNameStr};
 export * from ${fileNameStr};
 ${
-  opts.runtimeId
-    ? `$ out.global.runtimeId = ${JSON.stringify(opts.runtimeId)};\n`
+  opts.basePathVar
+    ? `
+static if (typeof ${opts.basePathVar} !== "string") throw new Error("${opts.basePathVar} must be defined when using basePathVar.");
+static if (!${opts.basePathVar}.endsWith("/")) throw new Error("${opts.basePathVar} must end with a '/' when using basePathVar.");
+`
     : ""
-}$ (out.global.___viteEntries || (out.global.___viteEntries = [])).push(${
+}${
+    opts.runtimeId
+      ? `$ out.global.runtimeId = ${JSON.stringify(opts.runtimeId)};\n`
+      : ""
+  }$ (out.global.___viteEntries || (out.global.___viteEntries = [])).push(${
     opts.entryData
   });
-<_vite slot="head-prepend"/>
-<_vite slot="head"/>
-<_vite slot="body-prepend"/>
+<_vite${base} slot="head-prepend"/>
+<_vite${base} slot="head"/>
+<_vite${base} slot="body-prepend"/>
 <\${template} ...input/>
 <init-components/>
 <await-reorderer/>
-<_vite slot="body"/>
+<_vite${base} slot="body"/>
 `;
 };

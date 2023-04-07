@@ -9,12 +9,20 @@ static function renderAssets(slot) {
 
     for (let i = lastWrittenEntry; i < writtenEntries; i++) {
       const entry = entries[i];
-      const parts = typeof __MARKO_MANIFEST__ === "object"
-        ? __MARKO_MANIFEST__[entry]?.[slot]
-        : entry[slot];
+      const parts =
+        typeof __MARKO_MANIFEST__ === "object"
+          ? __MARKO_MANIFEST__[entry]?.[slot]
+          : entry[slot];
 
       if (parts) {
-        html += parts.join(this.___viteInjectAttrs);
+        for (const part of parts) {
+          html +=
+            part === 0 /** InjectType.AssetAttrs */
+              ? this.___viteInjectAttrs
+              : part === 1 /** InjectType.PublicPath */
+              ? this.___viteBasePath
+              : part;
+        }
       }
     }
   }
@@ -26,6 +34,13 @@ $ if (!out.global.___viteRenderAssets) {
     ? ` nonce="${out.global.cspNonce.replace(/"/g, "&#39;")}"`
     : "";
   out.global.___viteRenderAssets = renderAssets;
+
+  if (input.base) {
+    out.global.___viteBasePath = input.base;
+    out.script(`$mbp${out.global.runtimeId ? `_${out.global.runtimeId}` : ""}=${JSON.stringify(input.base)}`);
+  } else {
+    out.global.___viteBasePath = import.meta.env.BASE_URL;
+  }
 }
 
 <__flush_here_and_after__>
