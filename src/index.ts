@@ -122,7 +122,9 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
     from,
     dep
   ) => {
-    const query = `${virtualFileQuery}&id=${normalizePath(dep.virtualPath)}`;
+    const query = `${virtualFileQuery}&id=${encodeURIComponent(
+      normalizePath(dep.virtualPath)
+    )}`;
     const normalizedFrom = normalizePath(from);
     const id = normalizePath(normalizedFrom) + query;
 
