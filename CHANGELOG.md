@@ -1,5 +1,17 @@
 # Changelog
 
+## 2.4.0
+
+### Minor Changes
+
+- [#51](https://github.com/marko-js/vite/pull/51) [`356df24`](https://github.com/marko-js/vite/commit/356df249df3751b087ebb01bf190cd7749496280) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Add support for a dynamic runtime asset base url.
+
+### Patch Changes
+
+- [#54](https://github.com/marko-js/vite/pull/54) [`597770a`](https://github.com/marko-js/vite/commit/597770a6ac089770659a324484fa534ae7aab1a4) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Fix resolving files from virtual files (eg inline stylesheets).
+
+- [#50](https://github.com/marko-js/vite/pull/50) [`e014eb9`](https://github.com/marko-js/vite/commit/e014eb90dc4bfda7f2928e44a0568ac133d860d0) Thanks [@rturnq](https://github.com/rturnq)! - fix: handle cjs dependencies of .marko templates
+
 ## 2.3.14
 
 ### Patch Changes
