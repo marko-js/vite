@@ -1,5 +1,6 @@
 import type * as vite from "vite";
 import type * as Compiler from "@marko/compiler";
+import type { TagDefinition } from "@marko/babel-utils";
 
 import fs from "fs";
 import path from "path";
@@ -19,6 +20,18 @@ import { BuildStore, FileStore } from "./store";
 
 export * from "./store";
 export type { BuildStore } from "./store";
+
+declare module "@marko/babel-utils" {
+  interface Taglib {
+    id: string;
+    dirname: string;
+    path: string;
+    tags: TagDefinition[];
+  }
+  interface TaglibLookup {
+    taglibsById: Record<string, Taglib>;
+  }
+}
 
 export interface Options {
   // Defaults to true, set to false to disable automatic component discovery and hydration.
@@ -153,6 +166,9 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
   let registeredTag: string | false = false;
   let serverManifest: ServerManifest | undefined;
   let store: BuildStore;
+  let cjsImports:
+    | Map<string, { template: string; esmWrapper?: string }>
+    | undefined;
   let basePath = "/";
   const entrySources = new Map<string, string>();
   const transformWatchFiles = new Map<string, string[]>();
@@ -166,6 +182,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         compiler ??= (await import(
           opts.compiler || "@marko/compiler"
         )) as typeof Compiler;
+        compiler.configure(baseConfig);
         root = normalizePath(config.root || process.cwd());
         devEntryFile = path.join(root, "index.html");
         devEntryFilePosix = normalizePath(devEntryFile);
@@ -193,8 +210,9 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           });
         }
 
-        const lookup = compiler.taglib.buildLookup(root) as any;
+        const lookup = compiler.taglib.buildLookup(root);
         const taglibDeps: string[] = [];
+        const optimizeTaglibDeps: string[] = [];
 
         for (const name in lookup.taglibsById) {
           const taglib = lookup.taglibsById[name];
@@ -202,12 +220,25 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
             !/^marko-(.+-)?core$/.test(taglib.id) &&
             /[\\/]node_modules[\\/]/.test(taglib.dirname)
           ) {
+            let isEsm: boolean | undefined;
             for (const tagName in taglib.tags) {
-              const tag = taglib.tags[tagName];
+              const tag: TagDefinition = taglib.tags[tagName];
               const entry = tag.template || tag.renderer;
 
               if (entry) {
-                taglibDeps.push(relativeImportPath(devEntryFile, entry));
+                const relativePath = relativeImportPath(devEntryFile, entry);
+                taglibDeps.push(relativePath);
+
+                if (
+                  isBuild ||
+                  (isEsm ??= getModuleType(taglib.path) === "esm")
+                ) {
+                  optimizeTaglibDeps.push(relativePath);
+                } else {
+                  (cjsImports ??= new Map()).set(normalizePath(entry), {
+                    template: tag.template,
+                  });
+                }
               }
             }
           }
@@ -219,7 +250,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
             ...(optimizeDeps.include || []),
             ...compiler.getRuntimeEntryFiles("dom", opts.translator),
             ...compiler.getRuntimeEntryFiles("html", opts.translator),
-            ...taglibDeps,
+            ...optimizeTaglibDeps,
           ])
         );
 
@@ -405,6 +436,23 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         return null;
       },
       async load(id) {
+        if (cjsImports?.has(id)) {
+          const tag = cjsImports.get(id)!;
+          if (!tag.esmWrapper) {
+            const { ast } = await compiler.compileFile(tag.template, {
+              output: "source",
+              ast: true,
+              sourceMaps: false,
+              code: false,
+            });
+            tag.esmWrapper = await createEsmWrapper(
+              id,
+              getExportIdentifiers(ast)
+            );
+          }
+          return tag.esmWrapper;
+        }
+
         switch (getMarkoQuery(id)) {
           case serverEntryQuery: {
             const fileName = id.slice(0, -serverEntryQuery.length);
@@ -472,7 +520,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           }
         }
 
-        if (!isMarkoFile(id)) {
+        if (!isMarkoFile(id) || cjsImports?.has(id)) {
           return null;
         }
 
@@ -692,4 +740,93 @@ function isEmpty(obj: unknown) {
   }
 
   return true;
+}
+
+function findPackageJson(
+  file: string,
+  root: string = process.cwd()
+): string | null {
+  let currentDir = path.dirname(file);
+  while (currentDir !== root && currentDir.length > root.length) {
+    const pkgPath = path.join(currentDir, "package.json");
+    if (fs.existsSync(pkgPath)) {
+      return pkgPath;
+    }
+    currentDir = path.dirname(currentDir);
+  }
+  return null;
+}
+
+const moduleTypeMap = new Map<string, "esm" | "cjs">();
+function getModuleType(file: string): "esm" | "cjs" {
+  const pkgPath = findPackageJson(file);
+  if (pkgPath) {
+    let moduleType = moduleTypeMap.get(pkgPath);
+    if (!moduleType) {
+      const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8"));
+      moduleType = pkg.type === "module" || pkg.exports ? "esm" : "cjs";
+      moduleTypeMap.set(pkgPath, moduleType);
+    }
+    return moduleType;
+  }
+  return "esm";
+}
+
+let requireHookInstalled = false;
+async function createEsmWrapper(
+  url: string,
+  exports: Set<string>
+): Promise<string> {
+  if (!requireHookInstalled) {
+    await import("@marko/compiler/register.js");
+    requireHookInstalled = true;
+  }
+
+  let code = `import { createRequire } from 'module';
+const mod = createRequire(import.meta.url)('${url}');
+`;
+
+  let namedExports: string | undefined;
+  for (const name of exports) {
+    if (name === "default") {
+      code += "export default mod.default;\n";
+    } else if (namedExports) {
+      namedExports += `, ${name}`;
+    } else {
+      namedExports = name;
+    }
+  }
+  if (namedExports) {
+    code += `export const { ${namedExports} } = mod;\n`;
+  }
+  return code;
+}
+
+function getExportIdentifiers(ast: Compiler.types.File) {
+  const exports = new Set<string>();
+  for (const node of ast.program.body) {
+    switch (node.type) {
+      case "ExportDefaultDeclaration":
+      case "MarkoTag":
+        exports.add("default");
+        break;
+      case "ExportNamedDeclaration":
+        if (node.declaration) {
+          for (const declarator of (node.declaration as any).declarations) {
+            exports.add(declarator.id.name);
+          }
+        }
+        for (const specifier of node.specifiers) {
+          if (specifier.type !== "ExportSpecifier") {
+            exports.add(specifier.exported.name);
+          }
+        }
+        break;
+      case "ExportAllDeclaration":
+        throw new Error(
+          'Re-exporting using `export * from "..."` is not supported.'
+        );
+    }
+  }
+  return exports;
 }
