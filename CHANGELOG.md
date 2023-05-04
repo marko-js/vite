@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.4.1
+
+### Patch Changes
+
+- [#56](https://github.com/marko-js/vite/pull/56) [`b8c6e7e`](https://github.com/marko-js/vite/commit/b8c6e7e6859c5466174176c09f0677a1bdd16430) Thanks [@rturnq](https://github.com/rturnq)! - fix: preload base path
+
 ## 2.4.0
 
 ### Minor Changes
