@@ -211,11 +211,15 @@ async function testPage(dir: string, steps: Step[], server: http.Server) {
     }`;
     await waitForPendingRequests(page, () => page.goto(href));
     await page.waitForSelector("#app");
-    await forEachChange((html, i) => snap(html, `.loading.${i}.html`, dir));
+    await forEachChange((html, i) =>
+      snap(html, { ext: `.loading.${i}.html`, dir })
+    );
 
     for (const [i, step] of steps.entries()) {
       await waitForPendingRequests(page, step);
-      await forEachChange((html, j) => snap(html, `.step-${i}.${j}.html`, dir));
+      await forEachChange((html, j) =>
+        snap(html, { ext: `.step-${i}.${j}.html`, dir })
+      );
     }
   } finally {
     server.close();
