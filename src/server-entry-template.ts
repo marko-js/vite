@@ -18,8 +18,11 @@ static if (!${opts.basePathVar}.endsWith("/")) throw new Error("${opts.basePathV
     : ""
 }${
     opts.runtimeId
-      ? `$ out.global.runtimeId = ${JSON.stringify(opts.runtimeId)};\n`
-      : ""
+      ? `$ out.global.runtimeId = ${JSON.stringify(opts.runtimeId)};\n` +
+        `$ out.global.___viteBaseVar = ${JSON.stringify(
+          "$mbp_" + opts.runtimeId
+        )};\n`
+      : `$ out.global.___viteBaseVar = "$mbp";\n`
   }$ (out.global.___viteEntries || (out.global.___viteEntries = [])).push(${
     opts.entryData
   });
