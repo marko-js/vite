@@ -52,8 +52,13 @@ export default function serialize(
             curString = "";
             break;
           case "link":
-            if (tag.attribs.rel === "stylesheet") {
-              urlAttr = "href";
+            urlAttr = "href";
+            if (
+              tag.attribs.rel === "stylesheet" ||
+              tag.attribs.rel === "modulepreload" ||
+              tag.attribs.as === "style" ||
+              tag.attribs.as === "script"
+            ) {
               parts.push(curString, InjectType.AssetAttrs);
               curString = "";
             }
