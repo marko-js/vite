@@ -34,15 +34,13 @@ $ if (!out.global.___viteRenderAssets) {
     ? ` nonce="${out.global.cspNonce.replace(/"/g, "&#39;")}"`
     : "";
   out.global.___viteRenderAssets = renderAssets;
-
-  if (input.base) {
-    out.global.___viteBasePath = input.base;
-    out.script(`$mbp${out.global.runtimeId ? `_${out.global.runtimeId}` : ""}=${JSON.stringify(input.base)}`);
-  } else {
-    out.global.___viteBasePath = import.meta.env.BASE_URL;
-  }
+  out.global.___viteBasePath = input.base || import.meta.env.BASE_URL;
 }
 
 <__flush_here_and_after__>
+  <if(input.base && !out.global.___flushedMBP)>
+    $ out.global.___flushedMBP = true;
+    $!{`<script${out.global.___viteInjectAttrs}>${out.global.___viteBaseVar}=${JSON.stringify(input.base)}</script>`}
+  </if>
   $!{out.global.___viteRenderAssets(input.slot)}
 </__flush_here_and_after__>

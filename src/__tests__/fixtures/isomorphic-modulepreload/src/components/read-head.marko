@@ -1,0 +1,14 @@
+class {
+  onCreate() {
+    this.state = {
+      modulePreloads: []
+    };
+  }
+  onMount() {
+    this.state.modulePreloads = document.querySelectorAll('link[rel="modulepreload"]');
+  }
+}
+
+<for|link| of=state.modulePreloads>
+  <div>PRELOAD: ${new URL(link.href).pathname.replace(/-[a-z0-9]+(\.\w+)$/i, '-[hash]$1')}</div>
+</for>
