@@ -510,6 +510,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         );
       },
       async transform(source, id, ssr) {
+        const isSSR = typeof ssr === "object" ? ssr.ssr : ssr;
         const query = getMarkoQuery(id);
 
         if (query && !query.startsWith(virtualFileQuery)) {
@@ -524,7 +525,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           return null;
         }
 
-        if (ssr && entrySources.has(id)) {
+        if (isSSR && linked && entrySources.has(id)) {
           entrySources.set(id, source);
 
           if (serverManifest) {
@@ -535,7 +536,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         const compiled = await compiler.compile(
           source,
           id,
-          (typeof ssr === "object" ? (ssr as any).ssr : ssr)
+          isSSR
             ? ssrConfig
             : query === browserEntryQuery
             ? hydrateConfig
