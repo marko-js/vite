@@ -160,15 +160,14 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
   let root: string;
   let devEntryFile: string;
   let devEntryFilePosix: string;
+  let isTest = false;
   let isBuild = false;
   let isSSRBuild = false;
   let devServer: vite.ViteDevServer;
   let registeredTag: string | false = false;
   let serverManifest: ServerManifest | undefined;
   let store: BuildStore;
-  let cjsImports:
-    | Map<string, { template: string; esmWrapper?: string }>
-    | undefined;
+  let CJSTemplates: Set<string> | undefined;
   let basePath = "/";
   const entrySources = new Map<string, string>();
   const transformWatchFiles = new Map<string, string[]>();
@@ -186,6 +185,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         root = normalizePath(config.root || process.cwd());
         devEntryFile = path.join(root, "index.html");
         devEntryFilePosix = normalizePath(devEntryFile);
+        isTest = env.mode === "test";
         isBuild = env.command === "build";
         isSSRBuild = isBuild && linked && Boolean(config.build!.ssr);
         store =
@@ -230,14 +230,13 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
                 taglibDeps.push(relativePath);
 
                 if (
+                  isTest ||
                   isBuild ||
                   (isEsm ??= getModuleType(taglib.path) === "esm")
                 ) {
                   optimizeTaglibDeps.push(relativePath);
                 } else {
-                  (cjsImports ??= new Map()).set(normalizePath(entry), {
-                    template: tag.template,
-                  });
+                  (CJSTemplates ??= new Set()).add(normalizePath(entry));
                 }
               }
             }
@@ -436,23 +435,6 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         return null;
       },
       async load(id) {
-        if (cjsImports?.has(id)) {
-          const tag = cjsImports.get(id)!;
-          if (!tag.esmWrapper) {
-            const { ast } = await compiler.compileFile(tag.template, {
-              output: "source",
-              ast: true,
-              sourceMaps: false,
-              code: false,
-            });
-            tag.esmWrapper = await createEsmWrapper(
-              id,
-              getExportIdentifiers(ast)
-            );
-          }
-          return tag.esmWrapper;
-        }
-
         switch (getMarkoQuery(id)) {
           case serverEntryQuery: {
             const fileName = id.slice(0, -serverEntryQuery.length);
@@ -521,8 +503,25 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           }
         }
 
-        if (!isMarkoFile(id) || cjsImports?.has(id)) {
+        if (!isMarkoFile(id)) {
           return null;
+        }
+
+        if (CJSTemplates?.has(id)) {
+          return createEsmWrapper(
+            id,
+            getExportIdentifiers(
+              (
+                await compiler.compile(source, id, {
+                  cache,
+                  ast: true,
+                  code: false,
+                  output: "source",
+                  sourceMaps: false,
+                })
+              ).ast
+            )
+          );
         }
 
         if (isSSR && linked && entrySources.has(id)) {
