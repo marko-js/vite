@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.4.3
+
+### Patch Changes
+
+- [#61](https://github.com/marko-js/vite/pull/61) [`d1a0460`](https://github.com/marko-js/vite/commit/d1a0460554e8c46caa105a6fb64cfa316ed42b58) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Disable linked mode automatically for vitest
+
 ## 2.4.2
 
 ### Patch Changes
