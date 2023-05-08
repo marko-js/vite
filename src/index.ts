@@ -99,7 +99,8 @@ const thisFile =
 
 export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
   let compiler: typeof Compiler;
-  const { runtimeId, basePathVar, linked = true } = opts;
+  let { linked = true } = opts;
+  const { runtimeId, basePathVar } = opts;
   const baseConfig: Compiler.Config = {
     cache,
     runtimeId,
@@ -193,6 +194,10 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           new FileStore(
             `marko-vite-${crypto.createHash("SHA1").update(root).digest("hex")}`
           );
+
+        if (isTest) {
+          linked = false;
+        }
 
         if (linked && !registeredTag) {
           // Here we inject either the watchMode vite tag, or the build one.
