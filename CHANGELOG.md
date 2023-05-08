@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.4.2
+
+### Patch Changes
+
+- [#60](https://github.com/marko-js/vite/pull/60) [`9950f8a`](https://github.com/marko-js/vite/commit/9950f8a44040e6bddb9e8300b3b7d062956c4d93) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Improve vitest support around CJS node_modules
+
+- [#58](https://github.com/marko-js/vite/pull/58) [`5968d1b`](https://github.com/marko-js/vite/commit/5968d1b8ac9444e70058bdfdaab0c4e626795954) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Fixes an issue where the ssr check was not accurate for the transform hook.
+
 ## 2.4.1
 
 ### Patch Changes
