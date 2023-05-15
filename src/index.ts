@@ -100,24 +100,12 @@ const thisFile =
 export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
   let compiler: typeof Compiler;
   let { linked = true } = opts;
-  const { runtimeId, basePathVar } = opts;
-  const baseConfig: Compiler.Config = {
-    cache,
-    runtimeId,
-    sourceMaps: true,
-    writeVersionComment: false,
-    babelConfig: {
-      ...opts.babelConfig,
-      caller: {
-        name: "@marko/vite",
-        supportsStaticESM: true,
-        supportsDynamicImport: true,
-        supportsTopLevelAwait: true,
-        supportsExportNamespaceFrom: true,
-        ...opts.babelConfig?.caller,
-      },
-    },
-  };
+  let runtimeId: string | undefined;
+  let basePathVar: string | undefined;
+  let baseConfig: Compiler.Config;
+  let ssrConfig: Compiler.Config;
+  let domConfig: Compiler.Config;
+  let hydrateConfig: Compiler.Config;
 
   const resolveViteVirtualDep: Compiler.Config["resolveVirtualDependency"] = (
     from,
@@ -138,24 +126,6 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
 
     virtualFiles.set(id, dep);
     return `./${path.posix.basename(normalizedFrom) + query}`;
-  };
-
-  const ssrConfig: Compiler.Config = {
-    ...baseConfig,
-    resolveVirtualDependency: resolveViteVirtualDep,
-    output: "html",
-  };
-
-  const domConfig: Compiler.Config = {
-    ...baseConfig,
-    resolveVirtualDependency: resolveViteVirtualDep,
-    output: "dom",
-  };
-
-  const hydrateConfig: Compiler.Config = {
-    ...baseConfig,
-    resolveVirtualDependency: resolveViteVirtualDep,
-    output: "hydrate",
   };
 
   let root: string;
@@ -182,6 +152,46 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         compiler ??= (await import(
           opts.compiler || "@marko/compiler"
         )) as typeof Compiler;
+
+        runtimeId = opts.runtimeId;
+        basePathVar = opts.basePathVar;
+
+        baseConfig = {
+          cache,
+          runtimeId,
+          sourceMaps: true,
+          writeVersionComment: false,
+          babelConfig: {
+            ...opts.babelConfig,
+            caller: {
+              name: "@marko/vite",
+              supportsStaticESM: true,
+              supportsDynamicImport: true,
+              supportsTopLevelAwait: true,
+              supportsExportNamespaceFrom: true,
+              ...opts.babelConfig?.caller,
+            },
+          },
+        };
+
+        ssrConfig = {
+          ...baseConfig,
+          resolveVirtualDependency: resolveViteVirtualDep,
+          output: "html",
+        };
+
+        domConfig = {
+          ...baseConfig,
+          resolveVirtualDependency: resolveViteVirtualDep,
+          output: "dom",
+        };
+
+        hydrateConfig = {
+          ...baseConfig,
+          resolveVirtualDependency: resolveViteVirtualDep,
+          output: "hydrate",
+        };
+
         compiler.configure(baseConfig);
         root = normalizePath(config.root || process.cwd());
         devEntryFile = path.join(root, "index.html");
@@ -472,7 +482,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
               fileName,
               entryData,
               runtimeId,
-              basePathVar,
+              basePathVar: isBuild ? basePathVar : undefined,
             });
           }
           case browserEntryQuery: {
