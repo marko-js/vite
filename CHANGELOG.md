@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.4.4
+
+### Patch Changes
+
+- [#63](https://github.com/marko-js/vite/pull/63) [`53955dc`](https://github.com/marko-js/vite/commit/53955dc94bfc0aa69f1744b9b086bfb4f92d15d9) Thanks [@rturnq](https://github.com/rturnq)! - Evaluate options in config hook
+
 ## 2.4.3
 
 ### Patch Changes
