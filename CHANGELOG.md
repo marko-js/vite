@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.4.5
+
+### Patch Changes
+
+- [`29c2f40`](https://github.com/marko-js/vite/commit/29c2f40879f6db5062defb059eebd6d142b5df24) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Avoid FOUC for dev mode page reloads.
+
 ## 2.4.4
 
 ### Patch Changes
