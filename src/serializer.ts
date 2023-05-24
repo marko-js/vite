@@ -26,6 +26,7 @@ const voidElements = new Set([
 export default function serialize(
   basePath: string,
   nodes: Node[],
+  entries: string[],
   parts?: (string | InjectType)[]
 ) {
   let curString = parts ? (parts.pop() as string) : "";
@@ -69,13 +70,17 @@ export default function serialize(
           if (attr.value === "") {
             curString += ` ${attr.name}`;
           } else if (attr.name === urlAttr) {
+            const id = stripBasePath(basePath, attr.value).replace(/^\.\//, "");
+
+            if (tag.name === "script") {
+              entries.push(id);
+            }
+
             curString += ` ${attr.name}="`;
             parts.push(
               curString,
               InjectType.PublicPath,
-              stripBasePath(basePath, attr.value)
-                .replace(/"/g, "&#39;")
-                .replace(/^\.\//, "") + '"'
+              id.replace(/"/g, "&#39;") + '"'
             );
             curString = "";
           } else {
@@ -87,7 +92,7 @@ export default function serialize(
 
         if (tag.children.length) {
           parts.push(curString);
-          serialize(basePath, tag.children, parts);
+          serialize(basePath, tag.children, entries, parts);
           curString = parts.pop() as string;
         }
 
