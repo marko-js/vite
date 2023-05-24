@@ -645,10 +645,13 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
             }
 
             if (chunk?.type === "asset") {
-              browserManifest[entryId] = await generateDocManifest(
-                basePath,
-                chunk.source.toString()
-              );
+              browserManifest[entryId] = {
+                ...(await generateDocManifest(
+                  basePath,
+                  chunk.source.toString()
+                )),
+                entries: undefined, // clear out entries for prod builds.
+              } as any;
 
               delete bundle[chunkId];
             } else {
