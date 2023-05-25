@@ -89,6 +89,7 @@ const queryReg = /\?marko-.+$/;
 const browserEntryQuery = "?marko-browser-entry";
 const serverEntryQuery = "?marko-server-entry";
 const virtualFileQuery = "?marko-virtual";
+const browserQuery = "?marko-browser";
 const manifestFileName = "manifest.json";
 const markoExt = ".marko";
 const htmlExt = ".html";
@@ -140,7 +141,8 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
   let store: BuildStore;
   let CJSTemplates: Set<string> | undefined;
   let basePath = "/";
-  const entrySources = new Map<string, string>();
+  const entryIds = new Set<string>();
+  const cachedSources = new Map<string, string>();
   const transformWatchFiles = new Map<string, string[]>();
   const transformOptionalFiles = new Map<string, string[]>();
 
@@ -321,8 +323,10 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         ssrConfig.hot = domConfig.hot = true;
         devServer = _server;
         devServer.watcher.on("all", (type, filename) => {
+          cachedSources.delete(filename);
+
           if (type === "unlink") {
-            entrySources.delete(filename);
+            entryIds.delete(filename);
             transformWatchFiles.delete(filename);
             transformOptionalFiles.delete(filename);
           }
@@ -362,10 +366,9 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
             ) as ServerManifest;
             inputOptions.input = toHTMLEntries(root, serverManifest.entries);
             for (const entry in serverManifest.entrySources) {
-              entrySources.set(
-                normalizePath(path.resolve(root, entry)),
-                serverManifest.entrySources[entry]
-              );
+              const id = normalizePath(path.resolve(root, entry));
+              entryIds.add(id);
+              cachedSources.set(id, serverManifest.entrySources[entry]);
             }
           } catch (err) {
             this.error(
@@ -410,6 +413,8 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           this.getModuleInfo(importer)?.isEntry
         ) {
           importeeQuery = browserEntryQuery;
+        } else if (linked && !ssr && !importeeQuery && isMarkoFile(importee)) {
+          importeeQuery = browserQuery;
         }
 
         if (importeeQuery) {
@@ -450,11 +455,12 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         return null;
       },
       async load(id) {
-        switch (getMarkoQuery(id)) {
+        const query = getMarkoQuery(id);
+        switch (query) {
           case serverEntryQuery: {
-            const fileName = id.slice(0, -serverEntryQuery.length);
+            const fileName = id.slice(0, -query.length);
             let entryData: string;
-            entrySources.set(fileName, "");
+            entryIds.add(fileName);
 
             if (isBuild) {
               const relativeFileName = path.posix.relative(root, fileName);
@@ -485,11 +491,12 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
               basePathVar: isBuild ? basePathVar : undefined,
             });
           }
-          case browserEntryQuery: {
-            // The goal below is to use the original source content
-            // for all browser entries rather than load the content
-            // from disk again. This is to support virtual Marko entry files.
-            return entrySources.get(id.slice(0, -browserEntryQuery.length));
+          case browserEntryQuery:
+          case browserQuery: {
+            // The goal below is to cached source content when in linked mode
+            // to avoid loading from disk for both server and browser builds.
+            // This is to support virtual Marko entry files.
+            return cachedSources.get(id.slice(0, -query.length)) || null;
           }
         }
 
@@ -522,28 +529,31 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           return null;
         }
 
-        if (CJSTemplates?.has(id)) {
-          return createEsmWrapper(
-            id,
-            getExportIdentifiers(
-              (
-                await compiler.compile(source, id, {
-                  cache,
-                  ast: true,
-                  code: false,
-                  output: "source",
-                  sourceMaps: false,
-                })
-              ).ast
-            )
-          );
-        }
+        if (isSSR) {
+          if (linked) {
+            cachedSources.set(id, source);
 
-        if (isSSR && linked && entrySources.has(id)) {
-          entrySources.set(id, source);
+            if (serverManifest && entryIds.has(id)) {
+              serverManifest.entrySources[path.posix.relative(root, id)] =
+                source;
+            }
+          }
 
-          if (serverManifest) {
-            serverManifest.entrySources[path.posix.relative(root, id)] = source;
+          if (CJSTemplates?.has(id)) {
+            return createEsmWrapper(
+              id,
+              getExportIdentifiers(
+                (
+                  await compiler.compile(source, id, {
+                    cache,
+                    ast: true,
+                    code: false,
+                    output: "source",
+                    sourceMaps: false,
+                  })
+                ).ast
+              )
+            );
           }
         }
 
