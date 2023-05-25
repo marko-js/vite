@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.4.6
+
+### Patch Changes
+
+- [#67](https://github.com/marko-js/vite/pull/67) [`e3015db`](https://github.com/marko-js/vite/commit/e3015db3bd505b6649715603d8a3f7b17ed27d14) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Improve HMR support by ensuring that client and server compiled modules have different resolved ids.
+
 ## 2.4.5
 
 ### Patch Changes
