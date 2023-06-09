@@ -458,9 +458,32 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         const query = getMarkoQuery(id);
         switch (query) {
           case serverEntryQuery: {
-            const fileName = id.slice(0, -query.length);
+            entryIds.add(id.slice(0, -query.length));
+            return null;
+          }
+          case browserEntryQuery:
+          case browserQuery: {
+            // The goal below is to cached source content when in linked mode
+            // to avoid loading from disk for both server and browser builds.
+            // This is to support virtual Marko entry files.
+            return cachedSources.get(id.slice(0, -query.length)) || null;
+          }
+        }
+
+        return virtualFiles.get(id) || null;
+      },
+      async transform(source, id, ssr) {
+        const isSSR = typeof ssr === "object" ? ssr.ssr : ssr;
+        const query = getMarkoQuery(id);
+
+        if (query && !query.startsWith(virtualFileQuery)) {
+          id = id.slice(0, -query.length);
+
+          if (query === serverEntryQuery) {
+            const fileName = id;
             let entryData: string;
-            entryIds.add(fileName);
+            id = `${id.slice(0, -markoExt.length)}.entry.marko`;
+            cachedSources.set(fileName, source);
 
             if (isBuild) {
               const relativeFileName = path.posix.relative(root, fileName);
@@ -478,50 +501,20 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
                   basePath,
                   await devServer.transformIndexHtml(
                     "/",
-                    generateInputDoc(posixFileNameToURL(fileName, root))
+                    generateInputDoc(
+                      posixFileNameToURL(fileName, root) + browserEntryQuery
+                    )
                   )
                 )
               );
             }
 
-            return getServerEntryTemplate({
+            source = await getServerEntryTemplate({
               fileName,
               entryData,
               runtimeId,
               basePathVar: isBuild ? basePathVar : undefined,
             });
-          }
-          case browserEntryQuery:
-          case browserQuery: {
-            // The goal below is to cached source content when in linked mode
-            // to avoid loading from disk for both server and browser builds.
-            // This is to support virtual Marko entry files.
-            return cachedSources.get(id.slice(0, -query.length)) || null;
-          }
-        }
-
-        return virtualFiles.get(id) || null;
-      },
-      async transformIndexHtml(html) {
-        if (isBuild) {
-          return html;
-        }
-
-        return html.replace(
-          /(src\s*=\s*(['"])(?:(?!\2).)*\.marko)(?:\?((?:(?!\2).)*))?\2/gim,
-          (_, prefix, quote, query) =>
-            prefix + browserEntryQuery + (query ? "&" + query : "") + quote
-        );
-      },
-      async transform(source, id, ssr) {
-        const isSSR = typeof ssr === "object" ? ssr.ssr : ssr;
-        const query = getMarkoQuery(id);
-
-        if (query && !query.startsWith(virtualFileQuery)) {
-          id = id.slice(0, -query.length);
-
-          if (query === serverEntryQuery) {
-            id = `${id.slice(0, -markoExt.length)}.entry.marko`;
           }
         }
 
@@ -699,7 +692,7 @@ function toHTMLEntries(root: string, serverEntries: ServerManifest["entries"]) {
     const markoFile = path.posix.join(root, serverEntries[id]);
     const htmlFile = markoFile + htmlExt;
     virtualFiles.set(htmlFile, {
-      code: generateInputDoc(markoFile),
+      code: generateInputDoc(markoFile + browserEntryQuery),
     });
     result.push(htmlFile);
   }
