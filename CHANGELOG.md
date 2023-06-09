@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.4.7
+
+### Patch Changes
+
+- [#69](https://github.com/marko-js/vite/pull/69) [`87fe302`](https://github.com/marko-js/vite/commit/87fe30279199014d1b9bd6a42029bffdfc0b4130) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Ensure browser entry query is added before transformIndexHTML. Without this Vite was incorrectly caching the module url.
+
+- [#69](https://github.com/marko-js/vite/pull/69) [`87fe302`](https://github.com/marko-js/vite/commit/87fe30279199014d1b9bd6a42029bffdfc0b4130) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Ensure server entry files cache their content (improves virtual file support).
+
 ## 2.4.6
 
 ### Patch Changes
