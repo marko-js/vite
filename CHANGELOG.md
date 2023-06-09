@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.4.8
+
+### Patch Changes
+
+- [#71](https://github.com/marko-js/vite/pull/71) [`231c767`](https://github.com/marko-js/vite/commit/231c767939e8b2cd6a601dbee11a049183070dec) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Fix server entry file cache for build mode.
+
 ## 2.4.7
 
 ### Patch Changes
