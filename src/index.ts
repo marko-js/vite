@@ -494,6 +494,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
                 chunksNeedingAssets: [],
               };
               serverManifest.entries[entryId] = relativeFileName;
+              serverManifest.entrySources[relativeFileName] = source;
               entryData = JSON.stringify(entryId);
             } else {
               entryData = JSON.stringify(
@@ -525,11 +526,6 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         if (isSSR) {
           if (linked) {
             cachedSources.set(id, source);
-
-            if (serverManifest && entryIds.has(id)) {
-              serverManifest.entrySources[path.posix.relative(root, id)] =
-                source;
-            }
           }
 
           if (CJSTemplates?.has(id)) {
