@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.4.9
+
+### Patch Changes
+
+- [#77](https://github.com/marko-js/vite/pull/77) [`1058400`](https://github.com/marko-js/vite/commit/10584002a4722f2494f7b25fec02d509f51ade97) Thanks [@rturnq](https://github.com/rturnq)! - Ensure base path script is written in head or body when those elements are present
+
 ## 2.4.8
 
 ### Patch Changes
