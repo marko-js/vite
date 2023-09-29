@@ -94,7 +94,7 @@ app.listen(3000);
 
 ### options.babelConfig
 
-You can manually override Marko's Babel configuration by passing a `babelConfig` object to the `@marko/vite` plugin. By default Babel's regular [config file resolution](https://babeljs.io/docs/en/config-files) will be used.
+You can manually override Marko's Babel configuration by passing a `babelConfig` object to the `@marko/vite` plugin. If no babel configuration is specified, babel related config files will not be considered.
 
 ```javascript
 marko({

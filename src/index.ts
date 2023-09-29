@@ -97,6 +97,13 @@ const resolveOpts = { skipSelf: true };
 const cache = new Map<unknown, unknown>();
 const thisFile =
   typeof __filename === "string" ? __filename : fileURLToPath(import.meta.url);
+const babelCaller = {
+  name: "@marko/vite",
+  supportsStaticESM: true,
+  supportsDynamicImport: true,
+  supportsTopLevelAwait: true,
+  supportsExportNamespaceFrom: true,
+};
 
 export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
   let compiler: typeof Compiler;
@@ -108,26 +115,24 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
   let domConfig: Compiler.Config;
   let hydrateConfig: Compiler.Config;
 
-  const resolveViteVirtualDep: Compiler.Config["resolveVirtualDependency"] = (
-    from,
-    dep
-  ) => {
-    const query = `${virtualFileQuery}&id=${encodeURIComponent(
-      normalizePath(dep.virtualPath)
-    )}`;
-    const normalizedFrom = normalizePath(from);
-    const id = normalizePath(normalizedFrom) + query;
+  const resolveVirtualDependency: Compiler.Config["resolveVirtualDependency"] =
+    (from, dep) => {
+      const query = `${virtualFileQuery}&id=${encodeURIComponent(
+        normalizePath(dep.virtualPath)
+      )}`;
+      const normalizedFrom = normalizePath(from);
+      const id = normalizePath(normalizedFrom) + query;
 
-    if (devServer) {
-      const prev = virtualFiles.get(id);
-      if (isDeferredPromise(prev)) {
-        prev.resolve(dep);
+      if (devServer) {
+        const prev = virtualFiles.get(id);
+        if (isDeferredPromise(prev)) {
+          prev.resolve(dep);
+        }
       }
-    }
 
-    virtualFiles.set(id, dep);
-    return `./${path.posix.basename(normalizedFrom) + query}`;
-  };
+      virtualFiles.set(id, dep);
+      return `./${path.posix.basename(normalizedFrom) + query}`;
+    };
 
   let root: string;
   let devEntryFile: string;
@@ -163,34 +168,43 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           runtimeId,
           sourceMaps: true,
           writeVersionComment: false,
-          babelConfig: {
-            ...opts.babelConfig,
-            caller: {
-              name: "@marko/vite",
-              supportsStaticESM: true,
-              supportsDynamicImport: true,
-              supportsTopLevelAwait: true,
-              supportsExportNamespaceFrom: true,
-              ...opts.babelConfig?.caller,
-            },
-          },
+          babelConfig: opts.babelConfig
+            ? {
+                ...opts.babelConfig,
+                caller: opts.babelConfig.caller
+                  ? {
+                      name: "@marko/vite",
+                      supportsStaticESM: true,
+                      supportsDynamicImport: true,
+                      supportsTopLevelAwait: true,
+                      supportsExportNamespaceFrom: true,
+                      ...opts.babelConfig.caller,
+                    }
+                  : babelCaller,
+              }
+            : {
+                babelrc: false,
+                configFile: false,
+                browserslistConfigFile: false,
+                caller: babelCaller,
+              },
         };
 
         ssrConfig = {
           ...baseConfig,
-          resolveVirtualDependency: resolveViteVirtualDep,
+          resolveVirtualDependency,
           output: "html",
         };
 
         domConfig = {
           ...baseConfig,
-          resolveVirtualDependency: resolveViteVirtualDep,
+          resolveVirtualDependency,
           output: "dom",
         };
 
         hydrateConfig = {
           ...baseConfig,
-          resolveVirtualDependency: resolveViteVirtualDep,
+          resolveVirtualDependency,
           output: "hydrate",
         };
 
