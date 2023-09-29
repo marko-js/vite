@@ -1,5 +1,13 @@
 # Changelog
 
+## 3.0.0
+
+### Major Changes
+
+- [#79](https://github.com/marko-js/vite/pull/79) [`bf735ba`](https://github.com/marko-js/vite/commit/bf735ba52aab7050d37e5c0ae8c8b20c48bab502) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - When using a runtime base path via the `basePathVar` option the vite [build.assetsDir](https://vitejs.dev/config/build-options.html#build-assetsdir) is now stripped from the final url. (You could add this back manually yourself if desired).
+
+- [#79](https://github.com/marko-js/vite/pull/79) [`d0c2b50`](https://github.com/marko-js/vite/commit/d0c2b50e36d239dbd39b4261f11ed457343ff518) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - No longer load babel config by default unless configured.
+
 ## 2.4.9
 
 ### Patch Changes
