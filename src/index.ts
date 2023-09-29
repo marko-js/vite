@@ -295,20 +295,35 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
             );
           }
 
+          const assetsDir =
+            config.build?.assetsDir?.replace(/[/\\]$/, "") ?? "assets";
+          const assetsDirLen = assetsDir.length;
+          const assetsDirEnd = assetsDirLen + 1;
+          const trimAssertsDir = (fileName: string) => {
+            if (fileName.startsWith(assetsDir)) {
+              switch (fileName[assetsDirLen]) {
+                case POSIX_SEP:
+                case WINDOWS_SEP:
+                  return fileName.slice(assetsDirEnd);
+              }
+            }
+
+            return fileName;
+          };
           config.experimental.renderBuiltUrl = (
             fileName,
             { hostType, ssr }
           ) => {
             switch (hostType) {
               case "html":
-                return fileName;
+                return trimAssertsDir(fileName);
               case "js":
                 return {
                   runtime: `${
                     ssr
                       ? basePathVar
                       : `$mbp${runtimeId ? `_${runtimeId}` : ""}`
-                  }+${JSON.stringify(fileName)}`,
+                  }+${JSON.stringify(trimAssertsDir(fileName))}`,
                 };
               default:
                 return { relative: true };
