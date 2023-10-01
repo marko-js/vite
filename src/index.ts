@@ -223,6 +223,16 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
 
         if (isTest) {
           linked = false;
+
+          if (
+            ((config as any).test?.environment as string | undefined)?.includes(
+              "dom"
+            )
+          ) {
+            config.resolve ??= {};
+            config.resolve.conditions ??= [];
+            config.resolve.conditions.push("browser");
+          }
         }
 
         if (linked && !registeredTag) {
