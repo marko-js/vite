@@ -1,5 +1,11 @@
 # Changelog
 
+## 3.0.1
+
+### Patch Changes
+
+- [#81](https://github.com/marko-js/vite/pull/81) [`7a4b118`](https://github.com/marko-js/vite/commit/7a4b118982ef9b59db0bd9b6d0bfcad69ef248f9) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Fix support for using this plugin with Vitest and a browser environment.
+
 ## 3.0.0
 
 ### Major Changes
