@@ -851,7 +851,7 @@ function stripVersionAndTimeStamp(id: string) {
   const queryStart = id.indexOf("?");
   if (queryStart === -1) return id;
   const url = id.slice(0, queryStart);
-  const query = id.slice(queryStart + 1).replace(/(?:^|[&])[vt]=[^&]/g, "");
+  const query = id.slice(queryStart + 1).replace(/(?:^|[&])[vt]=[^&]+/g, "");
   if (query) return `${url}?${query}`;
   return url;
 }
