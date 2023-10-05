@@ -1,37 +1,23 @@
 import type * as vite from "vite";
 import type * as Compiler from "@marko/compiler";
-import type { TagDefinition } from "@marko/babel-utils";
 
 import fs from "fs";
 import path from "path";
 import crypto from "crypto";
 import anyMatch from "anymatch";
 import { pathToFileURL, fileURLToPath } from "url";
-import { relativeImportPath } from "relative-import-path";
 
 import getServerEntryTemplate from "./server-entry-template";
 import {
   generateInputDoc,
   generateDocManifest,
-  DocManifest,
+  type DocManifest,
 } from "./manifest-generator";
 import esbuildPlugin from "./esbuild-plugin";
-import { BuildStore, FileStore } from "./store";
+import { type BuildStore, FileStore } from "./store";
 
 export * from "./store";
 export type { BuildStore } from "./store";
-
-declare module "@marko/babel-utils" {
-  interface Taglib {
-    id: string;
-    dirname: string;
-    path: string;
-    tags: TagDefinition[];
-  }
-  interface TaglibLookup {
-    taglibsById: Record<string, Taglib>;
-  }
-}
 
 export interface Options {
   // Defaults to true, set to false to disable automatic component discovery and hydration.
@@ -104,6 +90,7 @@ const babelCaller = {
   supportsTopLevelAwait: true,
   supportsExportNamespaceFrom: true,
 };
+let registeredTag: string | false = false;
 
 export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
   let compiler: typeof Compiler;
@@ -141,10 +128,8 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
   let isBuild = false;
   let isSSRBuild = false;
   let devServer: vite.ViteDevServer;
-  let registeredTag: string | false = false;
   let serverManifest: ServerManifest | undefined;
   let store: BuildStore;
-  let CJSTemplates: Set<string> | undefined;
   let basePath = "/";
   const entryIds = new Set<string>();
   const cachedSources = new Map<string, string>();
@@ -235,7 +220,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           }
         }
 
-        if (linked && !registeredTag) {
+        if (!registeredTag) {
           // Here we inject either the watchMode vite tag, or the build one.
           const transformer = path.resolve(
             thisFile,
@@ -251,48 +236,18 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           });
         }
 
-        const lookup = compiler.taglib.buildLookup(root);
-        const taglibDeps: string[] = [];
-        const optimizeTaglibDeps: string[] = [];
-
-        for (const name in lookup.taglibsById) {
-          const taglib = lookup.taglibsById[name];
-          if (
-            !/^marko-(.+-)?core$/.test(taglib.id) &&
-            /[\\/]node_modules[\\/]/.test(taglib.dirname)
-          ) {
-            let isEsm: boolean | undefined;
-            for (const tagName in taglib.tags) {
-              const tag: TagDefinition = taglib.tags[tagName];
-              const entry = tag.template || tag.renderer;
-
-              if (entry) {
-                const relativePath = relativeImportPath(devEntryFile, entry);
-                taglibDeps.push(relativePath);
-
-                if (
-                  isTest ||
-                  isBuild ||
-                  (isEsm ??= getModuleType(taglib.path) === "esm")
-                ) {
-                  optimizeTaglibDeps.push(relativePath);
-                } else {
-                  (CJSTemplates ??= new Set()).add(normalizePath(entry));
-                }
-              }
-            }
-          }
-        }
-
         const optimizeDeps = (config.optimizeDeps ??= {});
-        optimizeDeps.include = Array.from(
-          new Set([
-            ...(optimizeDeps.include || []),
-            ...compiler.getRuntimeEntryFiles("dom", opts.translator),
-            ...compiler.getRuntimeEntryFiles("html", opts.translator),
-            ...optimizeTaglibDeps,
-          ])
-        );
+        optimizeDeps.entries ??= [
+          "**/*.marko",
+          "!**/__snapshots__/**",
+          `!**/__tests__/**`,
+          `!**/coverage/**`,
+        ];
+
+        const domDeps = compiler.getRuntimeEntryFiles("dom", opts.translator);
+        optimizeDeps.include = optimizeDeps.include
+          ? [...optimizeDeps.include, ...domDeps]
+          : domDeps;
 
         const optimizeExtensions = (optimizeDeps.extensions ??= []);
         optimizeExtensions.push(".marko");
@@ -302,12 +257,18 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         esbuildPlugins.push(esbuildPlugin(compiler, baseConfig));
 
         const ssr = (config.ssr ??= {});
-        if (ssr.noExternal !== true) {
-          ssr.noExternal = Array.from(
-            new Set(
-              (taglibDeps as (string | RegExp)[]).concat(ssr.noExternal || [])
-            )
-          );
+        let { noExternal } = ssr;
+        if (noExternal !== true) {
+          const noExternalReg = /\.marko$/;
+          if (noExternal) {
+            if (Array.isArray(noExternal)) {
+              noExternal.push(noExternalReg);
+            } else {
+              noExternal = [noExternal, noExternalReg];
+            }
+          } else {
+            noExternal = noExternalReg;
+          }
         }
 
         if (basePathVar) {
@@ -420,12 +381,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           }
         }
       },
-      async resolveId(
-        importee,
-        importer,
-        importOpts,
-        ssr = (importOpts as any).ssr
-      ) {
+      async resolveId(importee, importer, importOpts, ssr = importOpts.ssr) {
         if (virtualFiles.has(importee)) {
           return importee;
         }
@@ -434,26 +390,33 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
 
         if (importeeQuery) {
           importee = importee.slice(0, -importeeQuery.length);
-        } else if (
-          ssr &&
-          linked &&
-          importer &&
-          (importer !== devEntryFile ||
-            normalizePath(importer) !== devEntryFilePosix) && // Vite tries to resolve against an `index.html` in some cases, we ignore it here.
-          isMarkoFile(importee) &&
-          !isMarkoFile(importer.replace(queryReg, ""))
-        ) {
-          importeeQuery = serverEntryQuery;
-        } else if (
-          !ssr &&
-          isBuild &&
-          importer &&
-          isMarkoFile(importee) &&
-          this.getModuleInfo(importer)?.isEntry
-        ) {
-          importeeQuery = browserEntryQuery;
-        } else if (linked && !ssr && !importeeQuery && isMarkoFile(importee)) {
-          importeeQuery = browserQuery;
+        } else if (!(importOpts as any).scan) {
+          if (
+            ssr &&
+            linked &&
+            importer &&
+            (importer !== devEntryFile ||
+              normalizePath(importer) !== devEntryFilePosix) && // Vite tries to resolve against an `index.html` in some cases, we ignore it here.
+            isMarkoFile(importee) &&
+            !isMarkoFile(importer.replace(queryReg, ""))
+          ) {
+            importeeQuery = serverEntryQuery;
+          } else if (
+            !ssr &&
+            isBuild &&
+            importer &&
+            isMarkoFile(importee) &&
+            this.getModuleInfo(importer)?.isEntry
+          ) {
+            importeeQuery = browserEntryQuery;
+          } else if (
+            linked &&
+            !ssr &&
+            !importeeQuery &&
+            isMarkoFile(importee)
+          ) {
+            importeeQuery = browserQuery;
+          }
         }
 
         if (importeeQuery) {
@@ -493,7 +456,8 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
 
         return null;
       },
-      async load(id) {
+      async load(rawId) {
+        const id = stripVersionAndTimeStamp(rawId);
         const query = getMarkoQuery(id);
         switch (query) {
           case serverEntryQuery: {
@@ -511,7 +475,8 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
 
         return virtualFiles.get(id) || null;
       },
-      async transform(source, id, ssr) {
+      async transform(source, rawId, ssr) {
+        let id = stripVersionAndTimeStamp(rawId);
         const isSSR = typeof ssr === "object" ? ssr.ssr : ssr;
         const query = getMarkoQuery(id);
 
@@ -567,21 +532,75 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
             cachedSources.set(id, source);
           }
 
-          if (CJSTemplates?.has(id)) {
-            return createEsmWrapper(
-              id,
-              getExportIdentifiers(
-                (
-                  await compiler.compile(source, id, {
-                    cache,
-                    ast: true,
-                    code: false,
-                    output: "source",
-                    sourceMaps: false,
-                  })
-                ).ast
-              )
-            );
+          if (!query) {
+            if (
+              /[\\/]node_modules[\\/]/.test(id) &&
+              getModuleType(id) === "cjs"
+            ) {
+              // For Marko files in CJS packages we create a facade
+              // that loads the module as commonjs.
+              const { ast } = await compiler.compile(source, id, {
+                cache,
+                ast: true,
+                code: false,
+                output: "source",
+                sourceMaps: false,
+              });
+              let namedExports = "";
+              let code = `import { createRequire } from "module";\n`;
+              code += `import "@marko/compiler/register.js";\n`;
+              code += `const mod = createRequire(import.meta.url)(${JSON.stringify(
+                id
+              )});\n`;
+
+              for (const child of ast.program.body) {
+                switch (child.type) {
+                  case "ExportAllDeclaration":
+                    code += `export * from ${JSON.stringify(
+                      child.source.value
+                    )};\n`;
+                    break;
+                  case "ExportNamedDeclaration":
+                    if (child.specifiers) {
+                      for (const specifier of child.specifiers) {
+                        if (specifier.exported.type === "Identifier") {
+                          namedExports += `${specifier.exported.name},`;
+                        } else {
+                          namedExports += `mod[${JSON.stringify(
+                            specifier.exported.value
+                          )}] as ${specifier.exported.value},`;
+                        }
+                      }
+                    }
+
+                    if (child.declaration) {
+                      if ("id" in child.declaration && child.declaration.id) {
+                        if (child.declaration.id.type === "Identifier") {
+                          namedExports += `${child.declaration.id.name},`;
+                        } else {
+                          namedExports += `mod[${JSON.stringify(
+                            child.declaration.id.value
+                          )}] as ${child.declaration.id.value},`;
+                        }
+                      }
+
+                      if ("declarations" in child.declaration) {
+                        for (const declaration of child.declaration
+                          .declarations) {
+                          if (declaration.id.type === "Identifier") {
+                            namedExports += `${declaration.id.name},`;
+                          }
+                        }
+                      }
+                    }
+                    break;
+                }
+              }
+
+              code += `export const { ${namedExports} } = mod;\n`;
+              code += `export default mod.default;\n`;
+              return code;
+            }
           }
         }
 
@@ -828,61 +847,11 @@ function getModuleType(file: string): "esm" | "cjs" {
   return "esm";
 }
 
-let requireHookInstalled = false;
-async function createEsmWrapper(
-  url: string,
-  exports: Set<string>
-): Promise<string> {
-  if (!requireHookInstalled) {
-    await import("@marko/compiler/register.js");
-    requireHookInstalled = true;
-  }
-
-  let code = `import { createRequire } from 'module';
-const mod = createRequire(import.meta.url)('${url}');
-`;
-
-  let namedExports: string | undefined;
-  for (const name of exports) {
-    if (name === "default") {
-      code += "export default mod.default;\n";
-    } else if (namedExports) {
-      namedExports += `, ${name}`;
-    } else {
-      namedExports = name;
-    }
-  }
-  if (namedExports) {
-    code += `export const { ${namedExports} } = mod;\n`;
-  }
-  return code;
-}
-
-function getExportIdentifiers(ast: Compiler.types.File) {
-  const exports = new Set<string>();
-  for (const node of ast.program.body) {
-    switch (node.type) {
-      case "ExportDefaultDeclaration":
-      case "MarkoTag":
-        exports.add("default");
-        break;
-      case "ExportNamedDeclaration":
-        if (node.declaration) {
-          for (const declarator of (node.declaration as any).declarations) {
-            exports.add(declarator.id.name);
-          }
-        }
-        for (const specifier of node.specifiers) {
-          if (specifier.type !== "ExportSpecifier") {
-            exports.add(specifier.exported.name);
-          }
-        }
-        break;
-      case "ExportAllDeclaration":
-        throw new Error(
-          'Re-exporting using `export * from "..."` is not supported.'
-        );
-    }
-  }
-  return exports;
+function stripVersionAndTimeStamp(id: string) {
+  const queryStart = id.indexOf("?");
+  if (queryStart === -1) return id;
+  const url = id.slice(0, queryStart);
+  const query = id.slice(queryStart + 1).replace(/(?:^|[&])[vt]=[^&]/g, "");
+  if (query) return `${url}?${query}`;
+  return url;
 }
