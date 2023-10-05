@@ -1,5 +1,11 @@
 # Changelog
 
+## 3.1.1
+
+### Patch Changes
+
+- [`3f5e52e`](https://github.com/marko-js/vite/commit/3f5e52ed62fd0dbc63f906f73c46a43f7e386a7e) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Fix issue where queries added from vitest were not being stripped
+
 ## 3.1.0
 
 ### Minor Changes
