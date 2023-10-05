@@ -1,5 +1,17 @@
 # Changelog
 
+## 3.1.0
+
+### Minor Changes
+
+- [#83](https://github.com/marko-js/vite/pull/83) [`4c8183c`](https://github.com/marko-js/vite/commit/4c8183c94ffe2cca08f6a65d6218d1fe0dce66c0) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Support Vite's dependency optimization scanning.
+
+### Patch Changes
+
+- [#83](https://github.com/marko-js/vite/pull/83) [`4c8183c`](https://github.com/marko-js/vite/commit/4c8183c94ffe2cca08f6a65d6218d1fe0dce66c0) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Improve commonjs interop for node_module `.marko` files which do not render any tags and/or use `export * from`.
+
+- [#83](https://github.com/marko-js/vite/pull/83) [`4c8183c`](https://github.com/marko-js/vite/commit/4c8183c94ffe2cca08f6a65d6218d1fe0dce66c0) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Improve support for Vitest by stripping off queries it adds before determining if we should process the module as a Marko file.
+
 ## 3.0.1
 
 ### Patch Changes
