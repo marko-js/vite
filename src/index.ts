@@ -533,11 +533,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           }
 
           if (!query) {
-            if (
-              !isBuild &&
-              /[\\/]node_modules[\\/]/.test(id) &&
-              getModuleType(id) === "cjs"
-            ) {
+            if (!isBuild && isCJSModule(id)) {
               // For Marko files in CJS packages we create a facade
               // that loads the module as commonjs.
               const { ast } = await compiler.compile(source, id, {
@@ -818,34 +814,26 @@ function isEmpty(obj: unknown) {
   return true;
 }
 
-function findPackageJson(
-  file: string,
-  root: string = process.cwd()
-): string | null {
-  let currentDir = path.dirname(file);
-  while (currentDir !== root && currentDir.length > root.length) {
-    const pkgPath = path.join(currentDir, "package.json");
-    if (fs.existsSync(pkgPath)) {
-      return pkgPath;
+const cjsModuleLookup = new Map<string, boolean>();
+function isCJSModule(id: string): boolean {
+  const modulePath =
+    /^.*[/\\]node_modules[/\\](?:@[^/\\]+[/\\])?[^/\\]+[/\\]/.exec(id)?.[0];
+  if (modulePath) {
+    let isCJS = cjsModuleLookup.get(modulePath);
+    if (isCJS === undefined) {
+      const pkgPath = modulePath + "package.json";
+      try {
+        const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8"));
+        isCJS = pkg.type !== "module" && !pkg.exports;
+      } catch {
+        isCJS = false;
+      }
+      cjsModuleLookup.set(modulePath, isCJS);
     }
-    currentDir = path.dirname(currentDir);
+    return isCJS;
   }
-  return null;
-}
 
-const moduleTypeMap = new Map<string, "esm" | "cjs">();
-function getModuleType(file: string): "esm" | "cjs" {
-  const pkgPath = findPackageJson(file);
-  if (pkgPath) {
-    let moduleType = moduleTypeMap.get(pkgPath);
-    if (!moduleType) {
-      const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8"));
-      moduleType = pkg.type === "module" || pkg.exports ? "esm" : "cjs";
-      moduleTypeMap.set(pkgPath, moduleType);
-    }
-    return moduleType;
-  }
-  return "esm";
+  return false;
 }
 
 function stripVersionAndTimeStamp(id: string) {
