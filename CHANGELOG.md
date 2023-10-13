@@ -1,5 +1,11 @@
 # Changelog
 
+## 3.1.2
+
+### Patch Changes
+
+- [#86](https://github.com/marko-js/vite/pull/86) [`701d0f9`](https://github.com/marko-js/vite/commit/701d0f9b4b6ec1e8b2bf921177e7397301077ab5) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Fix regression which prevented SSR cjs Marko files from being properly bundled.
+
 ## 3.1.1
 
 ### Patch Changes
