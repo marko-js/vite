@@ -1,5 +1,11 @@
 # Changelog
 
+## 3.1.3
+
+### Patch Changes
+
+- [#88](https://github.com/marko-js/vite/pull/88) [`f9644fe`](https://github.com/marko-js/vite/commit/f9644fe150f0ce988e27b64e51776e0abb6ac841) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Optimize check for if a Marko module is in a cjs package.
+
 ## 3.1.2
 
 ### Patch Changes
