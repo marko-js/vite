@@ -104,10 +104,11 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
 
   const resolveVirtualDependency: Compiler.Config["resolveVirtualDependency"] =
     (from, dep) => {
-      const query = `${virtualFileQuery}&id=${encodeURIComponent(
-        normalizePath(dep.virtualPath)
-      )}`;
       const normalizedFrom = normalizePath(from);
+      const query = `${virtualFileQuery}&id=${
+        Buffer.from(dep.virtualPath).toString("base64url") +
+        path.extname(dep.virtualPath)
+      }`;
       const id = normalizePath(normalizedFrom) + query;
 
       if (devServer) {
