@@ -104,22 +104,35 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
 
   const resolveVirtualDependency: Compiler.Config["resolveVirtualDependency"] =
     (from, dep) => {
-      const query = `${virtualFileQuery}&id=${encodeURIComponent(
-        normalizePath(dep.virtualPath)
-      )}`;
-      const normalizedFrom = normalizePath(from);
-      const id = normalizePath(normalizedFrom) + query;
-
-      if (devServer) {
-        const prev = virtualFiles.get(id);
-        if (isDeferredPromise(prev)) {
-          prev.resolve(dep);
-        }
-      }
-
-      virtualFiles.set(id, dep);
-      return `./${path.posix.basename(normalizedFrom) + query}`;
+      return resolveVirtualDependencyHandler("s", from, dep);
     };
+  const resolveVirtualDependencyH: Compiler.Config["resolveVirtualDependency"] =
+    (from, dep) => {
+      return resolveVirtualDependencyHandler("h", from, dep);
+    };
+  const resolveVirtualDependencyHandler = (
+    type: string,
+    from: string,
+    dep: any
+  ) => {
+    const query = `${virtualFileQuery}&id=${
+      type != "h"
+        ? encodeURIComponent(normalizePath(dep.virtualPath))
+        : normalizePath(dep.virtualPath)
+    }`;
+    const normalizedFrom = normalizePath(from);
+    const id = normalizePath(normalizedFrom) + query;
+
+    if (devServer) {
+      const prev = virtualFiles.get(id);
+      if (isDeferredPromise(prev)) {
+        prev.resolve(dep);
+      }
+    }
+
+    virtualFiles.set(id, dep);
+    return `./${path.posix.basename(normalizedFrom) + query}`;
+  };
 
   let root: string;
   let devEntryFile: string;
@@ -189,7 +202,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
 
         hydrateConfig = {
           ...baseConfig,
-          resolveVirtualDependency,
+          resolveVirtualDependency: resolveVirtualDependencyH,
           output: "hydrate",
         };
 
