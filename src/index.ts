@@ -534,6 +534,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
 
           if (!query) {
             if (
+              !isBuild &&
               /[\\/]node_modules[\\/]/.test(id) &&
               getModuleType(id) === "cjs"
             ) {
