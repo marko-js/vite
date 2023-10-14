@@ -1,5 +1,11 @@
 # Changelog
 
+## 3.1.4
+
+### Patch Changes
+
+- [#91](https://github.com/marko-js/vite/pull/91) [`16f6a11`](https://github.com/marko-js/vite/commit/16f6a112723ac6ea333fefca9e899e91944887f9) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Fix issue where encoding virtual files was not working in prod builds.
+
 ## 3.1.3
 
 ### Patch Changes
