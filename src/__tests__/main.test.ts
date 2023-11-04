@@ -3,6 +3,7 @@ import type http from "http";
 import fs from "fs";
 import net from "net";
 import path from "path";
+import url from "url";
 import { once } from "events";
 import * as vite from "vite";
 import snap from "mocha-snap";
@@ -12,6 +13,8 @@ import * as playwright from "playwright";
 import { defaultNormalizer, defaultSerializer } from "@marko/fixture-snapshots";
 import markoPlugin, { type Options } from "..";
 import type { Http2SecureServer } from "http2";
+
+const __dirname = path.dirname(url.fileURLToPath(import.meta.url));
 
 // https://github.com/esbuild-kit/tsx/issues/113
 const { toString } = Function.prototype;
@@ -83,6 +86,10 @@ before(async () => {
   ]);
 });
 
+beforeEach(() => {
+  changes = [];
+});
+
 after(() => browser.close());
 
 const FIXTURES = path.join(__dirname, "fixtures");
@@ -106,7 +113,7 @@ for (const fixture of fs.readdirSync(FIXTURES)) {
         await testPage(
           dir,
           steps,
-          (await requireCwd(path.join(dir, "dev-server.js"))).listen(0)
+          (await import(path.join(dir, "dev-server.mjs"))).default.listen(0)
         );
       });
 
@@ -139,7 +146,7 @@ for (const fixture of fs.readdirSync(FIXTURES)) {
         await testPage(
           dir,
           steps,
-          requireCwd(path.join(dir, "server.js")).listen(0)
+          (await import(path.join(dir, "server.mjs"))).default.listen(0)
         );
       });
     } else {
