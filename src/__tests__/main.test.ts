@@ -11,6 +11,7 @@ import { createRequire } from "module";
 import * as playwright from "playwright";
 import { defaultNormalizer, defaultSerializer } from "@marko/fixture-snapshots";
 import markoPlugin, { type Options } from "..";
+import type { Http2SecureServer } from "http2";
 
 // https://github.com/esbuild-kit/tsx/issues/113
 const { toString } = Function.prototype;
@@ -202,7 +203,11 @@ for (const fixture of fs.readdirSync(FIXTURES)) {
   });
 }
 
-async function testPage(dir: string, steps: Step[], server: http.Server) {
+async function testPage(
+  dir: string,
+  steps: Step[],
+  server: http.Server | Http2SecureServer
+) {
   try {
     if (!server.listening) await once(server, "listening");
 
