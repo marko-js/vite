@@ -1,5 +1,11 @@
 # Changelog
 
+## 3.1.5
+
+### Patch Changes
+
+- [#94](https://github.com/marko-js/vite/pull/94) [`1096959`](https://github.com/marko-js/vite/commit/1096959837711683f85a4a97eeb3fa971b073671) Thanks [@rturnq](https://github.com/rturnq)! - Marko CJS interop in SSR
+
 ## 3.1.4
 
 ### Patch Changes
