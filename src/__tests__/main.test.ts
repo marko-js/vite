@@ -113,7 +113,11 @@ for (const fixture of fs.readdirSync(FIXTURES)) {
         await testPage(
           dir,
           steps,
-          (await import(path.join(dir, "dev-server.mjs"))).default.listen(0)
+          (
+            await import(
+              url.pathToFileURL(path.join(dir, "dev-server.mjs")).href
+            )
+          ).default.listen(0)
         );
       });
 
@@ -146,7 +150,9 @@ for (const fixture of fs.readdirSync(FIXTURES)) {
         await testPage(
           dir,
           steps,
-          (await import(path.join(dir, "server.mjs"))).default.listen(0)
+          (
+            await import(url.pathToFileURL(path.join(dir, "server.mjs")).href)
+          ).default.listen(0)
         );
       });
     } else {
