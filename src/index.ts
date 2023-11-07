@@ -15,6 +15,9 @@ import {
 } from "./manifest-generator";
 import esbuildPlugin from "./esbuild-plugin";
 import { type BuildStore, FileStore } from "./store";
+import interopBabelPlugin from "./babel-plugin-cjs-interop";
+import type { PluginObj } from "@babel/core";
+import { isCJSModule } from "./resolve";
 
 export * from "./store";
 export type { BuildStore } from "./store";
@@ -71,7 +74,7 @@ const virtualFiles = new Map<
   string,
   VirtualFile | DeferredPromise<VirtualFile>
 >();
-const queryReg = /\?marko-.+$/;
+const queryReg = /\?marko-[^?]+$/;
 const browserEntryQuery = "?marko-browser-entry";
 const serverEntryQuery = "?marko-server-entry";
 const virtualFileQuery = "?marko-virtual";
@@ -99,6 +102,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
   let basePathVar: string | undefined;
   let baseConfig: Compiler.Config;
   let ssrConfig: Compiler.Config;
+  let ssrCjsConfig: Compiler.Config;
   let domConfig: Compiler.Config;
   let hydrateConfig: Compiler.Config;
 
@@ -319,6 +323,25 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
       },
       configResolved(config) {
         basePath = config.base;
+
+        ssrCjsConfig = {
+          ...ssrConfig,
+          //modules: 'cjs'
+          babelConfig: {
+            ...ssrConfig.babelConfig,
+            plugins: (
+              (ssrConfig.babelConfig!.plugins || []) as (
+                | PluginObj<any>
+                | string
+              )[]
+            ).concat(
+              interopBabelPlugin({
+                extensions: config.resolve.extensions,
+                conditions: config.resolve.conditions,
+              })
+            ),
+          },
+        };
       },
       configureServer(_server) {
         ssrConfig.hot = domConfig.hot = true;
@@ -533,8 +556,16 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
             cachedSources.set(id, source);
           }
 
-          if (!query) {
-            if (!isBuild && isCJSModule(id)) {
+          if (!query && isCJSModule(id)) {
+            if (isBuild) {
+              const { code, map } = await compiler.compile(
+                source,
+                id,
+                ssrCjsConfig
+              );
+
+              return { code, map, meta: { source } };
+            } else {
               // For Marko files in CJS packages we create a facade
               // that loads the module as commonjs.
               const { ast } = await compiler.compile(source, id, {
@@ -813,28 +844,6 @@ function isEmpty(obj: unknown) {
   }
 
   return true;
-}
-
-const cjsModuleLookup = new Map<string, boolean>();
-function isCJSModule(id: string): boolean {
-  const modulePath =
-    /^.*[/\\]node_modules[/\\](?:@[^/\\]+[/\\])?[^/\\]+[/\\]/.exec(id)?.[0];
-  if (modulePath) {
-    let isCJS = cjsModuleLookup.get(modulePath);
-    if (isCJS === undefined) {
-      const pkgPath = modulePath + "package.json";
-      try {
-        const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8"));
-        isCJS = pkg.type !== "module" && !pkg.exports;
-      } catch {
-        isCJS = false;
-      }
-      cjsModuleLookup.set(modulePath, isCJS);
-    }
-    return isCJS;
-  }
-
-  return false;
 }
 
 function stripVersionAndTimeStamp(id: string) {
