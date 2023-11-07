@@ -1,5 +1,6 @@
 import { exports } from "resolve.exports";
-import { type Opts as ResolveOpts, sync as resolveSync } from "resolve";
+import * as Resolve from "resolve";
+import type { Opts as ResolveOpts } from "resolve";
 import path from "path";
 import fs from "fs";
 
@@ -34,7 +35,7 @@ export function resolve(
   extensions: string[],
   conditions: string[]
 ) {
-  return resolveSync(id, {
+  return Resolve.sync(id, {
     basedir: path.dirname(from),
     filename: from,
     pathFilter,
