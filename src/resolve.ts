@@ -1,6 +1,5 @@
 import { exports } from "resolve.exports";
-import * as Resolve from "resolve";
-import type { Opts as ResolveOpts } from "resolve";
+import Resolve, { type Opts as ResolveOpts } from "resolve";
 import path from "path";
 import fs from "fs";
 
