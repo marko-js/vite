@@ -24,8 +24,8 @@ import { isCJSModule, resolve } from "./resolve";
  *
  *   3. Source:  ```import foo, * as nsFoo from 'foo';```
  *      Becomes: ```
- *        import _nsFoo from 'foo';
- *        const myFoo = nsFoo?.__esModule ? _foo.default : _foo
+ *        import nsFoo from 'foo';
+ *        const myFoo = nsFoo?.__esModule ? nsFoo.default : nsFoo
  *      ```
  */
 export default function plugin(options: {
