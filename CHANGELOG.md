@@ -1,5 +1,11 @@
 # Changelog
 
+## 3.1.6
+
+### Patch Changes
+
+- [#97](https://github.com/marko-js/vite/pull/97) [`79d62e3`](https://github.com/marko-js/vite/commit/79d62e3c047bf47c4271d3ed44fc5bb73a176984) Thanks [@rturnq](https://github.com/rturnq)! - Fix issues with CJS interop and fix esbuild plugin resolution
+
 ## 3.1.5
 
 ### Patch Changes
