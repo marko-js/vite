@@ -37,6 +37,7 @@ export default function esbuildPlugin(
         return {
           namespace: "marko:virtual",
           path: path.resolve(args.resolveDir, args.path),
+          external: isScan,
         };
       });
 
@@ -45,7 +46,6 @@ export default function esbuildPlugin(
         (args) => ({
           contents: virtualFiles.get(args.path)!.code,
           loader: path.extname(args.path).slice(1) as ESBuildLoader,
-          external: isScan,
         })
       );
 
