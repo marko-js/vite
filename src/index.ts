@@ -74,7 +74,7 @@ const virtualFiles = new Map<
   string,
   VirtualFile | DeferredPromise<VirtualFile>
 >();
-const queryReg = /\?marko-.+$/;
+const queryReg = /\?marko-[^?]+$/;
 const browserEntryQuery = "?marko-browser-entry";
 const serverEntryQuery = "?marko-server-entry";
 const virtualFileQuery = "?marko-virtual";
