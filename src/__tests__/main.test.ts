@@ -5,7 +5,6 @@ import net from "net";
 import path from "path";
 import url from "url";
 import { once } from "events";
-import * as vite from "vite";
 import snap from "mocha-snap";
 import { JSDOM } from "jsdom";
 import { createRequire } from "module";
@@ -33,10 +32,12 @@ declare const __track__: (html: string) => void;
 type Step = () => Promise<unknown> | unknown;
 
 const requireCwd = createRequire(process.cwd());
+let vite: typeof import("vite");
 let browser: playwright.Browser;
 let changes: string[] = [];
 
 before(async () => {
+  vite = await import("vite");
   browser = await playwright.chromium.launch();
   const context = await browser.newContext();
   await context.addInitScript("window.__name = v=>v");
@@ -119,11 +120,12 @@ for (const fixture of fs.readdirSync(FIXTURES)) {
         await vite.build({
           root: dir,
           configFile: false,
-          logLevel: "silent",
+          logLevel: "error",
           plugins: [markoPlugin(config.options)],
           build: {
             write: true,
             minify: false,
+            assetsInlineLimit: 0,
             emptyOutDir: false, // Avoid server / client deleting files from each other.
             ssr: path.join(dir, "src/index.js"),
           },
@@ -132,11 +134,12 @@ for (const fixture of fs.readdirSync(FIXTURES)) {
         await vite.build({
           root: dir,
           configFile: false,
-          logLevel: "silent",
+          logLevel: "error",
           plugins: [markoPlugin(config.options)],
           build: {
             write: true,
             minify: false,
+            assetsInlineLimit: 0,
             emptyOutDir: false, // Avoid server / client deleting files from each other.
           },
         });
@@ -163,7 +166,7 @@ for (const fixture of fs.readdirSync(FIXTURES)) {
               ],
             },
           },
-          logLevel: "silent",
+          logLevel: "error",
           optimizeDeps: { force: true },
           plugins: [markoPlugin({ ...config.options, linked: false })],
         });
@@ -177,7 +180,7 @@ for (const fixture of fs.readdirSync(FIXTURES)) {
         await vite.build({
           root: dir,
           configFile: false,
-          logLevel: "silent",
+          logLevel: "error",
           plugins: [markoPlugin({ ...config.options, linked: false })],
           build: {
             write: true,
