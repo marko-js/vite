@@ -11,10 +11,10 @@ function renderAssetsCall(t: typeof types, slot: string) {
     t.callExpression(
       t.memberExpression(
         t.memberExpression(t.identifier("out"), t.identifier("global")),
-        t.identifier("___viteRenderAssets")
+        t.identifier("___viteRenderAssets"),
       ),
-      [t.stringLiteral(slot)]
+      [t.stringLiteral(slot)],
     ),
-    false
+    false,
   );
 }

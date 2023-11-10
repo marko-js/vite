@@ -14,14 +14,14 @@ const markoErrorRegExp = /^(.+?)(?:\((\d+)(?:\s*,\s*(\d+))?\))?: (.*)$/gm;
 
 export default function esbuildPlugin(
   compiler: typeof Compiler,
-  config: Compiler.Config
+  config: Compiler.Config,
 ): ESBuildPlugin {
   return {
     name: "marko",
     async setup(build) {
       const { platform = "browser" } = build.initialOptions;
       const isScan = build.initialOptions.plugins?.some(
-        (v) => v.name === "vite:dep-scan"
+        (v) => v.name === "vite:dep-scan",
       );
       const virtualFiles = new Map<string, { code: string; map?: unknown }>();
       const finalConfig: Compiler.Config = {
@@ -46,14 +46,14 @@ export default function esbuildPlugin(
         (args) => ({
           contents: virtualFiles.get(args.path)!.code,
           loader: path.extname(args.path).slice(1) as ESBuildLoader,
-        })
+        }),
       );
 
       build.onLoad({ filter: /\.marko$/ }, async (args) => {
         try {
           const { code, meta } = await compiler.compileFile(
             args.path,
-            finalConfig
+            finalConfig,
           );
 
           return {
@@ -73,7 +73,7 @@ export default function esbuildPlugin(
             const line = parseInt(rawLine, 10) || 1;
             const column = parseInt(rawCol, 10) || 1;
             lines ||= (await fs.promises.readFile(args.path, "utf-8")).split(
-              /\n/g
+              /\n/g,
             );
             errors.push({
               text,

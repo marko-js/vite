@@ -27,7 +27,7 @@ export default function serialize(
   basePath: string,
   nodes: Node[],
   preload: string[],
-  parts?: (string | InjectType)[]
+  parts?: (string | InjectType)[],
 ) {
   let curString = parts ? (parts.pop() as string) : "";
   parts ??= [];
@@ -80,7 +80,7 @@ export default function serialize(
             parts.push(
               curString,
               InjectType.PublicPath,
-              id.replace(/"/g, "&#39;") + '"'
+              id.replace(/"/g, "&#39;") + '"',
             );
             curString = "";
           } else {

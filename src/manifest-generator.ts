@@ -16,7 +16,7 @@ const MARKER_COMMENT = "MARKO_VITE";
 
 export function generateDocManifest(
   basePath: string,
-  rawHtml: string
+  rawHtml: string,
 ): Promise<DocManifest> {
   return new Promise((resolve, reject) => {
     const parser = new Parser(
@@ -34,20 +34,20 @@ export function generateDocManifest(
         splitNodesByMarker(
           (
             htmlChildren.find(
-              (node) => isElement(node) && node.tagName === "head"
+              (node) => isElement(node) && node.tagName === "head",
             ) as Element
           ).childNodes,
           headPrepend,
-          head
+          head,
         );
         splitNodesByMarker(
           (
             htmlChildren.find(
-              (node) => isElement(node) && node.tagName === "body"
+              (node) => isElement(node) && node.tagName === "body",
             ) as Element
           ).childNodes,
           bodyPrepend,
-          body
+          body,
         );
 
         resolve({
@@ -57,7 +57,7 @@ export function generateDocManifest(
           "body-prepend": serializeOrNull(basePath, bodyPrepend, preload),
           body: serializeOrNull(basePath, body, preload),
         });
-      })
+      }),
     );
     parser.write(rawHtml);
     parser.end();
@@ -66,7 +66,7 @@ export function generateDocManifest(
 
 export function generateInputDoc(entry: string) {
   return `<!DOCTYPE html><html><head><!--${MARKER_COMMENT}--></head><body><!--${MARKER_COMMENT}--><script async type="module" src=${JSON.stringify(
-    entry
+    entry,
   )}></script></body></html>`;
 }
 

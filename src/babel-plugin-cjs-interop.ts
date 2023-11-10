@@ -49,7 +49,7 @@ export default function plugin(options: {
             path.node.source.value,
             (path.hub as any).file.opts.filename,
             options.extensions,
-            options.conditions
+            options.conditions,
           );
           if (!/\.c?js$/.test(resolved) || !isCJSModule(resolved)) {
             return;
@@ -78,7 +78,7 @@ export default function plugin(options: {
         }
 
         namespaceId ||= path.scope.generateUidIdentifier(
-          defaultImportId?.name || path.node.source.value
+          defaultImportId?.name || path.node.source.value,
         );
         path.node.specifiers = [t.importDefaultSpecifier(namespaceId)];
 
@@ -92,13 +92,13 @@ export default function plugin(options: {
                     namespaceId,
                     t.identifier("__esModule"),
                     false,
-                    true
+                    true,
                   ),
                   t.memberExpression(namespaceId, t.identifier("default")),
-                  namespaceId
-                )
+                  namespaceId,
+                ),
               ),
-            ])
+            ]),
           );
         }
 
@@ -112,13 +112,13 @@ export default function plugin(options: {
                       t.identifier(name),
                       t.identifier(alias),
                       false,
-                      name === alias
-                    )
-                  )
+                      name === alias,
+                    ),
+                  ),
                 ),
-                namespaceId
+                namespaceId,
               ),
-            ])
+            ]),
           );
         }
       },
