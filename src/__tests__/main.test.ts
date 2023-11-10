@@ -16,12 +16,6 @@ import type { Http2SecureServer } from "http2";
 
 const __dirname = path.dirname(url.fileURLToPath(import.meta.url));
 
-// https://github.com/esbuild-kit/tsx/issues/113
-const { toString } = Function.prototype;
-Function.prototype.toString = function () {
-  return toString.call(this).replace(/\b__name\(([^,]+),[^)]+\)/g, "$1");
-};
-
 declare global {
   const page: playwright.Page;
   namespace NodeJS {
@@ -55,7 +49,7 @@ before(async () => {
   await Promise.all([
     context.exposeFunction("__track__", (html: string) => {
       const formatted = defaultSerializer(
-        defaultNormalizer(JSDOM.fragment(html))
+        defaultNormalizer(JSDOM.fragment(html)),
       );
 
       if (changes.at(-1) !== formatted) {
@@ -117,7 +111,7 @@ for (const fixture of fs.readdirSync(FIXTURES)) {
             await import(
               url.pathToFileURL(path.join(dir, "dev-server.mjs")).href
             )
-          ).default.listen(0)
+          ).default.listen(0),
         );
       });
 
@@ -152,7 +146,7 @@ for (const fixture of fs.readdirSync(FIXTURES)) {
           steps,
           (
             await import(url.pathToFileURL(path.join(dir, "server.mjs")).href)
-          ).default.listen(0)
+          ).default.listen(0),
         );
       });
     } else {
@@ -209,7 +203,7 @@ for (const fixture of fs.readdirSync(FIXTURES)) {
               },
               preview: { port: await getAvailablePort() },
             })
-          ).httpServer
+          ).httpServer,
         );
       });
     }
@@ -219,7 +213,7 @@ for (const fixture of fs.readdirSync(FIXTURES)) {
 async function testPage(
   dir: string,
   steps: Step[],
-  server: http.Server | Http2SecureServer
+  server: http.Server | Http2SecureServer,
 ) {
   try {
     if (!server.listening) await once(server, "listening");
@@ -230,13 +224,13 @@ async function testPage(
     await waitForPendingRequests(page, () => page.goto(href));
     await page.waitForSelector("#app");
     await forEachChange((html, i) =>
-      snap(html, { ext: `.loading.${i}.html`, dir })
+      snap(html, { ext: `.loading.${i}.html`, dir }),
     );
 
     for (const [i, step] of steps.entries()) {
       await waitForPendingRequests(page, step);
       await forEachChange((html, j) =>
-        snap(html, { ext: `.step-${i}.${j}.html`, dir })
+        snap(html, { ext: `.step-${i}.${j}.html`, dir }),
       );
     }
   } finally {
@@ -248,7 +242,7 @@ async function testPage(
  * Applies changes currently and ensures no new changes come in while processing.
  */
 async function forEachChange<F extends (html: string, i: number) => unknown>(
-  fn: F
+  fn: F,
 ) {
   const len = changes.length;
   await Promise.all(changes.map(fn));

@@ -143,7 +143,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
   const transformWatchFiles = new Map<string, string[]>();
   const transformOptionalFiles = new Map<string, string[]>();
   const store = new ReadOncePersistedStore<ServerManifest>(
-    `vite-marko${runtimeId ? `-${runtimeId}` : ""}`
+    `vite-marko${runtimeId ? `-${runtimeId}` : ""}`,
   );
 
   return [
@@ -221,7 +221,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
 
           if (
             ((config as any).test?.environment as string | undefined)?.includes(
-              "dom"
+              "dom",
             )
           ) {
             config.resolve ??= {};
@@ -278,7 +278,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
 
           if (config.experimental.renderBuiltUrl) {
             throw new Error(
-              "Cannot use @marko/vite `basePathVar` with Vite's `renderBuiltUrl` option."
+              "Cannot use @marko/vite `basePathVar` with Vite's `renderBuiltUrl` option.",
             );
           }
 
@@ -299,7 +299,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           };
           config.experimental.renderBuiltUrl = (
             fileName,
-            { hostType, ssr }
+            { hostType, ssr },
           ) => {
             switch (hostType) {
               case "html":
@@ -335,7 +335,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
               interopBabelPlugin({
                 extensions: config.resolve.extensions,
                 conditions: config.resolve.conditions,
-              })
+              }),
             ),
           },
         };
@@ -405,7 +405,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
             }
           } catch (err) {
             this.error(
-              `You must run the "ssr" build before the "browser" build.`
+              `You must run the "ssr" build before the "browser" build.`,
             );
           }
 
@@ -463,7 +463,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
                   id: normalizePath(
                     importer
                       ? path.resolve(importer, "..", importee)
-                      : path.resolve(root, importee)
+                      : path.resolve(root, importee),
                   ),
                 }
               : await this.resolve(importee, importer, resolveOpts);
@@ -482,7 +482,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
 
             if (importee[0] === ".") {
               const resolved = normalizePath(
-                path.resolve(importer, "..", importee)
+                path.resolve(importer, "..", importee),
               );
               if (resolved === normalizePath(importer)) return resolved;
             }
@@ -549,10 +549,10 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
                   await devServer.transformIndexHtml(
                     "/",
                     generateInputDoc(
-                      posixFileNameToURL(fileName, root) + browserEntryQuery
-                    )
-                  )
-                )
+                      posixFileNameToURL(fileName, root) + browserEntryQuery,
+                    ),
+                  ),
+                ),
               );
             }
 
@@ -589,7 +589,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
               const { code, map } = await compiler.compile(
                 source,
                 id,
-                ssrCjsConfig
+                ssrCjsConfig,
               );
 
               return { code, map, meta: { source } };
@@ -607,14 +607,14 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
               let code = `import { createRequire } from "module";\n`;
               code += `import "@marko/compiler/register.js";\n`;
               code += `const mod = createRequire(import.meta.url)(${JSON.stringify(
-                id
+                id,
               )});\n`;
 
               for (const child of ast.program.body) {
                 switch (child.type) {
                   case "ExportAllDeclaration":
                     code += `export * from ${JSON.stringify(
-                      child.source.value
+                      child.source.value,
                     )};\n`;
                     break;
                   case "ExportNamedDeclaration":
@@ -624,7 +624,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
                           namedExports += `${specifier.exported.name},`;
                         } else {
                           namedExports += `mod[${JSON.stringify(
-                            specifier.exported.value
+                            specifier.exported.value,
                           )}] as ${specifier.exported.value},`;
                         }
                       }
@@ -636,7 +636,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
                           namedExports += `${child.declaration.id.name},`;
                         } else {
                           namedExports += `mod[${JSON.stringify(
-                            child.declaration.id.value
+                            child.declaration.id.value,
                           )}] as ${child.declaration.id.value},`;
                         }
                       }
@@ -668,7 +668,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
             ? ssrConfig
             : query === browserEntryQuery
             ? hydrateConfig
-            : domConfig
+            : domConfig,
         );
 
         const { map, meta } = compiled;
@@ -712,13 +712,13 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
 
         if (!isWrite) {
           this.error(
-            `Linked builds are currently only supported when in "write" mode.`
+            `Linked builds are currently only supported when in "write" mode.`,
           );
         }
 
         if (!serverManifest) {
           this.error(
-            "No Marko files were found when bundling the server in linked mode."
+            "No Marko files were found when bundling the server in linked mode.",
           );
         }
 
@@ -734,7 +734,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
               for (const id in chunk.modules) {
                 if (id.endsWith(serverEntryQuery)) {
                   serverManifest!.chunksNeedingAssets.push(
-                    path.resolve(dir, fileName)
+                    path.resolve(dir, fileName),
                   );
                   break;
                 }
@@ -748,21 +748,14 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
 
           for (const entryId in serverManifest!.entries) {
             const fileName = serverManifest!.entries[entryId];
-            let chunkId = fileName + htmlExt;
-            let chunk = bundle[chunkId];
-
-            if (!chunk) {
-              // In vite 2.8.x it gave us back posix paths, but in 2.9 we can get windows paths.
-              // so we have to check for both.
-              chunkId = chunkId.replace(/\//g, "\\");
-              chunk = bundle[chunkId];
-            }
+            const chunkId = fileName + htmlExt;
+            const chunk = bundle[chunkId];
 
             if (chunk?.type === "asset") {
               browserManifest[entryId] = {
                 ...(await generateDocManifest(
                   basePath,
-                  chunk.source.toString()
+                  chunk.source.toString(),
                 )),
                 preload: undefined, // clear out preload for prod builds.
               } as any;
@@ -770,13 +763,13 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
               delete bundle[chunkId];
             } else {
               this.error(
-                `Marko template had unexpected output from vite, ${fileName}`
+                `Marko template had unexpected output from vite, ${fileName}`,
               );
             }
           }
 
           const manifestStr = `;var __MARKO_MANIFEST__=${JSON.stringify(
-            browserManifest
+            browserManifest,
           )};\n`;
 
           for (const fileName of serverManifest!.chunksNeedingAssets) {
@@ -818,7 +811,7 @@ function toEntryId(id: string) {
   if (name === "index" || name === "template") {
     name = id.slice(
       id.lastIndexOf(POSIX_SEP, lastSepIndex - 1) + 1,
-      lastSepIndex
+      lastSepIndex,
     );
   }
 
@@ -833,11 +826,11 @@ function toEntryId(id: string) {
 function posixFileNameToURL(fileName: string, root: string) {
   const relativeURL = path.posix.relative(
     pathToFileURL(root).pathname,
-    pathToFileURL(fileName).pathname
+    pathToFileURL(fileName).pathname,
   );
   if (relativeURL[0] === ".") {
     throw new Error(
-      "@marko/vite: Entry templates must exist under the current root directory."
+      "@marko/vite: Entry templates must exist under the current root directory.",
     );
   }
 
