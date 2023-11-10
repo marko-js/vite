@@ -26,7 +26,7 @@ const voidElements = new Set([
 export default function serialize(
   basePath: string,
   nodes: Node[],
-  entries: string[],
+  preload: string[],
   parts?: (string | InjectType)[]
 ) {
   let curString = parts ? (parts.pop() as string) : "";
@@ -73,7 +73,7 @@ export default function serialize(
             const id = stripBasePath(basePath, attr.value).replace(/^\.\//, "");
 
             if (tag.name === "script") {
-              entries.push(id);
+              preload.push(id);
             }
 
             curString += ` ${attr.name}="`;
@@ -92,7 +92,7 @@ export default function serialize(
 
         if (tag.children.length) {
           parts.push(curString);
-          serialize(basePath, tag.children, entries, parts);
+          serialize(basePath, tag.children, preload, parts);
           curString = parts.pop() as string;
         }
 

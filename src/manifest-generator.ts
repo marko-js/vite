@@ -5,7 +5,7 @@ import serialize from "./serializer";
 
 type SerializedOrNull = null | ReturnType<typeof serialize>;
 export interface DocManifest {
-  entries: string[];
+  preload: string[];
   "head-prepend": SerializedOrNull;
   head: SerializedOrNull;
   "body-prepend": SerializedOrNull;
@@ -26,7 +26,7 @@ export function generateDocManifest(
         }
 
         const htmlChildren = dom.find(isElement)!.childNodes;
-        const entries: string[] = [];
+        const preload: string[] = [];
         const headPrepend: Node[] = [];
         const head: Node[] = [];
         const bodyPrepend: Node[] = [];
@@ -51,11 +51,11 @@ export function generateDocManifest(
         );
 
         resolve({
-          entries,
-          "head-prepend": serializeOrNull(basePath, headPrepend, entries),
-          head: serializeOrNull(basePath, head, entries),
-          "body-prepend": serializeOrNull(basePath, bodyPrepend, entries),
-          body: serializeOrNull(basePath, body, entries),
+          preload,
+          "head-prepend": serializeOrNull(basePath, headPrepend, preload),
+          head: serializeOrNull(basePath, head, preload),
+          "body-prepend": serializeOrNull(basePath, bodyPrepend, preload),
+          body: serializeOrNull(basePath, body, preload),
         });
       })
     );
@@ -70,8 +70,8 @@ export function generateInputDoc(entry: string) {
   )}></script></body></html>`;
 }
 
-function serializeOrNull(basePath: string, nodes: Node[], entries: string[]) {
-  const result = serialize(basePath, nodes, entries);
+function serializeOrNull(basePath: string, nodes: Node[], preload: string[]) {
+  const result = serialize(basePath, nodes, preload);
   if (result.length) {
     return result;
   }
