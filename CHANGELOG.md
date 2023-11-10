@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.0.0
+
+### Major Changes
+
+- [#99](https://github.com/marko-js/vite/pull/99) [`0bc357e`](https://github.com/marko-js/vite/commit/0bc357ebcf7850fb0592314f930301f31e2835df) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - - Removes the `store` config option. (BREAKING CHANGE).
+  - Adds a new hook for other vite plugins to add assets to the @marko/vite server entries.
+  - Optimize server entry code.
+
 ## 3.1.6
 
 ### Patch Changes
