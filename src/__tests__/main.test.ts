@@ -5,7 +5,6 @@ import net from "net";
 import path from "path";
 import url from "url";
 import { once } from "events";
-import * as vite from "vite";
 import snap from "mocha-snap";
 import { JSDOM } from "jsdom";
 import { createRequire } from "module";
@@ -15,12 +14,6 @@ import markoPlugin, { type Options } from "..";
 import type { Http2SecureServer } from "http2";
 
 const __dirname = path.dirname(url.fileURLToPath(import.meta.url));
-
-// https://github.com/esbuild-kit/tsx/issues/113
-const { toString } = Function.prototype;
-Function.prototype.toString = function () {
-  return toString.call(this).replace(/\b__name\(([^,]+),[^)]+\)/g, "$1");
-};
 
 declare global {
   const page: playwright.Page;
@@ -39,10 +32,12 @@ declare const __track__: (html: string) => void;
 type Step = () => Promise<unknown> | unknown;
 
 const requireCwd = createRequire(process.cwd());
+let vite: typeof import("vite");
 let browser: playwright.Browser;
 let changes: string[] = [];
 
 before(async () => {
+  vite = await import("vite");
   browser = await playwright.chromium.launch();
   const context = await browser.newContext();
   await context.addInitScript("window.__name = v=>v");
@@ -55,7 +50,7 @@ before(async () => {
   await Promise.all([
     context.exposeFunction("__track__", (html: string) => {
       const formatted = defaultSerializer(
-        defaultNormalizer(JSDOM.fragment(html))
+        defaultNormalizer(JSDOM.fragment(html)),
       );
 
       if (changes.at(-1) !== formatted) {
@@ -117,7 +112,7 @@ for (const fixture of fs.readdirSync(FIXTURES)) {
             await import(
               url.pathToFileURL(path.join(dir, "dev-server.mjs")).href
             )
-          ).default.listen(0)
+          ).default.listen(0),
         );
       });
 
@@ -125,11 +120,12 @@ for (const fixture of fs.readdirSync(FIXTURES)) {
         await vite.build({
           root: dir,
           configFile: false,
-          logLevel: "silent",
+          logLevel: "error",
           plugins: [markoPlugin(config.options)],
           build: {
             write: true,
             minify: false,
+            assetsInlineLimit: 0,
             emptyOutDir: false, // Avoid server / client deleting files from each other.
             ssr: path.join(dir, "src/index.js"),
           },
@@ -138,11 +134,12 @@ for (const fixture of fs.readdirSync(FIXTURES)) {
         await vite.build({
           root: dir,
           configFile: false,
-          logLevel: "silent",
+          logLevel: "error",
           plugins: [markoPlugin(config.options)],
           build: {
             write: true,
             minify: false,
+            assetsInlineLimit: 0,
             emptyOutDir: false, // Avoid server / client deleting files from each other.
           },
         });
@@ -152,7 +149,7 @@ for (const fixture of fs.readdirSync(FIXTURES)) {
           steps,
           (
             await import(url.pathToFileURL(path.join(dir, "server.mjs")).href)
-          ).default.listen(0)
+          ).default.listen(0),
         );
       });
     } else {
@@ -169,7 +166,7 @@ for (const fixture of fs.readdirSync(FIXTURES)) {
               ],
             },
           },
-          logLevel: "silent",
+          logLevel: "error",
           optimizeDeps: { force: true },
           plugins: [markoPlugin({ ...config.options, linked: false })],
         });
@@ -183,7 +180,7 @@ for (const fixture of fs.readdirSync(FIXTURES)) {
         await vite.build({
           root: dir,
           configFile: false,
-          logLevel: "silent",
+          logLevel: "error",
           plugins: [markoPlugin({ ...config.options, linked: false })],
           build: {
             write: true,
@@ -209,7 +206,7 @@ for (const fixture of fs.readdirSync(FIXTURES)) {
               },
               preview: { port: await getAvailablePort() },
             })
-          ).httpServer
+          ).httpServer,
         );
       });
     }
@@ -219,7 +216,7 @@ for (const fixture of fs.readdirSync(FIXTURES)) {
 async function testPage(
   dir: string,
   steps: Step[],
-  server: http.Server | Http2SecureServer
+  server: http.Server | Http2SecureServer,
 ) {
   try {
     if (!server.listening) await once(server, "listening");
@@ -230,13 +227,13 @@ async function testPage(
     await waitForPendingRequests(page, () => page.goto(href));
     await page.waitForSelector("#app");
     await forEachChange((html, i) =>
-      snap(html, { ext: `.loading.${i}.html`, dir })
+      snap(html, { ext: `.loading.${i}.html`, dir }),
     );
 
     for (const [i, step] of steps.entries()) {
       await waitForPendingRequests(page, step);
       await forEachChange((html, j) =>
-        snap(html, { ext: `.step-${i}.${j}.html`, dir })
+        snap(html, { ext: `.step-${i}.${j}.html`, dir }),
       );
     }
   } finally {
@@ -248,7 +245,7 @@ async function testPage(
  * Applies changes currently and ensures no new changes come in while processing.
  */
 async function forEachChange<F extends (html: string, i: number) => unknown>(
-  fn: F
+  fn: F,
 ) {
   const len = changes.length;
   await Promise.all(changes.map(fn));

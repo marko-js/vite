@@ -32,7 +32,7 @@ export function resolve(
   id: string,
   from: string,
   extensions: string[],
-  conditions: string[]
+  conditions: string[],
 ) {
   return Resolve.sync(id, {
     basedir: path.dirname(from),
@@ -45,7 +45,7 @@ export function resolve(
   function pathFilter(
     pkg: Record<string, unknown>,
     pkgFile: string,
-    relativePath: string
+    relativePath: string,
   ) {
     cjsModuleLookup.set(pkgFile, pkg.type !== "module" && !pkg.exports);
 
@@ -55,7 +55,7 @@ export function resolve(
         relativePath === exportsMainFile ? "." : relativePath,
         {
           conditions,
-        }
+        },
       )?.[0] as string;
     }
 
@@ -64,7 +64,7 @@ export function resolve(
 }
 
 function packageFilter<
-  T extends { main?: unknown; exports?: unknown; browser?: unknown }
+  T extends { main?: unknown; exports?: unknown; browser?: unknown },
 >(pkg: T) {
   if (pkg.exports) {
     // defers to the "exports" field.

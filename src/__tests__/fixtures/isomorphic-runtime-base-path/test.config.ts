@@ -17,7 +17,7 @@ export const ssr = true;
 export async function steps() {
   assert(
     await hasScript(/\$mbp[a-z0-1-_\s]*=/i),
-    "Base path script not found in head"
+    "Base path script not found in head",
   );
   await page.click("#clickable");
 }
