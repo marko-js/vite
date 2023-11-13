@@ -1,5 +1,11 @@
 # Changelog
 
+## 4.0.1
+
+### Patch Changes
+
+- [#101](https://github.com/marko-js/vite/pull/101) [`0601f65`](https://github.com/marko-js/vite/commit/0601f650c007704299e94163298aa97a88762711) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Fix regression when setting basePathVar in dev mode and runtimeId.
+
 ## 4.0.0
 
 ### Major Changes
