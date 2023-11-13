@@ -5,11 +5,11 @@ export function getRenderAssetsRuntime(opts: {
   basePathVar?: string;
 }): string {
   return `${
-    !opts.basePathVar
-      ? "const base = import.meta.env.BASE_URL;"
-      : `const base = globalThis.${opts.basePathVar};
+    opts.basePathVar && opts.isBuild
+      ? `const base = globalThis.${opts.basePathVar};
 if (typeof base !== "string") throw new Error("${opts.basePathVar} must be defined when using basePathVar.");
 if (!base.endsWith("/")) throw new Error("${opts.basePathVar} must end with a '/' when using basePathVar.");`
+      : "const base = import.meta.env.BASE_URL;"
   }
 export function addAssets(g, newEntries) {
   const entries = g.___viteEntries;
@@ -21,9 +21,7 @@ export function addAssets(g, newEntries) {
     g.___viteInjectAttrs = g.cspNonce
       ? \` nonce="\${g.cspNonce.replace(/"/g, "&#39;")}"\`
       : "";
-    ${
-      opts.runtimeId ? `$ g.runtimeId = ${JSON.stringify(opts.runtimeId)};` : ""
-    }
+    ${opts.runtimeId ? `g.runtimeId = ${JSON.stringify(opts.runtimeId)};` : ""}
   }
 }
 
