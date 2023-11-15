@@ -86,6 +86,10 @@ const browserQuery = "?marko-browser";
 const markoExt = ".marko";
 const htmlExt = ".html";
 const resolveOpts = { skipSelf: true };
+const configsByFileSystem = new Map<
+  typeof fs,
+  Map<Compiler.Config, Compiler.Config>
+>();
 const cache = new Map<unknown, unknown>();
 const babelCaller = {
   name: "@marko/vite",
@@ -103,7 +107,8 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
   let basePathVar: string | undefined;
   let baseConfig: Compiler.Config;
   let ssrConfig: Compiler.Config;
-  let ssrCjsConfig: Compiler.Config;
+  let ssrCjsBuildConfig: Compiler.Config;
+  let ssrCjsServeConfig: Compiler.Config;
   let domConfig: Compiler.Config;
   let hydrateConfig: Compiler.Config;
 
@@ -163,6 +168,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           runtimeId,
           sourceMaps: true,
           writeVersionComment: false,
+          optimize: env.mode === "production",
           babelConfig: opts.babelConfig
             ? {
                 ...opts.babelConfig,
@@ -189,6 +195,13 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           ...baseConfig,
           resolveVirtualDependency,
           output: "html",
+        };
+
+        ssrCjsServeConfig = {
+          ...ssrConfig,
+          ast: true,
+          code: false,
+          sourceMaps: false,
         };
 
         domConfig = {
@@ -321,7 +334,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
       configResolved(config) {
         basePath = config.base;
 
-        ssrCjsConfig = {
+        ssrCjsBuildConfig = {
           ...ssrConfig,
           //modules: 'cjs'
           babelConfig: {
@@ -386,6 +399,10 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         compiler.taglib.clearCaches();
         baseConfig.cache!.clear();
 
+        for (const [, cache] of configsByFileSystem) {
+          cache.clear();
+        }
+
         for (const mod of ctx.modules) {
           if (mod.id && virtualFiles.has(mod.id)) {
             virtualFiles.set(mod.id, createDeferredPromise());
@@ -432,6 +449,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
             ssr &&
             linked &&
             importer &&
+            importer[0] !== "\0" &&
             (importer !== devEntryFile ||
               normalizePath(importer) !== devEntryFilePosix) && // Vite tries to resolve against an `index.html` in some cases, we ignore it here.
             isMarkoFile(importee) &&
@@ -447,6 +465,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           ) {
             importeeQuery = browserEntryQuery;
           } else if (
+            !isBuild &&
             linked &&
             !ssr &&
             !importeeQuery &&
@@ -519,6 +538,11 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
       },
       async transform(source, rawId, ssr) {
         let id = stripVersionAndTimeStamp(rawId);
+        const info = isBuild ? this.getModuleInfo(id) : undefined;
+        if (info?.meta.arcSourceId) {
+          id = info.meta.arcSourceId;
+        }
+
         const isSSR = typeof ssr === "object" ? ssr.ssr : ssr;
         const query = getMarkoQuery(id);
 
@@ -586,23 +610,25 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
 
           if (!query && isCJSModule(id)) {
             if (isBuild) {
-              const { code, map } = await compiler.compile(
+              const { code, map, meta } = await compiler.compile(
                 source,
                 id,
-                ssrCjsConfig,
+                getConfigForFileSystem(info, ssrCjsBuildConfig),
               );
 
-              return { code, map, meta: { source } };
+              return {
+                code,
+                map,
+                meta: { arcSourceCode: source, arcScanIds: meta.analyzedTags },
+              };
             } else {
               // For Marko files in CJS packages we create a facade
               // that loads the module as commonjs.
-              const { ast } = await compiler.compile(source, id, {
-                cache,
-                ast: true,
-                code: false,
-                output: "source",
-                sourceMaps: false,
-              });
+              const { ast } = await compiler.compile(
+                source,
+                id,
+                ssrCjsServeConfig,
+              );
               let namedExports = "";
               let code = `import { createRequire } from "module";\n`;
               code += `import "@marko/compiler/register.js";\n`;
@@ -664,11 +690,14 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         const compiled = await compiler.compile(
           source,
           id,
-          isSSR
-            ? ssrConfig
-            : query === browserEntryQuery
-            ? hydrateConfig
-            : domConfig,
+          getConfigForFileSystem(
+            info,
+            isSSR
+              ? ssrConfig
+              : query === browserEntryQuery
+                ? hydrateConfig
+                : domConfig,
+          ),
         );
 
         const { map, meta } = compiled;
@@ -698,7 +727,13 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
 
           transformWatchFiles.set(id, meta.watchFiles);
         }
-        return { code, map, meta: isBuild ? { source } : undefined };
+        return {
+          code,
+          map,
+          meta: isBuild
+            ? { arcSourceCode: source, arcScanIds: meta.analyzedTags }
+            : undefined,
+        };
       },
     },
     {
@@ -874,4 +909,34 @@ function stripVersionAndTimeStamp(id: string) {
   const query = id.slice(queryStart + 1).replace(/(?:^|[&])[vt]=[^&]+/g, "");
   if (query) return `${url}?${query}`;
   return url;
+}
+
+/**
+ * For integration with arc-vite.
+ * We create a unique Marko config tied to each arcFileSystem.
+ */
+function getConfigForFileSystem(
+  info: vite.Rollup.ModuleInfo | undefined | null,
+  config: Compiler.Config,
+) {
+  const fileSystem = info?.meta.arcFS;
+  if (!fileSystem) return config;
+
+  let configsForFileSystem = configsByFileSystem.get(fileSystem);
+  if (!configsForFileSystem) {
+    configsForFileSystem = new Map();
+    configsByFileSystem.set(fileSystem, configsForFileSystem);
+  }
+
+  let configForFileSystem = configsForFileSystem.get(config);
+  if (!configForFileSystem) {
+    configForFileSystem = {
+      ...config,
+      fileSystem,
+      cache: configsForFileSystem,
+    };
+    configsForFileSystem.set(config, configForFileSystem);
+  }
+
+  return configForFileSystem;
 }
