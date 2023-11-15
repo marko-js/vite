@@ -1,5 +1,11 @@
 # Changelog
 
+## 4.0.2
+
+### Patch Changes
+
+- [#103](https://github.com/marko-js/vite/pull/103) [`16c1d7f`](https://github.com/marko-js/vite/commit/16c1d7fef3443cae289b98476e65a5de168073ed) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Add support for arc-vite and adaptive Marko files
+
 ## 4.0.1
 
 ### Patch Changes
