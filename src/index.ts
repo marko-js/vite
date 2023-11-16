@@ -156,6 +156,16 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
       name: "marko-vite:pre",
       enforce: "pre", // Must be pre to allow us to resolve assets before vite.
       async config(config, env) {
+        let optimize = env.mode === "production";
+
+        if ("MARKO_DEBUG" in process.env) {
+          optimize =
+            process.env.MARKO_DEBUG === "false" ||
+            process.env.MARKO_DEBUG === "0";
+        } else {
+          process.env.MARKO_DEBUG = optimize ? "false" : "true";
+        }
+
         compiler ??= (await import(
           opts.compiler || "@marko/compiler"
         )) as typeof Compiler;
@@ -165,10 +175,10 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
 
         baseConfig = {
           cache,
+          optimize,
           runtimeId,
           sourceMaps: true,
           writeVersionComment: false,
-          optimize: env.mode === "production",
           babelConfig: opts.babelConfig
             ? {
                 ...opts.babelConfig,
