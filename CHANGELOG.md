@@ -1,5 +1,11 @@
 # Changelog
 
+## 4.0.4
+
+### Patch Changes
+
+- [#107](https://github.com/marko-js/vite/pull/107) [`797b2c7`](https://github.com/marko-js/vite/commit/797b2c75260384816c66ad7d2fe89ad8b03dd24e) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Fix issue where vite dependency scan comes from a js/ts file into a Marko file. In this case we no longer give vite back the hydrate output, but the full compiled template from esbuild.
+
 ## 4.0.3
 
 ### Patch Changes
