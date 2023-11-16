@@ -26,11 +26,16 @@ export default function esbuildPlugin(
       const virtualFiles = new Map<string, { code: string; map?: unknown }>();
       const finalConfig: Compiler.Config = {
         ...config,
-        output: isScan ? "hydrate" : platform === "browser" ? "dom" : "html",
+        output: platform === "browser" ? "dom" : "html",
         resolveVirtualDependency(from, dep) {
           virtualFiles.set(path.join(from, "..", dep.virtualPath), dep);
           return dep.virtualPath;
         },
+      };
+
+      const scanConfig: Compiler.Config = {
+        ...finalConfig,
+        output: "hydrate",
       };
 
       build.onResolve({ filter: /\.marko\./ }, (args) => {
@@ -53,7 +58,7 @@ export default function esbuildPlugin(
         try {
           const { code, meta } = await compiler.compileFile(
             args.path,
-            finalConfig,
+            isScan && args.namespace === "" ? scanConfig : finalConfig,
           );
 
           return {
