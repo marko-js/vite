@@ -1,5 +1,11 @@
 # Changelog
 
+## 4.0.3
+
+### Patch Changes
+
+- [#105](https://github.com/marko-js/vite/pull/105) [`3aca277`](https://github.com/marko-js/vite/commit/3aca2777444af5b6408d2f0dffd8b4b0840acf1f) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Fix issue with mismatches MARKO_DEBUG environment and optimize compiler option.
+
 ## 4.0.2
 
 ### Patch Changes
