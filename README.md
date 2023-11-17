@@ -49,6 +49,21 @@ export default defineConfig({
 });
 ```
 
+# Browser asset references
+
+With @marko/vite when a _static relative path_ is used for certain native tag attributes, the relative asset will be imported and processed by Vite.
+
+As an example, with the following template, the `logo.svg` will be imported and processed as if it was a `import` at the root of the file.
+
+```
+<img src="./logo.svg">
+
+// Would produce a Vite processed asset and update the src, eg with the following output
+<img src="/assets/logo-TwEWmgMb.svg">
+```
+
+You can see the list of elements and their attributes which are processed [here](./src/relative-assets-transform.ts).
+
 # Linked Mode
 
 By default this plugin operates in `linked` mode (you can disabled this by passing [`linked: false` as an option](#options.linked)). In `linked` mode the plugin automatically discovers all of the entry `.marko` files while compiling the server, and tells `Vite` which modules to load in the browser.
