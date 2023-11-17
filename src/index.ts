@@ -22,6 +22,7 @@ import {
   renderAssetsRuntimeId,
 } from "./render-assets-runtime";
 import renderAssetsTransform from "./render-assets-transform";
+import relativeAssetsTransform from "./relative-assets-transform";
 import { ReadOncePersistedStore } from "./read-once-persisted-store";
 
 export namespace API {
@@ -258,6 +259,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           compiler.taglib.register("@marko/vite", {
             "<head>": { transformer: renderAssetsTransform },
             "<body>": { transformer: renderAssetsTransform },
+            "<*>": { transformer: relativeAssetsTransform },
           });
         }
 

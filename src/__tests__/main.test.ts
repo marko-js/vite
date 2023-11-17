@@ -51,7 +51,7 @@ before(async () => {
     context.exposeFunction("__track__", (html: string) => {
       const formatted = defaultSerializer(
         defaultNormalizer(JSDOM.fragment(html)),
-      );
+      ).replace(/-[a-z0-9]+(\.\w+)/i, "-[hash]$1");
 
       if (changes.at(-1) !== formatted) {
         changes.push(formatted);
