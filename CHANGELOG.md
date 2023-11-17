@@ -1,5 +1,11 @@
 # Changelog
 
+## 4.1.0
+
+### Minor Changes
+
+- [#109](https://github.com/marko-js/vite/pull/109) [`257b5d0`](https://github.com/marko-js/vite/commit/257b5d0ed94425ff9f9e6429a0f1326e19bf3ebe) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Support inline relative asset paths from native tags.
+
 ## 4.0.4
 
 ### Patch Changes
