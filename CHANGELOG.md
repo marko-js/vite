@@ -1,5 +1,11 @@
 # Changelog
 
+## 4.1.1
+
+### Patch Changes
+
+- [#111](https://github.com/marko-js/vite/pull/111) [`a1c8ff9`](https://github.com/marko-js/vite/commit/a1c8ff9fc79419432d4aa9ecfe0ae83fb6c59798) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Fix caching issue with virtual Marko files created by arc
+
 ## 4.1.0
 
 ### Minor Changes
