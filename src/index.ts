@@ -79,6 +79,7 @@ const virtualFiles = new Map<
   string,
   VirtualFile | DeferredPromise<VirtualFile>
 >();
+const extReg = /\.[^.]+$/;
 const queryReg = /\?marko-[^?]+$/;
 const browserEntryQuery = "?marko-browser-entry";
 const serverEntryQuery = "?marko-server-entry";
@@ -551,8 +552,12 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
       async transform(source, rawId, ssr) {
         let id = stripVersionAndTimeStamp(rawId);
         const info = isBuild ? this.getModuleInfo(id) : undefined;
-        if (info?.meta.arcSourceId) {
-          id = info.meta.arcSourceId;
+        const arcSourceId = info?.meta.arcSourceId;
+        if (arcSourceId) {
+          const arcFlagSet = info.meta.arcFlagSet;
+          id = arcFlagSet
+            ? arcSourceId.replace(extReg, `[${arcFlagSet.join("+")}]$&`)
+            : arcSourceId;
         }
 
         const isSSR = typeof ssr === "object" ? ssr.ssr : ssr;
