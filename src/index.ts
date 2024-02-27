@@ -243,15 +243,16 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
 
         if (isTest) {
           linked = false;
+          const { test } = config as any;
 
-          if (
-            ((config as any).test?.environment as string | undefined)?.includes(
-              "dom",
-            )
-          ) {
+          if ((test.environment as string | undefined)?.includes("dom")) {
             config.resolve ??= {};
             config.resolve.conditions ??= [];
             config.resolve.conditions.push("browser");
+            test.deps ??= {};
+            test.optimizer ??= {};
+            test.optimizer.web ??= {};
+            test.optimizer.web.enabled ??= true;
           }
         }
 
@@ -285,17 +286,17 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         esbuildPlugins.push(esbuildPlugin(compiler, baseConfig));
 
         const ssr = (config.ssr ??= {});
-        let { noExternal } = ssr;
+        const { noExternal } = ssr;
         if (noExternal !== true) {
           const noExternalReg = /\.marko$/;
           if (noExternal) {
             if (Array.isArray(noExternal)) {
-              noExternal.push(noExternalReg);
+              ssr.noExternal = [...noExternal, noExternalReg];
             } else {
-              noExternal = [noExternal, noExternalReg];
+              ssr.noExternal = [noExternal, noExternalReg];
             }
           } else {
-            noExternal = noExternalReg;
+            ssr.noExternal = noExternalReg;
           }
         }
 
