@@ -1,5 +1,11 @@
 # Changelog
 
+## 4.1.3
+
+### Patch Changes
+
+- [#115](https://github.com/marko-js/vite/pull/115) [`14834ed`](https://github.com/marko-js/vite/commit/14834ed6d48f39916fe71e801a7c07d5f3dac1aa) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Fix typo from previous vitest fix pr.
+
 ## 4.1.2
 
 ### Patch Changes
