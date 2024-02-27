@@ -250,9 +250,9 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
             config.resolve.conditions ??= [];
             config.resolve.conditions.push("browser");
             test.deps ??= {};
-            test.optimizer ??= {};
-            test.optimizer.web ??= {};
-            test.optimizer.web.enabled ??= true;
+            test.deps.optimizer ??= {};
+            test.deps.optimizer.web ??= {};
+            test.deps.optimizer.web.enabled ??= true;
           }
         }
 
