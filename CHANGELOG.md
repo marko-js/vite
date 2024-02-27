@@ -1,5 +1,11 @@
 # Changelog
 
+## 4.1.2
+
+### Patch Changes
+
+- [#113](https://github.com/marko-js/vite/pull/113) [`9838963`](https://github.com/marko-js/vite/commit/9838963c0dd7d4879de2aa4378d4c8b52b07569f) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Fix issue with latest versions of vitest.
+
 ## 4.1.1
 
 ### Patch Changes
