@@ -341,6 +341,17 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
             }
           };
         }
+
+        return {
+          resolve: {
+            alias: [
+              {
+                find: /^~/,
+                replacement: "",
+              },
+            ],
+          },
+        };
       },
       configResolved(config) {
         basePath = config.base;
