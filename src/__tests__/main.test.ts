@@ -98,7 +98,32 @@ for (const fixture of fs.readdirSync(FIXTURES)) {
       ssr: boolean;
       steps?: Step | Step[];
       options?: Options;
+      env?: Record<string, string>;
     };
+
+    if (config.env) {
+      const preservedEnv: [string, string | undefined | false][] = [];
+      before(() => {
+        for (const [key, value] of Object.entries(config.env!)) {
+          preservedEnv.push([
+            key,
+            key in process.env ? process.env[key] : false,
+          ]);
+          process.env[key] = value;
+        }
+      });
+
+      after(() => {
+        for (const [key, value] of preservedEnv) {
+          if (value === false) {
+            delete process.env[key];
+          } else {
+            process.env[key] = value;
+          }
+        }
+      });
+    }
+
     const steps: Step[] = config.steps
       ? Array.isArray(config.steps)
         ? config.steps
