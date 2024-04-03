@@ -15,7 +15,10 @@ const assetAttrsByTag = new Map([
   ["link", attrHref],
   ["object", new Set(["data"])],
   ["body", new Set(["background"])],
+  ["script", new Set(["src"])],
 ]);
+const assetFileReg =
+  /(?:^\..*\.(?:a?png|jpe?g|jfif|pipeg|pjp|gif|svg|ico|web[pm]|avif|mp4|ogg|mp3|wav|flac|aac|opus|woff2?|eot|[ot]tf|webmanifest|pdf|txt)(\?|$)|\?url\b)/;
 
 export default function transform(
   tag: types.NodePath<types.MarkoTag>,
@@ -38,15 +41,7 @@ export default function transform(
       assetAttrs.has(attr.name)
     ) {
       const { value } = attr.value;
-      if (
-        !(
-          (
-            value[0] === "/" || // Ignore absolute paths.
-            !/\.[^.]+$/.test(value) || // Ignore paths without a file extension.
-            /^[a-z]{2,}:/i.test(value)
-          ) // Ignore paths with a protocol.
-        )
-      ) {
+      if (assetFileReg.test(value)) {
         const importedId = tag.scope.generateUid(value);
         attr.value = t.identifier(importedId);
         tag.hub.file.path.unshiftContainer(

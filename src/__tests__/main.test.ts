@@ -52,7 +52,7 @@ before(async () => {
       const formatted = defaultSerializer(
         defaultNormalizer(JSDOM.fragment(html)),
       )
-        .replace(/-[a-z0-9]+(\.\w+)/i, "-[hash]$1")
+        .replace(/-[a-z0-9_]+(\.\w+)/gi, "-[hash]$1")
         .replace(/[?&][tv]=[\d.]+/, "");
 
       if (changes.at(-1) !== formatted) {

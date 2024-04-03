@@ -2,7 +2,7 @@ class {
   onCreate() {
     this.state = {
       clickCount: 0,
-      mounted: false
+      mounted: false,
     };
   }
   onMount() {
@@ -14,9 +14,13 @@ class {
   }
 }
 
-<div#clickable onClick("handleClick")>
-  Mounted: ${state.mounted}
-  Clicks: ${state.clickCount}
+<div onClick("handleClick") id="clickable">
+  Mounted: ${state.mounted} Clicks: ${state.clickCount}
 
   <img src="./logo.svg" alt="logo">
+  <img src="./logo.svg?url" alt="logo">
+  <script src="./script.js"/>
+  <script src="./script.js?url"/>
+  <link rel="stylesheet" href="./styles.css">
+  <link rel="stylesheet" href="./styles.css?url">
 </div>
