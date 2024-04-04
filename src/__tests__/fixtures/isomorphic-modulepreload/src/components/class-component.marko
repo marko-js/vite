@@ -1,10 +1,9 @@
 import logo from "./logo.svg";
-
 class {
   onCreate() {
     this.state = {
       clickCount: 0,
-      mounted: false
+      mounted: false,
     };
   }
   onMount() {
@@ -16,10 +15,6 @@ class {
   }
 }
 
-<div#clickable onClick("handleClick")>
-  Mounted: ${state.mounted}
-  Clicks: ${state.clickCount}
-
-  LOGO_PATH: ${logo.replace(/-[a-z0-9]+(\.\w+)$/i, '-[hash]$1')}
-  ENV: ${import.meta.env.BASE_URL}
+<div onClick("handleClick") id="clickable">
+  Mounted: ${state.mounted} Clicks: ${state.clickCount} LOGO_PATH: ${logo} ENV: ${import.meta.env.BASE_URL}
 </div>
