@@ -49,6 +49,12 @@ export default defineConfig({
 });
 ```
 
+# Base paths
+
+When deploying an application under a nested public path, use Vite's [`base` option](https://vitejs.dev/config/shared-options.html#base) to specify a path to prefix all assets. This option can also be specified with the `BASE_URL` environment variable.
+
+If the base path is not static, see the [basePathVar](#optionsbasepathvar) option for handling more advanced cases.
+
 # Browser asset references
 
 With @marko/vite when a _static relative path_ is used for certain native tag attributes, the relative asset will be imported and processed by Vite.
@@ -62,7 +68,7 @@ As an example, with the following template, the `logo.svg` will be imported and 
 <img src="/assets/logo-TwEWmgMb.svg">
 ```
 
-You can see the list of elements and their attributes which are processed [here](./src/relative-assets-transform.ts).
+Most common image, media, and font filetypes are transformed automatically but some file types such as `.js` and `.css` files will not be. Generally these should be imported directly and not rendered as markup. To force the transformation of a path, add `?url` to it. You can see the list of elements and their attributes which are processed [here](./src/relative-assets-transform.ts).
 
 # Linked Mode
 
