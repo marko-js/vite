@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.1.5
+
+### Patch Changes
+
+- [#117](https://github.com/marko-js/vite/pull/117) [`7a3a5e6`](https://github.com/marko-js/vite/commit/7a3a5e6bcce92bec30b0ece4f6dcc8ae29ea77c2) Thanks [@rturnq](https://github.com/rturnq)! - Support css-loader imports, limit relative src attribute transforms, support BASE_URL env var
+
+- [#120](https://github.com/marko-js/vite/pull/120) [`90cca62`](https://github.com/marko-js/vite/commit/90cca62c472becd7a50171237592ae3a91068d2a) Thanks [@rturnq](https://github.com/rturnq)! - Allow importing assets from marko file in cjs libs
+
 ## 4.1.4
 
 ### Patch Changes
