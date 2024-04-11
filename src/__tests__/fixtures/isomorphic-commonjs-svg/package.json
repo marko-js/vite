@@ -1,0 +1,6 @@
+{
+  "name": "isomorphic-commonjs",
+  "dependencies": {
+    "test-package": "0.0.0"
+  }
+}
