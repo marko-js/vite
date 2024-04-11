@@ -6,6 +6,7 @@ import path from "path";
 import crypto from "crypto";
 import anyMatch from "anymatch";
 import { pathToFileURL } from "url";
+import { transform as cjsToEsm } from "@chialab/cjs-to-esm";
 
 import getServerEntryTemplate from "./server-entry-template";
 import {
@@ -109,8 +110,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
   let basePathVar: string | undefined;
   let baseConfig: Compiler.Config;
   let ssrConfig: Compiler.Config;
-  let ssrCjsBuildConfig: Compiler.Config;
-  let ssrCjsServeConfig: Compiler.Config;
+  let ssrCjsConfig: Compiler.Config;
   let domConfig: Compiler.Config;
   let hydrateConfig: Compiler.Config;
 
@@ -212,13 +212,6 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         if (linked) {
           (ssrConfig as any).markoViteLinked = linked;
         }
-
-        ssrCjsServeConfig = {
-          ...ssrConfig,
-          ast: true,
-          code: false,
-          sourceMaps: false,
-        };
 
         domConfig = {
           ...baseConfig,
@@ -352,9 +345,8 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
       configResolved(config) {
         basePath = config.base;
 
-        ssrCjsBuildConfig = {
+        ssrCjsConfig = {
           ...ssrConfig,
-          //modules: 'cjs'
           babelConfig: {
             ...ssrConfig.babelConfig,
             plugins: (
@@ -366,6 +358,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
               interopBabelPlugin({
                 extensions: config.resolve.extensions,
                 conditions: config.resolve.conditions,
+                filter: isBuild ? undefined : (path) => !/^\./.test(path),
               }),
             ),
           },
@@ -622,6 +615,13 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         }
 
         if (!isMarkoFile(id)) {
+          if (!isBuild) {
+            const ext = path.extname(id);
+            if (ext === ".cjs" || (ext === ".js" && isCJSModule(id))) {
+              return cjsToEsm(source);
+            }
+          }
+
           return null;
         }
 
@@ -635,7 +635,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
               const { code, map, meta } = await compiler.compile(
                 source,
                 id,
-                getConfigForFileSystem(info, ssrCjsBuildConfig),
+                getConfigForFileSystem(info, ssrCjsConfig),
               );
 
               return {
@@ -643,68 +643,6 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
                 map,
                 meta: { arcSourceCode: source, arcScanIds: meta.analyzedTags },
               };
-            } else {
-              // For Marko files in CJS packages we create a facade
-              // that loads the module as commonjs.
-              const { ast } = await compiler.compile(
-                source,
-                id,
-                ssrCjsServeConfig,
-              );
-              let namedExports = "";
-              let code = `import { createRequire } from "module";\n`;
-              code += `import "@marko/compiler/register.js";\n`;
-              code += `const mod = createRequire(import.meta.url)(${JSON.stringify(
-                id,
-              )});\n`;
-
-              for (const child of ast.program.body) {
-                switch (child.type) {
-                  case "ExportAllDeclaration":
-                    code += `export * from ${JSON.stringify(
-                      child.source.value,
-                    )};\n`;
-                    break;
-                  case "ExportNamedDeclaration":
-                    if (child.specifiers) {
-                      for (const specifier of child.specifiers) {
-                        if (specifier.exported.type === "Identifier") {
-                          namedExports += `${specifier.exported.name},`;
-                        } else {
-                          namedExports += `mod[${JSON.stringify(
-                            specifier.exported.value,
-                          )}] as ${specifier.exported.value},`;
-                        }
-                      }
-                    }
-
-                    if (child.declaration) {
-                      if ("id" in child.declaration && child.declaration.id) {
-                        if (child.declaration.id.type === "Identifier") {
-                          namedExports += `${child.declaration.id.name},`;
-                        } else {
-                          namedExports += `mod[${JSON.stringify(
-                            child.declaration.id.value,
-                          )}] as ${child.declaration.id.value},`;
-                        }
-                      }
-
-                      if ("declarations" in child.declaration) {
-                        for (const declaration of child.declaration
-                          .declarations) {
-                          if (declaration.id.type === "Identifier") {
-                            namedExports += `${declaration.id.name},`;
-                          }
-                        }
-                      }
-                    }
-                    break;
-                }
-              }
-
-              code += `export const { ${namedExports} } = mod;\n`;
-              code += `export default mod.default;\n`;
-              return code;
             }
           }
         }
@@ -715,7 +653,9 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           getConfigForFileSystem(
             info,
             isSSR
-              ? ssrConfig
+              ? isCJSModule(id)
+                ? ssrCjsConfig
+                : ssrConfig
               : query === browserEntryQuery
                 ? hydrateConfig
                 : domConfig,

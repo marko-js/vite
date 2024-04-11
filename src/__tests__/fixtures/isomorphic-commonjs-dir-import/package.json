@@ -1,0 +1,7 @@
+{
+  "name": "isomorphic-commonjs-dir-import",
+  "type": "commonjs",
+  "dependencies": {
+    "test-package": "0.0.0"
+  }
+}

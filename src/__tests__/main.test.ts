@@ -227,6 +227,18 @@ async function testPage(
       (server.address() as net.AddressInfo).port
     }`;
     await waitForPendingRequests(page, () => page.goto(href));
+
+    const title = await page.title();
+    if (title === "Error") {
+      const error = new Error("Error in response");
+      const pre = await page.waitForSelector("pre");
+      const html = await pre.innerHTML();
+      if (html) {
+        error.stack = JSDOM.fragment(html.replace(/<br>/g, "\n")).textContent!;
+      }
+      throw error;
+    }
+
     await page.waitForSelector("#app");
     await forEachChange((html, i) =>
       snap(html, { ext: `.loading.${i}.html`, dir }),

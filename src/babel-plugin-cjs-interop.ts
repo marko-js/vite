@@ -31,15 +31,17 @@ import { isCJSModule, resolve } from "./resolve";
 export default function plugin(options: {
   extensions: string[];
   conditions: string[];
+  filter?: (path: string) => boolean;
 }): PluginObj {
   return {
     name: "marko-import-interop",
     visitor: {
       ImportDeclaration(path) {
-        // Skip side-effect only imports and marko imports
+        // Skip side-effect only, relative, and marko imports
         if (
           !path.node.specifiers.length ||
-          /\.(?:mjs|marko)$|\?/.test(path.node.source.value)
+          /\.(?:mjs|marko)$|\?/.test(path.node.source.value) ||
+          options.filter?.(path.node.source.value) === false
         ) {
           return;
         }
