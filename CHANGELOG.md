@@ -1,5 +1,11 @@
 # Changelog
 
+## 4.1.4
+
+### Patch Changes
+
+- [#118](https://github.com/marko-js/vite/pull/118) [`3818a34`](https://github.com/marko-js/vite/commit/3818a3439b9607b4e6c8932ebbc164c137527b7e) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Fix issue where asset related Marko taglibs / transforms were registered when not in linked mode (eg in tests)
+
 ## 4.1.3
 
 ### Patch Changes
