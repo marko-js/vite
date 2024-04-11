@@ -209,6 +209,10 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           output: "html",
         };
 
+        if (linked) {
+          (ssrConfig as any).markoViteLinked = linked;
+        }
+
         ssrCjsServeConfig = {
           ...ssrConfig,
           ast: true,
