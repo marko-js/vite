@@ -31,11 +31,8 @@ export default devServer.middlewares.use(async (req, res, next) => {
       path.join(__dirname, "./src/index.js"),
     );
     await handler(req, res, next);
-    if (!req.headersSent) {
-      return next();
-    }
   } catch (err) {
-    devServer.ssrFixStacktrace(err);
+    // devServer.ssrFixStacktrace(err);
     return next(err);
   }
 });

@@ -28,12 +28,9 @@ const devServer = await createServer({
 export default devServer.middlewares.use(async (req, res, next) => {
   try {
     const { handler } = await devServer.ssrLoadModule(
-      path.join(__dirname, "./src/index.js"),
+      path.join(__dirname, "./src/index.js")
     );
     await handler(req, res, next);
-    if (!req.headersSent) {
-      return next();
-    }
   } catch (err) {
     devServer.ssrFixStacktrace(err);
     return next(err);

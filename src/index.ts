@@ -175,6 +175,10 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         runtimeId = opts.runtimeId;
         basePathVar = opts.basePathVar;
 
+        if ("BASE_URL" in process.env && config.base == null) {
+          config.base = process.env.BASE_URL;
+        }
+
         baseConfig = {
           cache,
           optimize,
@@ -341,6 +345,17 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
             }
           };
         }
+
+        return {
+          resolve: {
+            alias: [
+              {
+                find: /^~/,
+                replacement: "",
+              },
+            ],
+          },
+        };
       },
       configResolved(config) {
         basePath = config.base;

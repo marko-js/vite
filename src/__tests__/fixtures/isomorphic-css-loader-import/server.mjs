@@ -1,6 +1,6 @@
 // In production, simply start up the http server.
-import path from "path";
-import url from "url";
+import path from 'path'
+import url from 'url';
 import { createServer } from "http";
 import serve from "serve-handler";
 import { handler } from "./dist/index.mjs";
