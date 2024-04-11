@@ -1,5 +1,11 @@
 # Changelog
 
+## 4.1.6
+
+### Patch Changes
+
+- [#122](https://github.com/marko-js/vite/pull/122) [`9cf3be1`](https://github.com/marko-js/vite/commit/9cf3be1fdedaa81c8ac0d4f7514ce85b0cb3c01a) Thanks [@rturnq](https://github.com/rturnq)! - Move transform lib to dependencies from devDependencies
+
 ## 4.1.5
 
 ### Patch Changes
