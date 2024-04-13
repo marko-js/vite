@@ -396,24 +396,25 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
       configureServer(_server) {
         ssrConfig.hot = domConfig.hot = true;
         devServer = _server;
-        devServer.watcher.on("all", (type, filename) => {
-          cachedSources.delete(filename);
+        devServer.watcher.on("all", (type, originalFileName) => {
+          const fileName = normalizePath(originalFileName);
+          cachedSources.delete(fileName);
 
           if (type === "unlink") {
-            entryIds.delete(filename);
-            transformWatchFiles.delete(filename);
-            transformOptionalFiles.delete(filename);
+            entryIds.delete(fileName);
+            transformWatchFiles.delete(fileName);
+            transformOptionalFiles.delete(fileName);
           }
 
           for (const [id, files] of transformWatchFiles) {
-            if (anyMatch(files, filename)) {
+            if (anyMatch(files, fileName)) {
               devServer.watcher.emit("change", id);
             }
           }
 
           if (type === "add" || type === "unlink") {
             for (const [id, files] of transformOptionalFiles) {
-              if (anyMatch(files, filename)) {
+              if (anyMatch(files, fileName)) {
                 devServer.watcher.emit("change", id);
               }
             }
