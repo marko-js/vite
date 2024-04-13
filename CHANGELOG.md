@@ -1,5 +1,11 @@
 # Changelog
 
+## 4.1.7
+
+### Patch Changes
+
+- [#124](https://github.com/marko-js/vite/pull/124) [`ff93773`](https://github.com/marko-js/vite/commit/ff937737d63baf628830423798856ace06b54969) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Fix issue where filename from vites watcher was not in posix which was preventing clearing cached data.
+
 ## 4.1.6
 
 ### Patch Changes
