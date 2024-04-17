@@ -634,7 +634,11 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           if (!isBuild) {
             const ext = path.extname(id);
             if (ext === ".cjs" || (ext === ".js" && isCJSModule(id))) {
-              return cjsToEsm(source);
+              try {
+                return await cjsToEsm(source);
+              } catch {
+                return null;
+              }
             }
           }
 
