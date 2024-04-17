@@ -1,5 +1,11 @@
 # Changelog
 
+## 4.1.8
+
+### Patch Changes
+
+- [#126](https://github.com/marko-js/vite/pull/126) [`68b6cc3`](https://github.com/marko-js/vite/commit/68b6cc3fb3efdf791653aa0bcb8b9e8362c244bf) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Ignore errors caused by cjs => esm conversion
+
 ## 4.1.7
 
 ### Patch Changes
