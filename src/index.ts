@@ -324,17 +324,19 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
             config.build?.assetsDir?.replace(/[/\\]$/, "") ?? "assets";
           const assetsDirLen = assetsDir.length;
           const assetsDirEnd = assetsDirLen + 1;
-          const trimAssertsDir = (fileName: string) => {
-            if (fileName.startsWith(assetsDir)) {
-              switch (fileName[assetsDirLen]) {
-                case POSIX_SEP:
-                case WINDOWS_SEP:
-                  return fileName.slice(assetsDirEnd);
-              }
-            }
+          const trimAssertsDir = assetsDir
+            ? (fileName: string) => {
+                if (fileName.startsWith(assetsDir)) {
+                  switch (fileName[assetsDirLen]) {
+                    case POSIX_SEP:
+                    case WINDOWS_SEP:
+                      return fileName.slice(assetsDirEnd);
+                  }
+                }
 
-            return fileName;
-          };
+                return fileName;
+              }
+            : (fileName: string) => fileName;
           config.experimental.renderBuiltUrl = (
             fileName,
             { hostType, ssr },
