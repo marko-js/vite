@@ -1,5 +1,11 @@
 # Changelog
 
+## 4.1.10
+
+### Patch Changes
+
+- [#131](https://github.com/marko-js/vite/pull/131) [`9f266ff`](https://github.com/marko-js/vite/commit/9f266ff9dbd890ce4044b24a9b444e83e6e02443) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Switch to overriding the default chunkFileNames instead of assets dir to avoid server assets in client assets folder.
+
 ## 4.1.9
 
 ### Patch Changes
