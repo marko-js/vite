@@ -301,6 +301,17 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           }
         }
 
+        if (isSSRBuild && !config.build?.rollupOptions?.output) {
+          // For the server build vite will still output code split chunks to the `assets` directory by default.
+          // this is problematic since you might have server assets in your client assets folder.
+          // Here we change the default chunkFileNames config to instead output to the outDir directly.
+          config.build ??= {};
+          config.build.rollupOptions ??= {};
+          config.build.rollupOptions.output = {
+            chunkFileNames: `[name]-[hash].js`,
+          };
+        }
+
         if (basePathVar) {
           config.experimental ??= {};
 
@@ -308,16 +319,6 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
             throw new Error(
               "Cannot use @marko/vite `basePathVar` with Vite's `renderBuiltUrl` option.",
             );
-          }
-
-          if (isSSRBuild && !config.build?.ssrEmitAssets) {
-            config.build ??= {};
-
-            // For the server build vite will still output code split chunks to the `assets` directory by default.
-            // this is problematic since you might have server assets in your client assets folder.
-            // Here we change the default to be an empty string which makes the assetsDir essentially the same as
-            // as outDir for the server chunks.
-            config.build.assetsDir ??= "";
           }
 
           const assetsDir =
