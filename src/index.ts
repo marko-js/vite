@@ -748,13 +748,10 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
             const chunk = bundle[fileName];
 
             if (chunk.type === "chunk") {
-              for (const id in chunk.modules) {
-                if (id.endsWith(serverEntryQuery)) {
-                  serverManifest!.chunksNeedingAssets.push(
-                    path.resolve(dir, fileName),
-                  );
-                  break;
-                }
+              if (chunk.moduleIds.includes(renderAssetsRuntimeId)) {
+                serverManifest!.chunksNeedingAssets.push(
+                  path.resolve(dir, fileName),
+                );
               }
             }
           }
