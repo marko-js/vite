@@ -361,7 +361,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           resolve: {
             alias: [
               {
-                find: /^~/,
+                find: /^~(?!\/)/,
                 replacement: "",
               },
             ],
