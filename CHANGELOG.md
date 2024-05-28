@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.1.11
+
+### Patch Changes
+
+- [#135](https://github.com/marko-js/vite/pull/135) [`f7f9bf7`](https://github.com/marko-js/vite/commit/f7f9bf71be6639358a0fd23006ea0753cadc4d0c) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Support optimizedRegistryIds compiler option"
+
+- [#134](https://github.com/marko-js/vite/pull/134) [`5f73701`](https://github.com/marko-js/vite/commit/5f737011aeb1847f95a2da26659ce6f86003c3d3) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Update ~ resolve alias to avoid matching ~ by itself as the package name.
+
 ## 4.1.10
 
 ### Patch Changes
