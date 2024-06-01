@@ -1,5 +1,11 @@
 # Changelog
 
+## 4.1.12
+
+### Patch Changes
+
+- [#137](https://github.com/marko-js/vite/pull/137) [`7eb1fd1`](https://github.com/marko-js/vite/commit/7eb1fd1972a7fd59797f6fd95e3d6b8808fd3ba7) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Disable registry id optimization while it (hopefully) stabalizes in Marko core.
+
 ## 4.1.11
 
 ### Patch Changes
