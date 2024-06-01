@@ -50,7 +50,7 @@ interface BrowserManifest {
 }
 
 interface ServerManifest {
-  optimizedRegistryIds?: { [id: string]: string };
+  // optimizedRegistryIds?: { [id: string]: string };
   entries: {
     [entryId: string]: string;
   };
@@ -102,7 +102,7 @@ const babelCaller = {
   supportsTopLevelAwait: true,
   supportsExportNamespaceFrom: true,
 };
-const optimizedRegistryIds: Map<string, string> = new Map();
+// const optimizedRegistryIds: Map<string, string> = new Map();
 let registeredTagLib = false;
 
 export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
@@ -184,8 +184,8 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         baseConfig = {
           cache,
           optimize,
-          optimizedRegistryIds:
-            optimize && linked ? optimizedRegistryIds : undefined,
+          // optimizedRegistryIds:
+          //   optimize && linked ? optimizedRegistryIds : undefined,
           runtimeId,
           sourceMaps: true,
           writeVersionComment: false,
@@ -456,14 +456,14 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         if (isBuild && linked && !isSSRBuild) {
           try {
             serverManifest = await store.read();
-            if (serverManifest.optimizedRegistryIds) {
-              for (const id in serverManifest.optimizedRegistryIds) {
-                optimizedRegistryIds.set(
-                  id,
-                  serverManifest.optimizedRegistryIds[id],
-                );
-              }
-            }
+            // if (serverManifest.optimizedRegistryIds) {
+            //   for (const id in serverManifest.optimizedRegistryIds) {
+            //     optimizedRegistryIds.set(
+            //       id,
+            //       serverManifest.optimizedRegistryIds[id],
+            //     );
+            //   }
+            // }
 
             inputOptions.input = toHTMLEntries(root, serverManifest.entries);
             for (const entry in serverManifest.entrySources) {
@@ -780,8 +780,8 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
             }
           }
 
-          serverManifest.optimizedRegistryIds =
-            Object.fromEntries(optimizedRegistryIds);
+          // serverManifest.optimizedRegistryIds =
+          //   Object.fromEntries(optimizedRegistryIds);
           store.write(serverManifest!);
         } else {
           const browserManifest: BrowserManifest = {};
