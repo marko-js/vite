@@ -1,5 +1,11 @@
 # Changelog
 
+## 4.1.13
+
+### Patch Changes
+
+- [#139](https://github.com/marko-js/vite/pull/139) [`9e3b9dc`](https://github.com/marko-js/vite/commit/9e3b9dcf22371d1a1c77a4308bdc167654d9a241) Thanks [@rturnq](https://github.com/rturnq)! - Load cjs transform code conditionally on-demand for envs that don't support native addons
+
 ## 4.1.12
 
 ### Patch Changes
