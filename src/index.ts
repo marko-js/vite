@@ -104,6 +104,11 @@ const babelCaller = {
 // const optimizedRegistryIds: Map<string, string> = new Map();
 let registeredTagLib = false;
 
+// This package has a dependency on @parcel/source-map which uses native addons.
+// Some enviroments like Stackblitz don't support loading these. So... load it
+// with a dynamic import to avoid everything failing.
+let cjsToEsm: typeof import("@chialab/cjs-to-esm").transform | null | undefined;
+
 export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
   let compiler: typeof Compiler;
   let { linked = true } = opts;
@@ -657,7 +662,14 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           if (!isBuild) {
             const ext = path.extname(id);
             if (ext === ".cjs" || (ext === ".js" && isCJSModule(id))) {
-              const cjsToEsm = await loadCJsToEsm();
+              if (cjsToEsm === undefined) {
+                try {
+                  cjsToEsm = (await import("@chialab/cjs-to-esm")).transform;
+                } catch {
+                  cjsToEsm = null;
+                  return null;
+                }
+              }
               if (cjsToEsm) {
                 try {
                   return await cjsToEsm(source);
@@ -946,19 +958,4 @@ function getConfigForFileSystem(
   }
 
   return configForFileSystem;
-}
-
-// This package has a dependency on @parcel/source-map which uses native addons.
-// Some enviroments like Stackblitz don't support loading these. So... load it
-// with a dynamic import to avoid everything failing.
-let cjsToEsm: typeof import("@chialab/cjs-to-esm").transform | null | undefined;
-async function loadCJsToEsm() {
-  if (cjsToEsm === undefined) {
-    try {
-      cjsToEsm = (await import("@chialab/cjs-to-esm")).transform;
-    } catch {
-      cjsToEsm = null;
-    }
-  }
-  return cjsToEsm;
 }
