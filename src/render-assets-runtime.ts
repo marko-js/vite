@@ -55,22 +55,16 @@ function renderAssets(slot) {
         // To avoid FOUC we will hide the page until all of these modules are loaded.
         const { preload } = entry;
         if (preload) {
-          let sep = "";
-          html += \`<script\${this.___viteInjectAttrs}>((root=document.documentElement)=>{\`;
-          html += "root.style.visibility='hidden';";
-          html += "document.currentScript.remove();";
-          html += "Promise.allSettled([";
-
+          html += \`<script class=marko-vite-preload blocking=render type=module\${this.___viteInjectAttrs}>\`;
           for (const id of preload) {
-            html += \`\${sep}import(\${JSON.stringify(base + id)})\`;
-            sep = ",";
+            html += \`import \${JSON.stringify(base + id)};\`;
           }
 
-          html += "]).then(()=>{";
-          html += "root.style.visibility='';";
+          html += "document.querySelectorAll('.marko-vite-preload').forEach((el) => el.remove());";
+          html += "document.documentElement.style.visibility='';";
           html +=
-            "if(root.getAttribute('style')==='')root.removeAttribute('style')";
-          html += "})})()</script>";
+            "if(document.documentElement.getAttribute('style')==='')document.documentElement.removeAttribute('style');";
+          html += "</script><script class=marko-vite-preload>document.documentElement.style.visibility='hidden'</script>";
         }
       }`
       }
