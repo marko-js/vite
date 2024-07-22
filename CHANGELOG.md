@@ -1,5 +1,11 @@
 # Changelog
 
+## 4.1.15
+
+### Patch Changes
+
+- [#143](https://github.com/marko-js/vite/pull/143) [`61a1a0a`](https://github.com/marko-js/vite/commit/61a1a0a764886a532ddf04aa830c6149cb77f3a3) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Fix issue in dev mode where render blocking was lasting longer than necessary due to a deferred module script. The script is now marked as async.
+
 ## 4.1.14
 
 ### Patch Changes
