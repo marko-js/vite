@@ -55,7 +55,7 @@ function renderAssets(slot) {
         // To avoid FOUC we will hide the page until all of these modules are loaded.
         const { preload } = entry;
         if (preload) {
-          html += \`<script class=marko-vite-preload blocking=render type=module\${this.___viteInjectAttrs}>\`;
+          html += \`<script class=marko-vite-preload async blocking=render type=module\${this.___viteInjectAttrs}>\`;
           for (const id of preload) {
             html += \`import \${JSON.stringify(base + id)};\`;
           }
