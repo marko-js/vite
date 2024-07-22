@@ -1,5 +1,11 @@
 # Changelog
 
+## 4.1.14
+
+### Patch Changes
+
+- [#141](https://github.com/marko-js/vite/pull/141) [`4136b09`](https://github.com/marko-js/vite/commit/4136b0978d888a311290bdc811c550051b8e8c77) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Improve handling of render blocking assets in dev mode.
+
 ## 4.1.13
 
 ### Patch Changes
