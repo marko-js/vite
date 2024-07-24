@@ -1,5 +1,11 @@
 # Changelog
 
+## 4.1.16
+
+### Patch Changes
+
+- [#145](https://github.com/marko-js/vite/pull/145) [`88655ce`](https://github.com/marko-js/vite/commit/88655ce6414d3d1301c440df18afe71f8e93c3a4) Thanks [@vwong](https://github.com/vwong)! - Fix issue in dev mode where Content Security Policies may prevent script from running
+
 ## 4.1.15
 
 ### Patch Changes
