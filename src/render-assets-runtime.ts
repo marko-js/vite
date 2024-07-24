@@ -64,7 +64,7 @@ function renderAssets(slot) {
           html += "document.documentElement.style.visibility='';";
           html +=
             "if(document.documentElement.getAttribute('style')==='')document.documentElement.removeAttribute('style');";
-          html += "</script><script class=marko-vite-preload>document.documentElement.style.visibility='hidden'</script>";
+          html += \`</script><script class=marko-vite-preload\${this.___viteInjectAttrs}>document.documentElement.style.visibility='hidden'</script>\`;
         }
       }`
       }
