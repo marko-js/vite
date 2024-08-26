@@ -275,12 +275,14 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         }
 
         const optimizeDeps = (config.optimizeDeps ??= {});
-        optimizeDeps.entries ??= [
-          "**/*.marko",
-          "!**/__snapshots__/**",
-          `!**/__tests__/**`,
-          `!**/coverage/**`,
-        ];
+        if (!isTest) {
+          optimizeDeps.entries ??= [
+            "**/*.marko",
+            "!**/__snapshots__/**",
+            `!**/__tests__/**`,
+            `!**/coverage/**`,
+          ];
+        }
 
         const domDeps = compiler.getRuntimeEntryFiles("dom", opts.translator);
         optimizeDeps.include = optimizeDeps.include
