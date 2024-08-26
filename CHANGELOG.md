@@ -1,5 +1,11 @@
 # Changelog
 
+## 4.1.17
+
+### Patch Changes
+
+- [#147](https://github.com/marko-js/vite/pull/147) [`e1df4f2`](https://github.com/marko-js/vite/commit/e1df4f2ba008d26cc835fd95c8f4296ae07769da) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Avoid setting optimizeDeps entries in vitest.
+
 ## 4.1.16
 
 ### Patch Changes
