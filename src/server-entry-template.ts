@@ -12,22 +12,36 @@ export * from ${fileNameStr};
 import { addAssets } from "${renderAssetsRuntimeId}";
 
 $ const g = out.global;
-$ addAssets(g, [${opts.entryData.join(",")}]);
+$ const writeSync = addAssets(g, [${opts.entryData.join(",")}]);
 
-<__flush_here_and_after__>
+<if(writeSync)>
   $!{
     g.___viteRenderAssets("head-prepend") +
     g.___viteRenderAssets("head") +
     g.___viteRenderAssets("body-prepend")
   }
-</__flush_here_and_after__>
+</>
+<else>
+  <__flush_here_and_after__>
+    $!{
+      g.___viteRenderAssets("head-prepend") +
+      g.___viteRenderAssets("head") +
+      g.___viteRenderAssets("body-prepend")
+    }
+  </__flush_here_and_after__>
+</>
 
 <\${template} ...input/>
 <init-components/>
 <await-reorderer/>
 
-<__flush_here_and_after__>
+<if(writeSync)>
   $!{g.___viteRenderAssets("body")}
-</__flush_here_and_after__>
+</>
+<else>
+  <__flush_here_and_after__>
+    $!{g.___viteRenderAssets("body")}
+  </__flush_here_and_after__>
+</>
 `;
 };

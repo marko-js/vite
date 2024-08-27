@@ -15,14 +15,15 @@ export function addAssets(g, newEntries) {
   const entries = g.___viteEntries;
   if (entries) {
     g.___viteEntries = entries.concat(newEntries);
-  } else {
-    g.___viteEntries = newEntries;
-    g.___viteRenderAssets = renderAssets;
-    g.___viteInjectAttrs = g.cspNonce
-      ? \` nonce="\${g.cspNonce.replace(/"/g, "&#39;")}"\`
-      : "";
-    ${opts.runtimeId ? `g.runtimeId = ${JSON.stringify(opts.runtimeId)};` : ""}
+    return true;
   }
+  g.___viteEntries = newEntries;
+  g.___viteRenderAssets = renderAssets;
+  g.___viteInjectAttrs = g.cspNonce
+    ? \` nonce="\${g.cspNonce.replace(/"/g, "&#39;")}"\`
+    : "";
+  g.___viteSeenIds = new Set();
+  ${opts.runtimeId ? `g.runtimeId = ${JSON.stringify(opts.runtimeId)};` : ""}
 }
 
 function renderAssets(slot) {
@@ -30,6 +31,7 @@ function renderAssets(slot) {
   let html = "";
 
   if (entries) {
+    const seenIds = this.___viteSeenIds;
     const slotWrittenEntriesKey = \`___viteWrittenEntries-\${slot}\`;
     const lastWrittenEntry = this[slotWrittenEntriesKey] || 0;
     const writtenEntries = (this[slotWrittenEntriesKey] = entries.length);
@@ -72,13 +74,29 @@ function renderAssets(slot) {
       const parts = entry[slot];
 
       if (parts) {
-        for (const part of parts) {
-          html +=
-            part === 0 /** InjectType.AssetAttrs */
-              ? this.___viteInjectAttrs
-              : part === 1 /** InjectType.PublicPath */
-              ? base
-              : part;
+        for (let i = 0; i < parts.length; i++) {
+          const part = parts[i];
+          switch (part) {
+            case 0: /** InjectType.AssetAttrs */
+              html += this.___viteInjectAttrs;
+              break;
+            case 1: /** InjectType.PublicPath */
+              html += base;
+              break;
+            case 2: /** InjectType.Dedupe */ {
+              const id = parts[++i];
+              const skipParts = parts[++i];
+              if (seenIds.has(id)) {
+                i += skipParts;
+              } else {
+                seenIds.add(id);
+              }
+              break;
+            }
+            default:
+              html += part;
+              break;
+          }
         }
       }
     }
