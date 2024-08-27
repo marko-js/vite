@@ -4,6 +4,7 @@ import type { Node, Element, Comment, Text } from "domhandler";
 enum InjectType {
   AssetAttrs = 0,
   PublicPath = 1,
+  Dedupe = 2,
 }
 
 const voidElements = new Set([
@@ -40,19 +41,40 @@ export default function serialize(
         const tag = node as Element;
         const { name } = tag;
         let urlAttr: undefined | string;
-        curString += `<${name}`;
+        let isDedupe = 0;
 
         switch (tag.tagName) {
           case "script":
-            parts.push(curString, InjectType.AssetAttrs);
-            urlAttr = "src";
+            if (tag.attribs.src) {
+              if (curString) {
+                parts.push(curString);
+                curString = "";
+              }
+              isDedupe = parts.push(InjectType.Dedupe, tag.attribs.src, 0) - 1;
+            }
+            parts.push(`${curString}<${name}`, InjectType.AssetAttrs);
             curString = "";
+            urlAttr = "src";
             break;
           case "style":
-            parts.push(curString, InjectType.AssetAttrs);
+            parts.push(`${curString}<${name}`, InjectType.AssetAttrs);
             curString = "";
             break;
           case "link":
+            if (tag.attribs.href) {
+              if (curString) {
+                parts.push(curString);
+                curString = "";
+              }
+              isDedupe =
+                parts.push(
+                  InjectType.Dedupe,
+                  [tag.attribs.rel || "", tag.attribs.href, tag.attribs.as]
+                    .filter((it) => it != null)
+                    .join("#"),
+                  0,
+                ) - 1;
+            }
             urlAttr = "href";
             if (
               tag.attribs.rel === "stylesheet" ||
@@ -60,9 +82,14 @@ export default function serialize(
               tag.attribs.as === "style" ||
               tag.attribs.as === "script"
             ) {
-              parts.push(curString, InjectType.AssetAttrs);
+              parts.push(`${curString}<${name}`, InjectType.AssetAttrs);
               curString = "";
+            } else {
+              curString += `<${name}`;
             }
+            break;
+          default:
+            curString += `<${name}`;
             break;
         }
 
@@ -98,6 +125,13 @@ export default function serialize(
 
         if (!voidElements.has(name)) {
           curString += `</${name}>`;
+        }
+        if (isDedupe) {
+          if (curString) {
+            parts.push(curString);
+            curString = "";
+          }
+          parts[isDedupe] = parts.length - isDedupe - 1;
         }
 
         break;
