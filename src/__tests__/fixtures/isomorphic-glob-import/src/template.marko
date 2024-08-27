@@ -1,0 +1,13 @@
+static const modules = import.meta.glob('./modules/*.marko', { eager: true })
+
+style {
+  div { color: green }
+}
+
+<layout-component>
+  <div#app>
+    <for|_id, mod| in=modules>
+      <${mod}/>
+    </for>
+  </div>
+</layout-component>
