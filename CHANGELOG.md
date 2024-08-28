@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.1.18
+
+### Patch Changes
+
+- [#149](https://github.com/marko-js/vite/pull/149) [`8de3e9d`](https://github.com/marko-js/vite/commit/8de3e9d70a58c66dc5cfe37f8acc1410ff271ed8) Thanks [@LuLaValva](https://github.com/LuLaValva)! - Dedupe scripts and links
+
+- [#151](https://github.com/marko-js/vite/pull/151) [`33d23ab`](https://github.com/marko-js/vite/commit/33d23aba3974b4ced75152d8a62d0e341439ff3c) Thanks [@rturnq](https://github.com/rturnq)! - Enable hydration of components glob imported
+
 ## 4.1.17
 
 ### Patch Changes
