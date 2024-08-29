@@ -1,5 +1,11 @@
 # Changelog
 
+## 4.1.19
+
+### Patch Changes
+
+- [#152](https://github.com/marko-js/vite/pull/152) [`27218bc`](https://github.com/marko-js/vite/commit/27218bc8751a3b7720f2a44948ef658d8c6e21fc) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Add missing dep fast-glob.
+
 ## 4.1.18
 
 ### Patch Changes
