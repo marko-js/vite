@@ -1,5 +1,11 @@
 # Changelog
 
+## 4.1.20
+
+### Patch Changes
+
+- [#155](https://github.com/marko-js/vite/pull/155) [`d5fe7ef`](https://github.com/marko-js/vite/commit/d5fe7ef959085bbd361cf2cbd6c6b81547d9e92f) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Fixes a caching regression caused by having a different SSR config compared to the rest of the configs and using that in a transform (which is cached).
+
 ## 4.1.19
 
 ### Patch Changes
