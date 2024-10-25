@@ -216,15 +216,15 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
               },
         };
 
+        if (linked) {
+          (baseConfig as any).markoViteLinked = linked;
+        }
+
         ssrConfig = {
           ...baseConfig,
           resolveVirtualDependency,
           output: "html",
         };
-
-        if (linked) {
-          (ssrConfig as any).markoViteLinked = linked;
-        }
 
         domConfig = {
           ...baseConfig,
