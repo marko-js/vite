@@ -23,6 +23,9 @@ const devServer = await createServer({
       ignored: ["**/node_modules/**", "**/dist/**", "**/__snapshots__/**"],
     },
   },
+  build: {
+    assetsInlineLimit: 0,
+  },
 });
 
 export default devServer.middlewares.use(async (req, res, next) => {
