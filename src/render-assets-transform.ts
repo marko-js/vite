@@ -12,7 +12,7 @@ function renderAssetsCall(t: typeof types, slot: string) {
   return t.markoPlaceholder(
     t.callExpression(
       t.memberExpression(
-        t.memberExpression(t.identifier("out"), t.identifier("global")),
+        t.identifier("$global"),
         t.identifier("___viteRenderAssets"),
       ),
       [t.stringLiteral(slot)],
