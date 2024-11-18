@@ -1,5 +1,15 @@
 # Changelog
 
+## 5.0.0
+
+### Major Changes
+
+- [#158](https://github.com/marko-js/vite/pull/158) [`c016305`](https://github.com/marko-js/vite/commit/c016305921d85487de4c7b00a0ff33fae729b1c9) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Drop support for passing in a dynamic compiler (rely on peerDependency).
+
+### Minor Changes
+
+- [#158](https://github.com/marko-js/vite/pull/158) [`c016305`](https://github.com/marko-js/vite/commit/c016305921d85487de4c7b00a0ff33fae729b1c9) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Detect when native tags api translator is in use and tweak virtual files to work properly.
+
 ## 4.1.20
 
 ### Patch Changes
