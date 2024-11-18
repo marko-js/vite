@@ -1,7 +1,7 @@
 import fs from "fs";
 import path from "path";
 import type * as vite from "vite";
-import type * as Compiler from "@marko/compiler";
+import * as compiler from "@marko/compiler";
 
 type ESBuildOptions = Exclude<
   vite.DepOptimizationConfig["esbuildOptions"],
@@ -12,10 +12,7 @@ type ESBuildLoader = Exclude<ESBuildOptions["loader"], undefined>[string];
 
 const markoErrorRegExp = /^(.+?)(?:\((\d+)(?:\s*,\s*(\d+))?\))?: (.*)$/gm;
 
-export default function esbuildPlugin(
-  compiler: typeof Compiler,
-  config: Compiler.Config,
-): ESBuildPlugin {
+export default function esbuildPlugin(config: compiler.Config): ESBuildPlugin {
   return {
     name: "marko",
     async setup(build) {
@@ -24,7 +21,7 @@ export default function esbuildPlugin(
         (v) => v.name === "vite:dep-scan",
       );
       const virtualFiles = new Map<string, { code: string; map?: unknown }>();
-      const finalConfig: Compiler.Config = {
+      const finalConfig: compiler.Config = {
         ...config,
         output: platform === "browser" ? "dom" : "html",
         resolveVirtualDependency(from, dep) {
@@ -33,7 +30,7 @@ export default function esbuildPlugin(
         },
       };
 
-      const scanConfig: Compiler.Config = {
+      const scanConfig: compiler.Config = {
         ...finalConfig,
         output: "hydrate",
       };

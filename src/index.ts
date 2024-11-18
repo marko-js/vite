@@ -1,5 +1,6 @@
 import type * as vite from "vite";
-import type * as Compiler from "@marko/compiler";
+import * as compiler from "@marko/compiler";
+import defaultConfig from "@marko/compiler/config";
 
 import fs from "fs";
 import path from "path";
@@ -33,8 +34,6 @@ export namespace API {
 export interface Options {
   // Defaults to true, set to false to disable automatic component discovery and hydration.
   linked?: boolean;
-  // Override the Marko compiler instance being used. (primarily for tools wrapping this module)
-  compiler?: string;
   // Sets a custom runtimeId to avoid conflicts with multiple copies of Marko on the same page.
   runtimeId?: string;
   // Overrides the Marko translator being used.
@@ -42,7 +41,7 @@ export interface Options {
   // If set, will use the provided string as a variable name and prefix all assets paths with that variable.
   basePathVar?: string;
   // Overrides the Babel config that Marko will use.
-  babelConfig?: Compiler.Config["babelConfig"];
+  babelConfig?: compiler.Config["babelConfig"];
 }
 
 interface BrowserManifest {
@@ -92,7 +91,7 @@ const htmlExt = ".html";
 const resolveOpts = { skipSelf: true };
 const configsByFileSystem = new Map<
   typeof fs,
-  Map<Compiler.Config, Compiler.Config>
+  Map<compiler.Config, compiler.Config>
 >();
 const cache = new Map<unknown, unknown>();
 const babelCaller = {
@@ -106,22 +105,21 @@ const babelCaller = {
 let registeredTagLib = false;
 
 // This package has a dependency on @parcel/source-map which uses native addons.
-// Some enviroments like Stackblitz don't support loading these. So... load it
+// Some environments like Stackblitz don't support loading these. So... load it
 // with a dynamic import to avoid everything failing.
 let cjsToEsm: typeof import("@chialab/cjs-to-esm").transform | null | undefined;
 
 export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
-  let compiler: typeof Compiler;
   let { linked = true } = opts;
   let runtimeId: string | undefined;
   let basePathVar: string | undefined;
-  let baseConfig: Compiler.Config;
-  let ssrConfig: Compiler.Config;
-  let ssrCjsConfig: Compiler.Config;
-  let domConfig: Compiler.Config;
-  let hydrateConfig: Compiler.Config;
+  let baseConfig: compiler.Config;
+  let ssrConfig: compiler.Config;
+  let ssrCjsConfig: compiler.Config;
+  let domConfig: compiler.Config;
+  let hydrateConfig: compiler.Config;
 
-  const resolveVirtualDependency: Compiler.Config["resolveVirtualDependency"] =
+  const resolveVirtualDependency: compiler.Config["resolveVirtualDependency"] =
     (from, dep) => {
       const normalizedFrom = normalizePath(from);
       const query = `${virtualFileQuery}&id=${
@@ -152,6 +150,9 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
   let serverManifest: ServerManifest | undefined;
   let basePath = "/";
   let getMarkoAssetFns: undefined | API.getMarkoAssetCodeForEntry[];
+  const tagsAPI = !/^@marko\/translator-(?:default|interop-class-tags)$/.test(
+    opts.translator ?? defaultConfig.translator,
+  );
   const entryIds = new Set<string>();
   const cachedSources = new Map<string, string>();
   const transformWatchFiles = new Map<string, string[]>();
@@ -174,10 +175,6 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         } else {
           process.env.MARKO_DEBUG = optimize ? "false" : "true";
         }
-
-        compiler ??= (await import(
-          opts.compiler || "@marko/compiler"
-        )) as typeof Compiler;
 
         runtimeId = opts.runtimeId;
         basePathVar = opts.basePathVar;
@@ -296,7 +293,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
 
         const esbuildOptions = (optimizeDeps.esbuildOptions ??= {});
         const esbuildPlugins = (esbuildOptions.plugins ??= []);
-        esbuildPlugins.push(esbuildPlugin(compiler, baseConfig));
+        esbuildPlugins.push(esbuildPlugin(baseConfig));
 
         const ssr = (config.ssr ??= {});
         const { noExternal } = ssr;
@@ -658,6 +655,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
               entryData,
               runtimeId,
               basePathVar: isBuild ? basePathVar : undefined,
+              tagsAPI,
             });
           }
         }
@@ -940,7 +938,7 @@ function stripVersionAndTimeStamp(id: string) {
  */
 function getConfigForFileSystem(
   info: vite.Rollup.ModuleInfo | undefined | null,
-  config: Compiler.Config,
+  config: compiler.Config,
 ) {
   const fileSystem = info?.meta.arcFS;
   if (!fileSystem) return config;

@@ -5,42 +5,47 @@ export default async (opts: {
   entryData: string[];
   runtimeId?: string;
   basePathVar?: string;
+  tagsAPI?: boolean;
 }): Promise<string> => {
+  const addAssetsCall = `addAssets($global, [${opts.entryData.join(",")}])`;
   const fileNameStr = JSON.stringify(`./${path.basename(opts.fileName)}`);
   return `import template from ${fileNameStr};
 export * from ${fileNameStr};
 import { addAssets } from "${renderAssetsRuntimeId}";
 
-$ const g = out.global;
-$ const writeSync = addAssets(g, [${opts.entryData.join(",")}]);
+${opts.tagsAPI ? `<const/writeSync=${addAssetsCall}/>` : `$ const writeSync = ${addAssetsCall};`}
 
 <if(writeSync)>
   $!{
-    g.___viteRenderAssets("head-prepend") +
-    g.___viteRenderAssets("head") +
-    g.___viteRenderAssets("body-prepend")
+    $global.___viteRenderAssets("head-prepend") +
+    $global.___viteRenderAssets("head") +
+    $global.___viteRenderAssets("body-prepend")
   }
 </>
 <else>
   <__flush_here_and_after__>
     $!{
-      g.___viteRenderAssets("head-prepend") +
-      g.___viteRenderAssets("head") +
-      g.___viteRenderAssets("body-prepend")
+      $global.___viteRenderAssets("head-prepend") +
+      $global.___viteRenderAssets("head") +
+      $global.___viteRenderAssets("body-prepend")
     }
   </__flush_here_and_after__>
 </>
 
-<\${template} ...input/>
+<\${template} ...input/>${
+    opts.tagsAPI
+      ? ""
+      : `
 <init-components/>
-<await-reorderer/>
+<await-reorderer/>`
+  }
 
 <if(writeSync)>
-  $!{g.___viteRenderAssets("body")}
+  $!{$global.___viteRenderAssets("body")}
 </>
 <else>
   <__flush_here_and_after__>
-    $!{g.___viteRenderAssets("body")}
+    $!{$global.___viteRenderAssets("body")}
   </__flush_here_and_after__>
 </>
 `;
