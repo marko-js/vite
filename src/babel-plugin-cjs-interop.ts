@@ -79,25 +79,47 @@ export default function plugin(options: {
           }
         }
 
-        namespaceId ||= path.scope.generateUidIdentifier(
-          defaultImportId?.name || path.node.source.value,
+        const rawImport = path.scope.generateUidIdentifier(
+          namespaceId?.name || defaultImportId?.name || path.node.source.value,
         );
-        path.node.specifiers = [t.importDefaultSpecifier(namespaceId)];
+        path.node.specifiers = [t.importNamespaceSpecifier(rawImport)];
 
         if (defaultImportId) {
           path.insertAfter(
             t.variableDeclaration("const", [
               t.variableDeclarator(
-                defaultImportId,
+                t.objectPattern([
+                  t.objectProperty(t.identifier("default"), defaultImportId),
+                ]),
                 t.conditionalExpression(
                   t.optionalMemberExpression(
-                    namespaceId,
+                    t.memberExpression(rawImport, t.identifier("default")),
                     t.identifier("__esModule"),
                     false,
                     true,
                   ),
-                  t.memberExpression(namespaceId, t.identifier("default")),
-                  namespaceId,
+                  t.memberExpression(rawImport, t.identifier("default")),
+                  rawImport,
+                ),
+              ),
+            ]),
+          );
+        }
+
+        if (namespaceId) {
+          path.insertAfter(
+            t.variableDeclaration("const", [
+              t.variableDeclarator(
+                namespaceId,
+                t.conditionalExpression(
+                  t.optionalMemberExpression(
+                    rawImport,
+                    t.identifier("__esModule"),
+                    false,
+                    true,
+                  ),
+                  rawImport,
+                  t.memberExpression(rawImport, t.identifier("default")),
                 ),
               ),
             ]),
@@ -118,7 +140,16 @@ export default function plugin(options: {
                     ),
                   ),
                 ),
-                namespaceId,
+                t.conditionalExpression(
+                  t.optionalMemberExpression(
+                    rawImport,
+                    t.identifier("__esModule"),
+                    false,
+                    true,
+                  ),
+                  rawImport,
+                  t.memberExpression(rawImport, t.identifier("default")),
+                ),
               ),
             ]),
           );

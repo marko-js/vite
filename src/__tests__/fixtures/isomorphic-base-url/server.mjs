@@ -12,7 +12,7 @@ const baseUrl = process.env.BASE_URL;
 export default createServer(async (req, res) => {
   // remove the base url from the request url
   if (req.url.startsWith(baseUrl, 1)) {
-    req.url = req.url.slice(baseUrl.length - 1);
+    req.url = req.url.slice(baseUrl.length);
   }
 
   await handler(req, res);

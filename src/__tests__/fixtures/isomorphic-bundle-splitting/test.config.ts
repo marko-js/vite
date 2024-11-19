@@ -1,4 +1,6 @@
 export const ssr = true;
 export async function steps() {
-  await page.click("#clickable");
+  for (const el of await page.$$(".clickable")) {
+    await el.click();
+  }
 }
