@@ -1,6 +1,5 @@
 import type * as vite from "vite";
 import * as compiler from "@marko/compiler";
-import defaultConfig from "@marko/compiler/config";
 
 import fs from "fs";
 import path from "path";
@@ -151,7 +150,9 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
   let basePath = "/";
   let getMarkoAssetFns: undefined | API.getMarkoAssetCodeForEntry[];
   const tagsAPI = !/^@marko\/translator-(?:default|interop-class-tags)$/.test(
-    opts.translator ?? defaultConfig.translator,
+    opts.translator ||
+      compiler.globalConfig?.translator ||
+      "@marko/translator-default",
   );
   const entryIds = new Set<string>();
   const cachedSources = new Map<string, string>();
