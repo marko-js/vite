@@ -1,5 +1,13 @@
 # Changelog
 
+## 5.0.1
+
+### Patch Changes
+
+- [#160](https://github.com/marko-js/vite/pull/160) [`25fea17`](https://github.com/marko-js/vite/commit/25fea178a5319a9b635e3f0a5a9664103fa184e8) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Use global config exported from @marko/compiler
+
+- [`a5b74f3`](https://github.com/marko-js/vite/commit/a5b74f313f05b8b1a3f51302d5e81f0b159c4c1f) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Improve\* cjs interop
+
 ## 5.0.0
 
 ### Major Changes
