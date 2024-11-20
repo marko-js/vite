@@ -35,6 +35,11 @@ export default devServer.middlewares.use(async (req, res, next) => {
     );
     await handler(req, res, next);
     if (!req.headersSent) {
+      if (/(script\.js|styles\.css)$/.test(req.url)) {
+        res.statusCode = 200;
+        res.end();
+        return;
+      }
       return next();
     }
   } catch (err) {

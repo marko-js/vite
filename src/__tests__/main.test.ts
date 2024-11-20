@@ -70,6 +70,22 @@ before(async () => {
         }
       });
 
+      let errorContainer: HTMLElement | null = null;
+      window.addEventListener("error", onError);
+      document.addEventListener("error", onError, true);
+
+      function onError(evt: ErrorEvent) {
+        if (!errorContainer) {
+          errorContainer = document.createElement("pre");
+          (getRoot() || document.body).appendChild(errorContainer);
+        }
+
+        errorContainer.insertAdjacentText(
+          "beforeend",
+          `${evt.error || `Error loading ${(evt.target as any).outerHTML}`}\n`,
+        );
+      }
+
       observe();
       function observe() {
         observer.observe(getRoot() || document, {

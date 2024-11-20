@@ -15,7 +15,7 @@ export default createServer(async (req, res) => {
   await handler(req, res);
   if (res.headersSent) return;
   if (req.url.startsWith("/my-prefix/")) {
-    req.url = req.url.replace("/my-prefix", "");
+    req.url = req.url.replace("/my-prefix", "/assets");
   }
   await serve(req, res, serveOpts);
 });
