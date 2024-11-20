@@ -280,17 +280,21 @@ async function testPage(
       throw error;
     }
 
+    let snapshot = "";
+
     await page.waitForSelector("#app");
-    await forEachChange((html, i) =>
-      snap(html, { ext: `.loading.${i}.html`, dir }),
-    );
+    await forEachChange((html, i) => {
+      snapshot += `# Loading ${i}\n\`\`\`html\n${html}\n\`\`\`\n\n`;
+    });
 
     for (const [i, step] of steps.entries()) {
       await waitForPendingRequests(page, step);
-      await forEachChange((html, j) =>
-        snap(html, { ext: `.step-${i}.${j}.html`, dir }),
-      );
+      await forEachChange((html, j) => {
+        snapshot += `# Step ${i}-${j}\n\`\`\`html\n${html}\`\`\`\n\n`;
+      });
     }
+
+    snap(snapshot, { ext: ".md", dir });
   } finally {
     server.close();
   }

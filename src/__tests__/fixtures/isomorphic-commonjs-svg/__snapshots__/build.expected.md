@@ -1,0 +1,10 @@
+# Loading 0
+```html
+<button>
+  <img
+    alt="icon"
+    src="/assets/icon-[hash].svg"
+  />
+</button>
+```
+
