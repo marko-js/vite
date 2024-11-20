@@ -1,5 +1,11 @@
 # Changelog
 
+## 5.0.2
+
+### Patch Changes
+
+- [#162](https://github.com/marko-js/vite/pull/162) [`942c22e`](https://github.com/marko-js/vite/commit/942c22ebaa39dbfced8dbfdf5bf63893a0f49b57) Thanks [@rturnq](https://github.com/rturnq)! - Emit SSR assets in client build
+
 ## 5.0.1
 
 ### Patch Changes
