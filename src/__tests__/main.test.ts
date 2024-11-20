@@ -12,6 +12,7 @@ import * as playwright from "playwright";
 import { defaultNormalizer, defaultSerializer } from "@marko/fixture-snapshots";
 import markoPlugin, { type Options } from "..";
 import type { Http2SecureServer } from "http2";
+import { diffLines } from "diff";
 
 const __dirname = path.dirname(url.fileURLToPath(import.meta.url));
 
@@ -69,6 +70,22 @@ before(async () => {
           queueMicrotask(observe);
         }
       });
+
+      let errorContainer: HTMLElement | null = null;
+      window.addEventListener("error", onError);
+      document.addEventListener("error", onError, true);
+
+      function onError(evt: ErrorEvent) {
+        if (!errorContainer) {
+          errorContainer = document.createElement("pre");
+          (getRoot() || document.body).appendChild(errorContainer);
+        }
+
+        errorContainer.insertAdjacentText(
+          "beforeend",
+          `${evt.error || `Error loading ${(evt.target as any).outerHTML}`}\n`,
+        );
+      }
 
       observe();
       function observe() {
@@ -264,17 +281,29 @@ async function testPage(
       throw error;
     }
 
+    let snapshot = "";
+
     await page.waitForSelector("#app");
-    await forEachChange((html, i) =>
-      snap(html, { ext: `.loading.${i}.html`, dir }),
-    );
+
+    snapshot += `# Loading\n\n`;
+    let prevHtml: string | undefined;
+    await forEachChange((html) => {
+      snapshot += htmlSnapshot(html, prevHtml);
+      prevHtml = html;
+    });
 
     for (const [i, step] of steps.entries()) {
       await waitForPendingRequests(page, step);
-      await forEachChange((html, j) =>
-        snap(html, { ext: `.step-${i}.${j}.html`, dir }),
-      );
+      snapshot += `# Step ${i}\n${getStepString(step)}\n\n`;
+
+      let prevHtml: string | undefined;
+      await forEachChange((html) => {
+        snapshot += htmlSnapshot(html, prevHtml);
+        prevHtml = html;
+      });
     }
+
+    snap(snapshot, { ext: ".md", dir });
   } finally {
     server.close();
   }
@@ -334,4 +363,25 @@ async function getAvailablePort() {
       server.close(() => resolve(port));
     });
   });
+}
+
+function getStepString(step: Step) {
+  return step
+    .toString()
+    .replace(/^.*?{\s*([\s\S]*?)\s*}.*?$/, "$1")
+    .replace(/^ {4}/gm, "")
+    .replace(/;$/, "");
+}
+
+function htmlSnapshot(html: string, prevHtml?: string) {
+  if (prevHtml) {
+    const diff = diffLines(prevHtml, html)
+      .map((part) =>
+        part.added ? `+${part.value}` : part.removed ? `-${part.value}` : "",
+      )
+      .filter(Boolean)
+      .join("");
+    return `\`\`\`diff\n${diff}\n\`\`\`\n\n`;
+  }
+  return `\`\`\`html\n${html}\n\`\`\`\n\n`;
 }

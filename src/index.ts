@@ -56,6 +56,7 @@ interface ServerManifest {
     [entryId: string]: string;
   };
   chunksNeedingAssets: string[];
+  ssrAssetIds: string[];
 }
 
 interface VirtualFile {
@@ -107,6 +108,8 @@ let registeredTagLib = false;
 // Some environments like Stackblitz don't support loading these. So... load it
 // with a dynamic import to avoid everything failing.
 let cjsToEsm: typeof import("@chialab/cjs-to-esm").transform | null | undefined;
+
+function noop() {}
 
 export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
   let { linked = true } = opts;
@@ -477,6 +480,13 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
               entryIds.add(id);
               cachedSources.set(id, serverManifest.entrySources[entry]);
             }
+
+            for (const assetId of serverManifest.ssrAssetIds) {
+              this.load({
+                id: normalizePath(path.resolve(root, assetId)),
+                resolveDependencies: false,
+              }).catch(noop);
+            }
           } catch (err) {
             this.error(
               `You must run the "ssr" build before the "browser" build.`,
@@ -623,6 +633,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
                 entries: {},
                 entrySources: {},
                 chunksNeedingAssets: [],
+                ssrAssetIds: [],
               };
               serverManifest.entries[entryId] = relativeFileName;
               serverManifest.entrySources[relativeFileName] = source;
@@ -797,8 +808,18 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
             }
           }
 
-          // serverManifest.optimizedRegistryIds =
-          //   Object.fromEntries(optimizedRegistryIds);
+          serverManifest!.ssrAssetIds = [];
+          for (const moduleId of this.getModuleIds()) {
+            if (moduleId.startsWith(root)) {
+              const module = this.getModuleInfo(moduleId);
+              if (module?.meta["vite:asset"]) {
+                serverManifest!.ssrAssetIds.push(
+                  "." + moduleId.slice(root.length),
+                );
+              }
+            }
+          }
+
           store.write(serverManifest!);
         } else {
           const browserManifest: BrowserManifest = {};
