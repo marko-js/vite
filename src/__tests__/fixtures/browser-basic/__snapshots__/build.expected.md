@@ -1,4 +1,5 @@
-# Loading 0
+# Loading
+
 ```html
 Loaded Implicit Component
 <div
@@ -16,25 +17,15 @@ Loaded Implicit Component
 </div>
 ```
 
-# Loading 1
-```html
-Loaded Implicit Component
-<div
-  id="page"
->
-  <div
-    id="implicit"
-  >
-    <div
-      id="clickable"
-    >
-      Mounted: true Clicks: 0
-    </div>
-  </div>
-</div>
+```diff
+-      Mounted: false Clicks: 0
++      Mounted: true Clicks: 0
+
 ```
 
-# Step 0-0
+# Step 0
+await page.click("#clickable")
+
 ```html
 Loaded Implicit Component
 <div
@@ -49,5 +40,6 @@ Loaded Implicit Component
       Mounted: true Clicks: 1
     </div>
   </div>
-</div>```
+</div>
+```
 

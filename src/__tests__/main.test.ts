@@ -12,6 +12,7 @@ import * as playwright from "playwright";
 import { defaultNormalizer, defaultSerializer } from "@marko/fixture-snapshots";
 import markoPlugin, { type Options } from "..";
 import type { Http2SecureServer } from "http2";
+import { diffLines } from "diff";
 
 const __dirname = path.dirname(url.fileURLToPath(import.meta.url));
 
@@ -283,14 +284,22 @@ async function testPage(
     let snapshot = "";
 
     await page.waitForSelector("#app");
-    await forEachChange((html, i) => {
-      snapshot += `# Loading ${i}\n\`\`\`html\n${html}\n\`\`\`\n\n`;
+
+    snapshot += `# Loading\n\n`;
+    let prevHtml: string | undefined;
+    await forEachChange((html) => {
+      snapshot += htmlSnapshot(html, prevHtml);
+      prevHtml = html;
     });
 
     for (const [i, step] of steps.entries()) {
       await waitForPendingRequests(page, step);
-      await forEachChange((html, j) => {
-        snapshot += `# Step ${i}-${j}\n\`\`\`html\n${html}\`\`\`\n\n`;
+      snapshot += `# Step ${i}\n${getStepString(step)}\n\n`;
+
+      let prevHtml: string | undefined;
+      await forEachChange((html) => {
+        snapshot += htmlSnapshot(html, prevHtml);
+        prevHtml = html;
       });
     }
 
@@ -354,4 +363,25 @@ async function getAvailablePort() {
       server.close(() => resolve(port));
     });
   });
+}
+
+function getStepString(step: Step) {
+  return step
+    .toString()
+    .replace(/^.*?{\s*([\s\S]*?)\s*}.*?$/, "$1")
+    .replace(/^ {4}/gm, "")
+    .replace(/;$/, "");
+}
+
+function htmlSnapshot(html: string, prevHtml?: string) {
+  if (prevHtml) {
+    const diff = diffLines(prevHtml, html)
+      .map((part) =>
+        part.added ? `+${part.value}` : part.removed ? `-${part.value}` : "",
+      )
+      .filter(Boolean)
+      .join("");
+    return `\`\`\`diff\n${diff}\n\`\`\`\n\n`;
+  }
+  return `\`\`\`html\n${html}\n\`\`\`\n\n`;
 }
