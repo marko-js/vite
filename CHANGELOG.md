@@ -1,5 +1,11 @@
 # Changelog
 
+## 5.0.3
+
+### Patch Changes
+
+- [#164](https://github.com/marko-js/vite/pull/164) [`a9d6a42`](https://github.com/marko-js/vite/commit/a9d6a420667b8d778c9c7506aaa0f29e71525c10) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Fix issue with generated server entry code when using tags api.
+
 ## 5.0.2
 
 ### Patch Changes
