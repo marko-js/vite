@@ -1,5 +1,11 @@
 # Changelog
 
+## 5.0.4
+
+### Patch Changes
+
+- [#166](https://github.com/marko-js/vite/pull/166) [`cca2e07`](https://github.com/marko-js/vite/commit/cca2e077aa7211bd8848817c9a89b51f9b38050a) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Enable optimizeKnownTemplates config for Marko compiler to have shorter registry ids in production builds.
+
 ## 5.0.3
 
 ### Patch Changes
