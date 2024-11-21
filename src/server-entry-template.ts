@@ -15,7 +15,7 @@ import { addAssets } from "${renderAssetsRuntimeId}";
 
 ${opts.tagsAPI ? `<const/writeSync=${addAssetsCall}/>` : `$ const writeSync = ${addAssetsCall};`}
 
-<if(writeSync)>
+${opts.tagsAPI ? "<if=writeSync>" : "<if(writeSync)>"}
   $!{
     $global.___viteRenderAssets("head-prepend") +
     $global.___viteRenderAssets("head") +
@@ -40,7 +40,7 @@ ${opts.tagsAPI ? `<const/writeSync=${addAssetsCall}/>` : `$ const writeSync = ${
 <await-reorderer/>`
   }
 
-<if(writeSync)>
+${opts.tagsAPI ? "<if=writeSync>" : "<if(writeSync)>"}
   $!{$global.___viteRenderAssets("body")}
 </>
 <else>
