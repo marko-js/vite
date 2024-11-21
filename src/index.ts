@@ -4,6 +4,7 @@ import * as compiler from "@marko/compiler";
 import fs from "fs";
 import path from "path";
 import crypto from "crypto";
+import glob from "fast-glob";
 import anyMatch from "anymatch";
 import { pathToFileURL } from "url";
 
@@ -48,7 +49,6 @@ interface BrowserManifest {
 }
 
 interface ServerManifest {
-  // optimizedRegistryIds?: { [id: string]: string };
   entries: {
     [entryId: string]: string;
   };
@@ -101,7 +101,7 @@ const babelCaller = {
   supportsTopLevelAwait: true,
   supportsExportNamespaceFrom: true,
 };
-// const optimizedRegistryIds: Map<string, string> = new Map();
+const optimizeKnownTemplatesForRoot = new Map<string, string[]>();
 let registeredTagLib = false;
 
 // This package has a dependency on @parcel/source-map which uses native addons.
@@ -187,14 +187,15 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           config.base = process.env.BASE_URL;
         }
 
+        root = normalizePath(config.root || process.cwd());
         baseConfig = {
           cache,
           optimize,
-          // optimizedRegistryIds:
-          //   optimize && linked ? optimizedRegistryIds : undefined,
           runtimeId,
           sourceMaps: true,
           writeVersionComment: false,
+          optimizeKnownTemplates:
+            optimize && linked ? await getKnownTemplates(root) : undefined,
           babelConfig: opts.babelConfig
             ? {
                 ...opts.babelConfig,
@@ -240,7 +241,6 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         };
 
         compiler.configure(baseConfig);
-        root = normalizePath(config.root || process.cwd());
         devEntryFile = path.join(root, "index.html");
         devEntryFilePosix = normalizePath(devEntryFile);
         isTest = env.mode === "test";
@@ -449,6 +449,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
       handleHotUpdate(ctx) {
         compiler.taglib.clearCaches();
         baseConfig.cache!.clear();
+        optimizeKnownTemplatesForRoot.clear();
 
         for (const [, cache] of configsByFileSystem) {
           cache.clear();
@@ -465,15 +466,6 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         if (isBuild && linked && !isSSRBuild) {
           try {
             serverManifest = await store.read();
-            // if (serverManifest.optimizedRegistryIds) {
-            //   for (const id in serverManifest.optimizedRegistryIds) {
-            //     optimizedRegistryIds.set(
-            //       id,
-            //       serverManifest.optimizedRegistryIds[id],
-            //     );
-            //   }
-            // }
-
             inputOptions.input = toHTMLEntries(root, serverManifest.entries);
             for (const entry in serverManifest.entrySources) {
               const id = normalizePath(path.resolve(root, entry));
@@ -982,4 +974,28 @@ function getConfigForFileSystem(
   }
 
   return configForFileSystem;
+}
+
+function getKnownTemplates(root: string) {
+  let knownTemplates = optimizeKnownTemplatesForRoot.get(root);
+  if (!knownTemplates) {
+    optimizeKnownTemplatesForRoot.set(
+      root,
+      (knownTemplates = glob.globSync("**/*.marko", {
+        absolute: true,
+        cwd: root,
+        ignore: [
+          "**/*test*/**",
+          "**/*example*/**",
+          "**/*stories*/**",
+          "**/*coverage*/**",
+          "**/*snapshots*/**",
+          "**/node_modules/**",
+          "**/*.d.marko",
+        ],
+      })),
+    );
+  }
+
+  return knownTemplates;
 }
