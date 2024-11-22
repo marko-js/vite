@@ -11,6 +11,19 @@ if (typeof base !== "string") throw new Error("${opts.basePathVar} must be defin
 if (!base.endsWith("/")) throw new Error("${opts.basePathVar} must end with a '/' when using basePathVar.");`
       : "const base = import.meta.env.BASE_URL;"
   }
+
+export function getPrepend(g) {
+  return (
+    g.___viteRenderAssets("head-prepend") +
+    g.___viteRenderAssets("head") +
+    g.___viteRenderAssets("body-prepend") 
+  );
+}
+export function getAppend(g) {
+  return (
+    g.___viteRenderAssets("body-prepend") 
+  );
+}
 export function addAssets(g, newEntries) {
   const entries = g.___viteEntries;
   if (entries) {
