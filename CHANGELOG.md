@@ -1,5 +1,11 @@
 # Changelog
 
+## 5.0.5
+
+### Patch Changes
+
+- [#168](https://github.com/marko-js/vite/pull/168) [`af98046`](https://github.com/marko-js/vite/commit/af980462df3c97f144f4c79380605e5edbcb92a1) Thanks [@rturnq](https://github.com/rturnq)! - Implement marko compiler optimized registry ids
+
 ## 5.0.4
 
 ### Patch Changes
