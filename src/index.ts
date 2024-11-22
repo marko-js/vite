@@ -4,7 +4,6 @@ import * as compiler from "@marko/compiler";
 import fs from "fs";
 import path from "path";
 import crypto from "crypto";
-import glob from "fast-glob";
 import anyMatch from "anymatch";
 import { pathToFileURL } from "url";
 
@@ -57,6 +56,7 @@ interface ServerManifest {
   };
   chunksNeedingAssets: string[];
   ssrAssetIds: string[];
+  registered?: string[];
 }
 
 interface VirtualFile {
@@ -101,7 +101,6 @@ const babelCaller = {
   supportsTopLevelAwait: true,
   supportsExportNamespaceFrom: true,
 };
-const optimizeKnownTemplatesForRoot = new Map<string, string[]>();
 let registeredTagLib = false;
 
 // This package has a dependency on @parcel/source-map which uses native addons.
@@ -159,6 +158,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
   );
   const entryIds = new Set<string>();
   const cachedSources = new Map<string, string>();
+  const optimizedRegisistyIdMap = new Map<string, number>();
   const transformWatchFiles = new Map<string, string[]>();
   const transformOptionalFiles = new Map<string, string[]>();
   const store = new ReadOncePersistedStore<ServerManifest>(
@@ -194,8 +194,16 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           runtimeId,
           sourceMaps: true,
           writeVersionComment: false,
-          optimizeKnownTemplates:
-            optimize && linked ? await getKnownTemplates(root) : undefined,
+          optimizeRegistryId(id) {
+            let registryId = optimizedRegisistyIdMap.get(id);
+            if (registryId === undefined) {
+              optimizedRegisistyIdMap.set(
+                id,
+                (registryId = optimizedRegisistyIdMap.size),
+              );
+            }
+            return registryId;
+          },
           babelConfig: opts.babelConfig
             ? {
                 ...opts.babelConfig,
@@ -449,7 +457,6 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
       handleHotUpdate(ctx) {
         compiler.taglib.clearCaches();
         baseConfig.cache!.clear();
-        optimizeKnownTemplatesForRoot.clear();
 
         for (const [, cache] of configsByFileSystem) {
           cache.clear();
@@ -467,12 +474,16 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           try {
             serverManifest = await store.read();
             inputOptions.input = toHTMLEntries(root, serverManifest.entries);
+            if (serverManifest.registered) {
+              for (let i = 0; i < serverManifest.registered.length; i++) {
+                optimizedRegisistyIdMap.set(serverManifest.registered[i], i);
+              }
+            }
             for (const entry in serverManifest.entrySources) {
               const id = normalizePath(path.resolve(root, entry));
               entryIds.add(id);
               cachedSources.set(id, serverManifest.entrySources[entry]);
             }
-
             for (const assetId of serverManifest.ssrAssetIds) {
               this.load({
                 id: normalizePath(path.resolve(root, assetId)),
@@ -812,6 +823,9 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
             }
           }
 
+          if (optimizedRegisistyIdMap.size) {
+            serverManifest!.registered = [...optimizedRegisistyIdMap.keys()];
+          }
           store.write(serverManifest!);
         } else {
           const browserManifest: BrowserManifest = {};
@@ -974,28 +988,4 @@ function getConfigForFileSystem(
   }
 
   return configForFileSystem;
-}
-
-function getKnownTemplates(root: string) {
-  let knownTemplates = optimizeKnownTemplatesForRoot.get(root);
-  if (!knownTemplates) {
-    optimizeKnownTemplatesForRoot.set(
-      root,
-      (knownTemplates = glob.globSync("**/*.marko", {
-        absolute: true,
-        cwd: root,
-        ignore: [
-          "**/*test*/**",
-          "**/*example*/**",
-          "**/*stories*/**",
-          "**/*coverage*/**",
-          "**/*snapshots*/**",
-          "**/node_modules/**",
-          "**/*.d.marko",
-        ],
-      })),
-    );
-  }
-
-  return knownTemplates;
 }
