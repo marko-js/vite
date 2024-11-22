@@ -1,5 +1,11 @@
 # Changelog
 
+## 5.0.6
+
+### Patch Changes
+
+- [#170](https://github.com/marko-js/vite/pull/170) [`89bdc76`](https://github.com/marko-js/vite/commit/89bdc76265669a44b63c38475d4db70895a52f85) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Improve support for tags api.
+
 ## 5.0.5
 
 ### Patch Changes
