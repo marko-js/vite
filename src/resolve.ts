@@ -1,7 +1,7 @@
-import { exports } from "resolve.exports";
-import Resolve, { type Opts as ResolveOpts } from "resolve";
-import path from "path";
 import fs from "fs";
+import path from "path";
+import Resolve, { type Opts as ResolveOpts } from "resolve";
+import { exports } from "resolve.exports";
 
 const exportsMainFile = `__package_exports__`;
 

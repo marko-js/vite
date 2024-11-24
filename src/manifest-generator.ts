@@ -1,6 +1,7 @@
-import { Parser } from "htmlparser2";
 import { ElementType } from "domelementtype";
-import { DomHandler, Element, Comment, Node } from "domhandler";
+import { Comment, DomHandler, Element, Node } from "domhandler";
+import { Parser } from "htmlparser2";
+
 import serialize from "./serializer";
 
 type SerializedOrNull = null | ReturnType<typeof serialize>;

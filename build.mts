@@ -1,5 +1,5 @@
-import path from "path";
 import { build } from "esbuild";
+import path from "path";
 const srcdir = path.resolve("src");
 const outdir = path.resolve("dist");
 await build({

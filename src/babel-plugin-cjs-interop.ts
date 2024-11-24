@@ -1,5 +1,6 @@
-import * as t from "@babel/types";
 import type { PluginObj } from "@babel/core";
+import * as t from "@babel/types";
+
 import { isCJSModule, resolve } from "./resolve";
 
 /**

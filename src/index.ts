@@ -1,30 +1,29 @@
-import type * as vite from "vite";
+import type { PluginObj } from "@babel/core";
 import * as compiler from "@marko/compiler";
-
+import anyMatch from "anymatch";
+import crypto from "crypto";
 import fs from "fs";
 import path from "path";
-import crypto from "crypto";
-import anyMatch from "anymatch";
 import { pathToFileURL } from "url";
+import type * as vite from "vite";
 
-import getServerEntryTemplate from "./server-entry-template";
-import {
-  generateInputDoc,
-  generateDocManifest,
-  type DocManifest,
-} from "./manifest-generator";
-import esbuildPlugin from "./esbuild-plugin";
 import interopBabelPlugin from "./babel-plugin-cjs-interop";
-import type { PluginObj } from "@babel/core";
-import { isCJSModule } from "./resolve";
+import esbuildPlugin from "./esbuild-plugin";
+import globImportTransformer from "./glob-import-transform";
+import {
+  type DocManifest,
+  generateDocManifest,
+  generateInputDoc,
+} from "./manifest-generator";
+import { ReadOncePersistedStore } from "./read-once-persisted-store";
+import relativeAssetsTransform from "./relative-assets-transform";
 import {
   getRenderAssetsRuntime,
   renderAssetsRuntimeId,
 } from "./render-assets-runtime";
 import renderAssetsTransform from "./render-assets-transform";
-import relativeAssetsTransform from "./relative-assets-transform";
-import globImportTransformer from "./glob-import-transform";
-import { ReadOncePersistedStore } from "./read-once-persisted-store";
+import { isCJSModule } from "./resolve";
+import getServerEntryTemplate from "./server-entry-template";
 
 export namespace API {
   export type getMarkoAssetCodeForEntry = (id: string) => string | void;

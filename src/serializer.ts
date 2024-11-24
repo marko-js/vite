@@ -1,5 +1,5 @@
 import { ElementType } from "domelementtype";
-import type { Node, Element, Comment, Text } from "domhandler";
+import type { Comment, Element, Node, Text } from "domhandler";
 
 enum InjectType {
   AssetAttrs = 0,

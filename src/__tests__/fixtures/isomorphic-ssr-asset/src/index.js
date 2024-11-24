@@ -1,6 +1,5 @@
-import template from "./template.marko";
-
 import imageUrl from "./image.svg";
+import template from "./template.marko";
 
 export function handler(req, res) {
   if (req.url === "/") {
