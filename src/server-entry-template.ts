@@ -1,4 +1,5 @@
 import path from "path";
+
 import { renderAssetsRuntimeId } from "./render-assets-runtime";
 export default async (opts: {
   fileName: string;

@@ -1,8 +1,8 @@
 // In production, simply start up the http server.
-import path from 'path'
-import url from 'url';
 import { createServer } from "http";
+import path from 'path'
 import serve from "serve-handler";
+import url from 'url';
 
 globalThis.assetsPath = "/my-prefix/";
 // dyanmic import so globalThis.assetsPath can be set prior to the imported code executing

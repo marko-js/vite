@@ -1,5 +1,6 @@
-import type { Options } from "../../..";
 import assert from "assert";
+
+import type { Options } from "../../..";
 
 async function hasScript(pattern: RegExp) {
   const headScripts = await page.locator("head > script");

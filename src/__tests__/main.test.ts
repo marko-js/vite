@@ -1,18 +1,18 @@
-import type http from "http";
-
+import { defaultNormalizer, defaultSerializer } from "@marko/fixture-snapshots";
+import { diffLines } from "diff";
+import { once } from "events";
 import fs from "fs";
+import type http from "http";
+import type { Http2SecureServer } from "http2";
+import { JSDOM } from "jsdom";
+import snap from "mocha-snap";
+import { createRequire } from "module";
 import net from "net";
 import path from "path";
-import url from "url";
-import { once } from "events";
-import snap from "mocha-snap";
-import { JSDOM } from "jsdom";
-import { createRequire } from "module";
 import * as playwright from "playwright";
-import { defaultNormalizer, defaultSerializer } from "@marko/fixture-snapshots";
+import url from "url";
+
 import markoPlugin, { type Options } from "..";
-import type { Http2SecureServer } from "http2";
-import { diffLines } from "diff";
 
 const __dirname = path.dirname(url.fileURLToPath(import.meta.url));
 

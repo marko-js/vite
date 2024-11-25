@@ -1,5 +1,6 @@
-import template from "./template.marko";
 import "./components/read-head.marko";
+
+import template from "./template.marko";
 
 export function handler(req, res) {
   if (req.url === "/") {

@@ -1,7 +1,7 @@
+import * as compiler from "@marko/compiler";
 import fs from "fs";
 import path from "path";
 import type * as vite from "vite";
-import * as compiler from "@marko/compiler";
 
 type ESBuildOptions = Exclude<
   vite.DepOptimizationConfig["esbuildOptions"],

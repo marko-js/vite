@@ -1,10 +1,10 @@
 // In dev we'll start a Vite dev server in middleware mode,
 // and forward requests to our http request handler.
 
-import { createServer } from "vite";
+import { createRequire } from "module";
 import path from "path";
 import url from "url";
-import { createRequire } from "module";
+import { createServer } from "vite";
 
 // change to import once marko-vite is updated to ESM
 const markoPlugin = createRequire(import.meta.url)("../../..").default;
@@ -37,7 +37,9 @@ export default devServer.middlewares.use(async (req, res, next) => {
   } catch (err) {
     try {
       devServer.ssrFixStacktrace(err);
-    } catch (_) {}
+    } catch {
+      // ignore
+    }
     return next(err);
   }
 });
