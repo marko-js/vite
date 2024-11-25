@@ -2,6 +2,7 @@ import type { PluginObj } from "@babel/core";
 import * as compiler from "@marko/compiler";
 import anyMatch from "anymatch";
 import crypto from "crypto";
+import glob from "fast-glob";
 import fs from "fs";
 import path from "path";
 import { pathToFileURL } from "url";
@@ -55,7 +56,6 @@ interface ServerManifest {
   };
   chunksNeedingAssets: string[];
   ssrAssetIds: string[];
-  registered?: string[];
 }
 
 interface VirtualFile {
@@ -100,6 +100,7 @@ const babelCaller = {
   supportsTopLevelAwait: true,
   supportsExportNamespaceFrom: true,
 };
+const optimizeKnownTemplatesForRoot = new Map<string, string[]>();
 let registeredTagLib = false;
 
 // This package has a dependency on @parcel/source-map which uses native addons.
@@ -157,7 +158,6 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
   );
   const entryIds = new Set<string>();
   const cachedSources = new Map<string, string>();
-  const optimizedRegisistyIdMap = new Map<string, number>();
   const transformWatchFiles = new Map<string, string[]>();
   const transformOptionalFiles = new Map<string, string[]>();
   const store = new ReadOncePersistedStore<ServerManifest>(
@@ -193,16 +193,8 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           runtimeId,
           sourceMaps: true,
           writeVersionComment: false,
-          optimizeRegistryId(id) {
-            let registryId = optimizedRegisistyIdMap.get(id);
-            if (registryId === undefined) {
-              optimizedRegisistyIdMap.set(
-                id,
-                (registryId = optimizedRegisistyIdMap.size),
-              );
-            }
-            return registryId;
-          },
+          optimizeKnownTemplates:
+            optimize && linked ? getKnownTemplates(root) : undefined,
           babelConfig: opts.babelConfig
             ? {
                 ...opts.babelConfig,
@@ -456,6 +448,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
       handleHotUpdate(ctx) {
         compiler.taglib.clearCaches();
         baseConfig.cache!.clear();
+        optimizeKnownTemplatesForRoot.clear();
 
         for (const [, cache] of configsByFileSystem) {
           cache.clear();
@@ -473,11 +466,6 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           try {
             serverManifest = await store.read();
             inputOptions.input = toHTMLEntries(root, serverManifest.entries);
-            if (serverManifest.registered) {
-              for (let i = 0; i < serverManifest.registered.length; i++) {
-                optimizedRegisistyIdMap.set(serverManifest.registered[i], i);
-              }
-            }
             for (const entry in serverManifest.entrySources) {
               const id = normalizePath(path.resolve(root, entry));
               entryIds.add(id);
@@ -822,9 +810,6 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
             }
           }
 
-          if (optimizedRegisistyIdMap.size) {
-            serverManifest!.registered = [...optimizedRegisistyIdMap.keys()];
-          }
           store.write(serverManifest!);
         } else {
           const browserManifest: BrowserManifest = {};
@@ -987,4 +972,32 @@ function getConfigForFileSystem(
   }
 
   return configForFileSystem;
+}
+
+function getKnownTemplates(cwd: string) {
+  let knownTemplates = optimizeKnownTemplatesForRoot.get(cwd);
+  if (!knownTemplates) {
+    optimizeKnownTemplatesForRoot.set(
+      cwd,
+      (knownTemplates = glob.globSync(
+        ["**/*.marko", "**/node_modules/.marko/**/*.marko"],
+        {
+          cwd,
+          absolute: true,
+          ignore: [
+            "**/*.d.marko",
+            "**/*build*/**",
+            "**/*coverage*/**",
+            "**/*dist*/**",
+            "**/*example*/**",
+            "**/*fixture*/**",
+            "**/*snapshot*/**",
+            "**/*stories*/**",
+            "**/*test*/**",
+          ],
+        },
+      )),
+    );
+  }
+  return knownTemplates;
 }
