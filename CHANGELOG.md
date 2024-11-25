@@ -1,5 +1,11 @@
 # Changelog
 
+## 5.0.7
+
+### Patch Changes
+
+- [#173](https://github.com/marko-js/vite/pull/173) [`d0f5cd2`](https://github.com/marko-js/vite/commit/d0f5cd27e770d3d0411d37f9de324b19d0dd6475) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Revert #168 which was causing non idempotent builds.
+
 ## 5.0.6
 
 ### Patch Changes
