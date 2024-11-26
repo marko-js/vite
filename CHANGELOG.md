@@ -1,5 +1,11 @@
 # Changelog
 
+## 5.0.8
+
+### Patch Changes
+
+- [#175](https://github.com/marko-js/vite/pull/175) [`da6a4a8`](https://github.com/marko-js/vite/commit/da6a4a812a8864d7fc3c99d2172fc341f5eb5be5) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Bump peer for vite 6.
+
 ## 5.0.7
 
 ### Patch Changes
