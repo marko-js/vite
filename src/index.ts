@@ -545,7 +545,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
               : await this.resolve(importee, importer, resolveOpts);
 
           if (resolved) {
-            resolved.id += importeeQuery;
+            resolved.id = stripVersionAndTimeStamp(resolved.id) + importeeQuery;
           }
 
           return resolved;
