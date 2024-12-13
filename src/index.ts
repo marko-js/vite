@@ -151,11 +151,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
   let serverManifest: ServerManifest | undefined;
   let basePath = "/";
   let getMarkoAssetFns: undefined | API.getMarkoAssetCodeForEntry[];
-  const tagsAPI = !/^@marko\/translator-(?:default|interop-class-tags)$/.test(
-    opts.translator ||
-      compiler.globalConfig?.translator ||
-      "@marko/translator-default",
-  );
+  let tagsAPI: undefined | boolean;
   const entryIds = new Set<string>();
   const cachedSources = new Map<string, string>();
   const transformWatchFiles = new Map<string, string[]>();
@@ -648,6 +644,27 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
                 const asset = getMarkoAsset(fileName);
                 if (asset) {
                   entryData.push(asset);
+                }
+              }
+            }
+
+            if (tagsAPI === undefined) {
+              const translatorPackage =
+                opts.translator ||
+                compiler.globalConfig?.translator ||
+                "marko/translator";
+              if (
+                /^@marko\/translator-(?:default|interop-class-tags)$/.test(
+                  translatorPackage,
+                )
+              ) {
+                tagsAPI = false;
+              } else {
+                try {
+                  tagsAPI =
+                    (await import(translatorPackage)).preferAPI !== "class";
+                } catch {
+                  tagsAPI = true;
                 }
               }
             }
