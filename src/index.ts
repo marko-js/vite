@@ -4,6 +4,7 @@ import anyMatch from "anymatch";
 import crypto from "crypto";
 import glob from "fast-glob";
 import fs from "fs";
+import { createRequire } from "module";
 import path from "path";
 import { pathToFileURL } from "url";
 import type * as vite from "vite";
@@ -661,8 +662,8 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
                 tagsAPI = false;
               } else {
                 try {
-                  tagsAPI =
-                    (await import(translatorPackage)).preferAPI !== "class";
+                  const require = createRequire(import.meta.url);
+                  tagsAPI = require(translatorPackage).preferAPI !== "class";
                 } catch {
                   tagsAPI = true;
                 }
