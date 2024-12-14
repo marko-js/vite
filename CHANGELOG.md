@@ -1,5 +1,11 @@
 # Changelog
 
+## 5.0.10
+
+### Patch Changes
+
+- [#181](https://github.com/marko-js/vite/pull/181) [`9ac0c90`](https://github.com/marko-js/vite/commit/9ac0c90bb2602e8da523c4a27832c8d63969c636) Thanks [@rturnq](https://github.com/rturnq)! - Fix loading of translator when checking if tags API is being used"
+
 ## 5.0.9
 
 ### Patch Changes
