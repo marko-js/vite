@@ -6,7 +6,6 @@ import glob from "fast-glob";
 import fs from "fs";
 import { createRequire } from "module";
 import path from "path";
-import { pathToFileURL } from "url";
 import type * as vite from "vite";
 
 import interopBabelPlugin from "./babel-plugin-cjs-interop";
@@ -71,6 +70,7 @@ type DeferredPromise<T> = Promise<T> & {
 
 const POSIX_SEP = "/";
 const WINDOWS_SEP = "\\";
+const TEMPLATE_ID_HASH_OPTS = { outputLength: 3 };
 
 const normalizePath =
   path.sep === WINDOWS_SEP
@@ -128,7 +128,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         Buffer.from(dep.virtualPath).toString("base64url") +
         path.extname(dep.virtualPath)
       }`;
-      const id = normalizePath(normalizedFrom) + query;
+      const id = normalizedFrom + query;
 
       if (devServer) {
         const prev = virtualFiles.get(id);
@@ -614,7 +614,9 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
             cachedSources.set(fileName, source);
 
             if (isBuild) {
-              const relativeFileName = path.posix.relative(root, fileName);
+              const relativeFileName = normalizePath(
+                path.relative(root, fileName),
+              );
               const entryId = toEntryId(relativeFileName);
               serverManifest ??= {
                 entries: {},
@@ -632,7 +634,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
                   await devServer.transformIndexHtml(
                     "/",
                     generateInputDoc(
-                      posixFileNameToURL(fileName, root) + browserEntryQuery,
+                      fileNameToURL(fileName, root) + browserEntryQuery,
                     ),
                   ),
                 ),
@@ -879,7 +881,7 @@ function toHTMLEntries(root: string, serverEntries: ServerManifest["entries"]) {
   const result: string[] = [];
 
   for (const id in serverEntries) {
-    const markoFile = path.posix.join(root, serverEntries[id]);
+    const markoFile = normalizePath(path.join(root, serverEntries[id]));
     const htmlFile = markoFile + htmlExt;
     virtualFiles.set(htmlFile, {
       code: generateInputDoc(markoFile + browserEntryQuery),
@@ -902,18 +904,13 @@ function toEntryId(id: string) {
   }
 
   return `${name}_${crypto
-    .createHash("SHA1")
+    .createHash("shake256", TEMPLATE_ID_HASH_OPTS)
     .update(id)
-    .digest("base64")
-    .replace(/[/+]/g, "-")
-    .slice(0, 4)}`;
+    .digest("base64url")}`;
 }
 
-function posixFileNameToURL(fileName: string, root: string) {
-  const relativeURL = path.posix.relative(
-    pathToFileURL(root).pathname,
-    pathToFileURL(fileName).pathname,
-  );
+function fileNameToURL(fileName: string, root: string) {
+  const relativeURL = normalizePath(path.relative(root, fileName));
   if (relativeURL[0] === ".") {
     throw new Error(
       "@marko/vite: Entry templates must exist under the current root directory.",
