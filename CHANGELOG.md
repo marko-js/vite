@@ -1,5 +1,11 @@
 # Changelog
 
+## 5.0.11
+
+### Patch Changes
+
+- [#183](https://github.com/marko-js/vite/pull/183) [`1e31950`](https://github.com/marko-js/vite/commit/1e31950776789d7083abea9bf7a5dc9124bf316a) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Fix windows path normalization.
+
 ## 5.0.10
 
 ### Patch Changes
