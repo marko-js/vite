@@ -1,5 +1,11 @@
 # Changelog
 
+## 5.0.12
+
+### Patch Changes
+
+- [#186](https://github.com/marko-js/vite/pull/186) [`85ccd2f`](https://github.com/marko-js/vite/commit/85ccd2fb296883d347cb20730df1cdc5e686edfb) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Fix issue where link mode was incorrectly left enabled in test environments.
+
 ## 5.0.11
 
 ### Patch Changes
