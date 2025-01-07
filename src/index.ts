@@ -167,6 +167,12 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
       enforce: "pre", // Must be pre to allow us to resolve assets before vite.
       async config(config, env) {
         let optimize = env.mode === "production";
+        isTest = env.mode === "test";
+        isBuild = env.command === "build";
+
+        if (isTest) {
+          linked = false;
+        }
 
         if ("MARKO_DEBUG" in process.env) {
           optimize =
@@ -239,8 +245,6 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         compiler.configure(baseConfig);
         devEntryFile = path.join(root, "index.html");
         devEntryFilePosix = normalizePath(devEntryFile);
-        isTest = env.mode === "test";
-        isBuild = env.command === "build";
         isSSRBuild = isBuild && linked && Boolean(config.build!.ssr);
         renderAssetsRuntimeCode = getRenderAssetsRuntime({
           isBuild,
@@ -249,7 +253,6 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         });
 
         if (isTest) {
-          linked = false;
           const { test } = config as any;
 
           if ((test.environment as string | undefined)?.includes("dom")) {
