@@ -152,7 +152,6 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
   let serverManifest: ServerManifest | undefined;
   let basePath = "/";
   let getMarkoAssetFns: undefined | API.getMarkoAssetCodeForEntry[];
-  let tagsAPI: undefined | boolean;
   const entryIds = new Set<string>();
   const cachedSources = new Map<string, string>();
   const transformWatchFiles = new Map<string, string[]>();
@@ -160,6 +159,34 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
   const store = new ReadOncePersistedStore<ServerManifest>(
     `vite-marko${runtimeId ? `-${runtimeId}` : ""}`,
   );
+
+  const isTagsApi = (() => {
+    let tagsAPI: undefined | boolean;
+    return () => {
+      if (tagsAPI === undefined) {
+        const translatorPackage =
+          opts.translator ||
+          compiler.globalConfig?.translator ||
+          "marko/translator";
+        if (
+          /^@marko\/translator-(?:default|interop-class-tags)$/.test(
+            translatorPackage,
+          )
+        ) {
+          tagsAPI = false;
+        } else {
+          try {
+            const require = createRequire(import.meta.url);
+            tagsAPI = require(translatorPackage).preferAPI !== "class";
+          } catch {
+            tagsAPI = true;
+          }
+        }
+      }
+
+      return tagsAPI;
+    };
+  })();
 
   return [
     {
@@ -654,33 +681,12 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
               }
             }
 
-            if (tagsAPI === undefined) {
-              const translatorPackage =
-                opts.translator ||
-                compiler.globalConfig?.translator ||
-                "marko/translator";
-              if (
-                /^@marko\/translator-(?:default|interop-class-tags)$/.test(
-                  translatorPackage,
-                )
-              ) {
-                tagsAPI = false;
-              } else {
-                try {
-                  const require = createRequire(import.meta.url);
-                  tagsAPI = require(translatorPackage).preferAPI !== "class";
-                } catch {
-                  tagsAPI = true;
-                }
-              }
-            }
-
             source = await getServerEntryTemplate({
               fileName,
               entryData,
               runtimeId,
               basePathVar: isBuild ? basePathVar : undefined,
-              tagsAPI,
+              tagsAPI: isTagsApi(),
             });
           }
         }
@@ -750,7 +756,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         const { map, meta } = compiled;
         let { code } = compiled;
 
-        if (query !== browserEntryQuery && devServer) {
+        if (query !== browserEntryQuery && devServer && !isTagsApi()) {
           code += `\nif (import.meta.hot) import.meta.hot.accept(() => {});`;
         }
 
