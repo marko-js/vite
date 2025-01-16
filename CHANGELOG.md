@@ -1,5 +1,11 @@
 # Changelog
 
+## 5.0.13
+
+### Patch Changes
+
+- [#188](https://github.com/marko-js/vite/pull/188) [`e719cab`](https://github.com/marko-js/vite/commit/e719cab76e7b70376a3b27a437cd55a3ee84eb02) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Temporarily disable hmr for tags api projects (hmr is pending implementation for tags api).
+
 ## 5.0.12
 
 ### Patch Changes
