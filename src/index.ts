@@ -351,6 +351,16 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           };
         }
 
+        if (isSSRBuild && !config.build?.commonjsOptions?.esmExternals) {
+          // Rollup rewrites `require` calls to default imports for commonjs dependencies; however, if the
+          // dependency is inlined, its require calls which were assumed to be commonjs are also rewritten but
+          // now resolve from an ESM context and the default import is no longer safe due to conditional exports.
+          // This tells Rollup which dependencies are ESM so it uses a namespace import instead.
+          config.build ??= {};
+          config.build.commonjsOptions ??= {};
+          config.build.commonjsOptions.esmExternals = (id) => !isCJSModule(id);
+        }
+
         if (basePathVar) {
           config.experimental ??= {};
 
