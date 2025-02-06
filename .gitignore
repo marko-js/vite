@@ -7,8 +7,10 @@
 
 # NPM
 **/node_modules/*
-!**/node_modules/test-package
-!**/node_modules/test-package2
+!**/__tests__/**/node_modules/test-package
+!**/__tests__/**/node_modules/test-package2
+!**/__tests__/**/node_modules/dep
+!**/__tests__/**/node_modules/transient-dep
 npm-debug.log
 
 # Build
