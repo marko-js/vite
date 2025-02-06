@@ -1,5 +1,11 @@
 # Changelog
 
+## 5.0.14
+
+### Patch Changes
+
+- [#190](https://github.com/marko-js/vite/pull/190) [`a648063`](https://github.com/marko-js/vite/commit/a6480637826df0fbe858c39d2e5667c773b5694d) Thanks [@rturnq](https://github.com/rturnq)! - Fix default imports of transient deps of an inlined commonjs dep
+
 ## 5.0.13
 
 ### Patch Changes
