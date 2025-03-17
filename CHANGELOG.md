@@ -1,5 +1,11 @@
 # Changelog
 
+## 5.0.15
+
+### Patch Changes
+
+- [#192](https://github.com/marko-js/vite/pull/192) [`b8ad3fc`](https://github.com/marko-js/vite/commit/b8ad3fcbf2078bed19f8250ee42293631d379be2) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Fix issue is cjs files incorrectly being labeled esm.
+
 ## 5.0.14
 
 ### Patch Changes

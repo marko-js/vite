@@ -1,6 +1,6 @@
 {
   "name": "@marko/vite",
-  "version": "5.0.14",
+  "version": "5.0.15",
   "description": "A Marko plugin for Vite",
   "keywords": [
     "loader",
