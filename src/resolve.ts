@@ -1,75 +1,51 @@
 import fs from "fs";
 import path from "path";
 import Resolve, { type Opts as ResolveOpts } from "resolve";
-import { exports } from "resolve.exports";
 
-const exportsMainFile = `__package_exports__`;
-
-const modulePathReg = /^.*[/\\]node_modules[/\\](?:@[^/\\]+[/\\])?[^/\\]+[/\\]/;
-
+const moduleNameReg = /^(?:@[^/\\]+[/\\])?[^/\\]+/;
+const modulePathReg =
+  /^.*[/\\]node_modules[/\\]((?:@[^/\\]+[/\\])?[^/\\]+[/\\])/;
 const cjsModuleLookup = new Map<string, boolean>();
-export function isCJSModule(id: string): boolean {
-  const modulePath = modulePathReg.exec(id)?.[0];
-  if (modulePath) {
-    const pkgPath = modulePath + "package.json";
-    let isCJS = cjsModuleLookup.get(pkgPath);
-    if (isCJS === undefined) {
-      try {
+
+export function isCJSModule(id: string, fromFile: string): boolean {
+  if (/\.cjs$/.test(id)) return true;
+  if (/\.mjs$/.test(id)) return false;
+  if (id[0] === ".") return isCJSModule(fromFile, fromFile);
+
+  const isAbsolute = path.isAbsolute(id);
+  const moduleId = moduleNameReg.exec(
+    isAbsolute ? id.replace(modulePathReg, "$1").replace(/\\/g, "/") : id,
+  )?.[0];
+  if (!moduleId) return false;
+
+  let isCJS = cjsModuleLookup.get(moduleId);
+
+  if (isCJS === undefined) {
+    try {
+      if (isAbsolute) {
+        const pkgPath = modulePathReg.exec(id)![0] + "/package.json";
         const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8"));
         isCJS = pkg.type !== "module" && !pkg.exports;
-      } catch {
-        isCJS = false;
+      } else {
+        Resolve.sync(moduleId + "/package.json", {
+          basedir: path.dirname(fromFile),
+          filename: fromFile,
+          pathFilter(
+            pkg: Record<string, unknown>,
+            _pkgFile: string,
+            relativePath: string,
+          ) {
+            isCJS = pkg.type !== "module" && !pkg.exports;
+            return relativePath;
+          },
+        } as ResolveOpts);
+        isCJS ??= false;
       }
-      cjsModuleLookup.set(pkgPath, isCJS);
+    } catch {
+      isCJS = false;
     }
-    return isCJS;
+    cjsModuleLookup.set(moduleId, isCJS);
   }
 
-  return false;
-}
-
-export function resolve(
-  id: string,
-  from: string,
-  extensions: string[],
-  conditions: string[],
-) {
-  return Resolve.sync(id, {
-    basedir: path.dirname(from),
-    filename: from,
-    pathFilter,
-    packageFilter,
-    extensions,
-  } as ResolveOpts);
-
-  function pathFilter(
-    pkg: Record<string, unknown>,
-    pkgFile: string,
-    relativePath: string,
-  ) {
-    cjsModuleLookup.set(pkgFile, pkg.type !== "module" && !pkg.exports);
-
-    if (pkg.exports) {
-      return exports(
-        pkg,
-        relativePath === exportsMainFile ? "." : relativePath,
-        {
-          conditions,
-        },
-      )?.[0] as string;
-    }
-
-    return relativePath;
-  }
-}
-
-function packageFilter<
-  T extends { main?: unknown; exports?: unknown; browser?: unknown },
->(pkg: T) {
-  if (pkg.exports) {
-    // defers to the "exports" field.
-    pkg.main = exportsMainFile;
-  }
-
-  return pkg;
+  return isCJS;
 }

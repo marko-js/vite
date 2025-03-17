@@ -1,7 +1,7 @@
 import type { PluginObj } from "@babel/core";
 import * as t from "@babel/types";
 
-import { isCJSModule, resolve } from "./resolve";
+import { isCJSModule } from "./resolve";
 
 /**
  * This plugin is designed to transform imports within Marko files to interop between ESM and CJS.
@@ -30,8 +30,6 @@ import { isCJSModule, resolve } from "./resolve";
  *      ```
  */
 export default function plugin(options: {
-  extensions: string[];
-  conditions: string[];
   filter?: (path: string) => boolean;
 }): PluginObj {
   return {
@@ -42,22 +40,12 @@ export default function plugin(options: {
         if (
           !path.node.specifiers.length ||
           /\.(?:mjs|marko)$|\?/.test(path.node.source.value) ||
-          options.filter?.(path.node.source.value) === false
-        ) {
-          return;
-        }
-
-        try {
-          const resolved = resolve(
+          options.filter?.(path.node.source.value) === false ||
+          !isCJSModule(
             path.node.source.value,
             (path.hub as any).file.opts.filename,
-            options.extensions,
-            options.conditions,
-          );
-          if (!/\.c?js$/.test(resolved) || !isCJSModule(resolved)) {
-            return;
-          }
-        } catch (_) {
+          )
+        ) {
           return;
         }
 

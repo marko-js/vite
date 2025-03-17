@@ -142,6 +142,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
     };
 
   let root: string;
+  let rootResolveFile: string;
   let devEntryFile: string;
   let devEntryFilePosix: string;
   let renderAssetsRuntimeCode: string;
@@ -217,6 +218,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         }
 
         root = normalizePath(config.root || process.cwd());
+        rootResolveFile = path.join(root, "_.js");
         baseConfig = {
           cache,
           optimize,
@@ -358,7 +360,8 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           // This tells Rollup which dependencies are ESM so it uses a namespace import instead.
           config.build ??= {};
           config.build.commonjsOptions ??= {};
-          config.build.commonjsOptions.esmExternals = (id) => !isCJSModule(id);
+          config.build.commonjsOptions.esmExternals = (id) =>
+            !isCJSModule(id, rootResolveFile);
         }
 
         if (basePathVar) {
@@ -419,7 +422,6 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
       },
       configResolved(config) {
         basePath = config.base;
-
         ssrCjsConfig = {
           ...ssrConfig,
           babelConfig: {
@@ -431,8 +433,6 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
               )[]
             ).concat(
               interopBabelPlugin({
-                extensions: config.resolve.extensions,
-                conditions: config.resolve.conditions,
                 filter: isBuild ? undefined : (path) => !/^\./.test(path),
               }),
             ),
@@ -704,7 +704,10 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         if (!isMarkoFile(id)) {
           if (!isBuild) {
             const ext = path.extname(id);
-            if (ext === ".cjs" || (ext === ".js" && isCJSModule(id))) {
+            if (
+              ext === ".cjs" ||
+              (ext === ".js" && isCJSModule(id, rootResolveFile))
+            ) {
               if (cjsToEsm === undefined) {
                 try {
                   cjsToEsm = (await import("@chialab/cjs-to-esm")).transform;
@@ -731,7 +734,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
             cachedSources.set(id, source);
           }
 
-          if (!query && isCJSModule(id)) {
+          if (!query && isCJSModule(id, rootResolveFile)) {
             if (isBuild) {
               const { code, map, meta } = await compiler.compile(
                 source,
@@ -754,7 +757,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           getConfigForFileSystem(
             info,
             isSSR
-              ? isCJSModule(id)
+              ? isCJSModule(id, rootResolveFile)
                 ? ssrCjsConfig
                 : ssrConfig
               : query === browserEntryQuery
