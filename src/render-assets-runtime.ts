@@ -48,15 +48,16 @@ function renderAssets(slot) {
     const slotWrittenEntriesKey = \`___viteWrittenEntries-\${slot}\`;
     const lastWrittenEntry = this[slotWrittenEntriesKey] || 0;
     const writtenEntries = (this[slotWrittenEntriesKey] = entries.length);
-
-    if(!this.___flushedMBP && slot !== "head-prepend") {
-        this.___flushedMBP = true;
-
-        html += \`<script\${this.___viteInjectAttrs}>${
-          opts.runtimeId ? `$mbp_${opts.runtimeId}` : "$mbp"
-        }=\${JSON.stringify(base)}</script>\`
+    ${
+      opts.basePathVar
+        ? `if (!this.___flushedMBP && slot !== "head-prepend") {
+      this.___flushedMBP = true;
+      html += \`<script\${this.___viteInjectAttrs}>${
+        opts.runtimeId ? `$mbp_${opts.runtimeId}` : "$mbp"
+      }=\${JSON.stringify(base)}</script>\`
+    }`
+        : ""
     }
-
     for (let i = lastWrittenEntry; i < writtenEntries; i++) {
       let entry = entries[i];
 

@@ -15,7 +15,7 @@ const devServer = await createServer({
   root: __dirname,
   appType: "custom",
   logLevel: "silent",
-  plugins: [markoPlugin()],
+  plugins: [markoPlugin({ basePathVar: "assetsPath" })],
   optimizeDeps: { force: true },
   server: {
     middlewareMode: true,
