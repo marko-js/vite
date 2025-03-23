@@ -1,5 +1,15 @@
 # Changelog
 
+## 5.1.0
+
+### Minor Changes
+
+- [#194](https://github.com/marko-js/vite/pull/194) [`17e18d5`](https://github.com/marko-js/vite/commit/17e18d5934f72db85eb11bd816e97340d067172c) Thanks [@kanashimia](https://github.com/kanashimia)! - Support CSS modules
+
+### Patch Changes
+
+- [#196](https://github.com/marko-js/vite/pull/196) [`a207366`](https://github.com/marko-js/vite/commit/a207366651575addbb8ad4b6f4dbb9353079776f) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Avoid writing base path var script when unconfigured.
+
 ## 5.0.15
 
 ### Patch Changes
