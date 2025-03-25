@@ -495,7 +495,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         }
       },
 
-      async buildStart(inputOptions) {
+      async options(inputOptions) {
         if (isBuild && linked && !isSSRBuild) {
           try {
             serverManifest = await store.read();
@@ -505,12 +505,6 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
               entryIds.add(id);
               cachedSources.set(id, serverManifest.entrySources[entry]);
             }
-            for (const assetId of serverManifest.ssrAssetIds) {
-              this.load({
-                id: normalizePath(path.resolve(root, assetId)),
-                resolveDependencies: false,
-              }).catch(noop);
-            }
           } catch (err) {
             this.error(
               `You must run the "ssr" build before the "browser" build.`,
@@ -519,6 +513,16 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
 
           if (isEmpty(inputOptions.input)) {
             this.error("No Marko files were found when compiling the server.");
+          }
+        }
+      },
+      async buildStart() {
+        if (isBuild && linked && !isSSRBuild) {
+          for (const assetId of serverManifest!.ssrAssetIds) {
+            this.load({
+              id: normalizePath(path.resolve(root, assetId)),
+              resolveDependencies: false,
+            }).catch(noop);
           }
         }
       },
