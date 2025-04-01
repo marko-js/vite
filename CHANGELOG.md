@@ -1,5 +1,11 @@
 # Changelog
 
+## 5.1.1
+
+### Patch Changes
+
+- [#197](https://github.com/marko-js/vite/pull/197) [`d66fc0f`](https://github.com/marko-js/vite/commit/d66fc0f1da3fee66c3331c49c1764d849f77a60b) Thanks [@sapphi-red](https://github.com/sapphi-red)! - fix: update options.input in options hook
+
 ## 5.1.0
 
 ### Minor Changes
