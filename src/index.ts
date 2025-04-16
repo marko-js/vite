@@ -807,6 +807,18 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
       name: "marko-vite:post",
       apply: "build",
       enforce: "post", // We use a "post" plugin to allow us to read the final generated `.html` from vite.
+      transform(_source, id, opts) {
+        if (!opts?.ssr && /\.module\.[^.]+(?:\?|$)/.test(id)) {
+          // CSS modules in vite tree shake, however when coupled with
+          // Marko (which leaves code on the server) this leads to no
+          // reference to the css module and causes it to be removed
+          // even when it should not be. Here we say all css moduleish
+          // files should not tree shake.
+          return {
+            moduleSideEffects: "no-treeshake",
+          };
+        }
+      },
       async generateBundle(outputOptions, bundle, isWrite) {
         if (!linked) {
           return;
