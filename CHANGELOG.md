@@ -1,5 +1,11 @@
 # Changelog
 
+## 5.1.2
+
+### Patch Changes
+
+- [#199](https://github.com/marko-js/vite/pull/199) [`368e1b0`](https://github.com/marko-js/vite/commit/368e1b027259b0a573f0dbd5a67ae972f9466b4f) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Ensure css modules in ssr only files are not tree shaken.
+
 ## 5.1.1
 
 ### Patch Changes
