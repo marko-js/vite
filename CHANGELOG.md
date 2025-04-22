@@ -1,5 +1,11 @@
 # Changelog
 
+## 5.1.3
+
+### Patch Changes
+
+- [#201](https://github.com/marko-js/vite/pull/201) [`d400592`](https://github.com/marko-js/vite/commit/d40059246f71172f2d99346e479f017faae34b12) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Improve cjs interop in vitest.
+
 ## 5.1.2
 
 ### Patch Changes
