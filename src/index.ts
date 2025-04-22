@@ -250,10 +250,30 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           (baseConfig as any).markoViteLinked = linked;
         }
 
+        const getCJSInteropBabelConfig = () => ({
+          ...baseConfig.babelConfig,
+          plugins: (
+            (baseConfig.babelConfig!.plugins || []) as (
+              | PluginObj<any>
+              | string
+            )[]
+          ).concat(
+            interopBabelPlugin({
+              filter:
+                isBuild || isTest ? undefined : (path) => !/^\./.test(path),
+            }),
+          ),
+        });
+
         ssrConfig = {
           ...baseConfig,
           resolveVirtualDependency,
           output: "html",
+        };
+
+        ssrCjsConfig = {
+          ...ssrConfig,
+          babelConfig: getCJSInteropBabelConfig(),
         };
 
         domConfig = {
@@ -261,6 +281,10 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           resolveVirtualDependency,
           output: "dom",
         };
+
+        if (isTest) {
+          domConfig.babelConfig = getCJSInteropBabelConfig();
+        }
 
         hydrateConfig = {
           ...baseConfig,
@@ -419,23 +443,6 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
       },
       configResolved(config) {
         basePath = config.base;
-        ssrCjsConfig = {
-          ...ssrConfig,
-          babelConfig: {
-            ...ssrConfig.babelConfig,
-            plugins: (
-              (ssrConfig.babelConfig!.plugins || []) as (
-                | PluginObj<any>
-                | string
-              )[]
-            ).concat(
-              interopBabelPlugin({
-                filter: isBuild ? undefined : (path) => !/^\./.test(path),
-              }),
-            ),
-          },
-        };
-
         getMarkoAssetFns = undefined;
         for (const plugin of config.plugins) {
           const fn = plugin.api?.getMarkoAssetCodeForEntry as
@@ -451,7 +458,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         }
       },
       configureServer(_server) {
-        ssrConfig.hot = domConfig.hot = true;
+        ssrConfig.hot = ssrCjsConfig.hot = domConfig.hot = true;
         devServer = _server;
         devServer.watcher.on("all", (type, originalFileName) => {
           const fileName = normalizePath(originalFileName);
