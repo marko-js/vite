@@ -1,5 +1,11 @@
 # Changelog
 
+## 5.1.5
+
+### Patch Changes
+
+- [#205](https://github.com/marko-js/vite/pull/205) [`bf5884e`](https://github.com/marko-js/vite/commit/bf5884e56a65a86f6815ed8ffc7d0a0794c8ded4) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Optimize inline preloading/paintblocking dev mode scripts.
+
 ## 5.1.4
 
 ### Patch Changes
