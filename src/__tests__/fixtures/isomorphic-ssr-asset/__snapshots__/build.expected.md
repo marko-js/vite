@@ -1,4 +1,5 @@
-# Loading 0
+# Loading
+
 ```html
 <img
   alt="image"
