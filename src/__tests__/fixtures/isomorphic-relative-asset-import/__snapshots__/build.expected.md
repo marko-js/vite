@@ -37,15 +37,19 @@
       href="./styles.css"
       rel="stylesheet"
     />
-
-```
-
-```diff
-+    <link
+    <link
       href="/assets/styles-[hash].css"
       rel="stylesheet"
     />
 
+```
+
+```diff
+-</div>+</div>
+<pre>
+  Error loading &lt;link rel="stylesheet" href="/assets/styles-[hash].css"&gt;
+
+</pre>
 ```
 
 ```diff
@@ -91,5 +95,9 @@ await page.click("#clickable")
     />
   </div>
 </div>
+<pre>
+  Error loading &lt;link rel="stylesheet" href="/assets/styles-[hash].css"&gt;
+
+</pre>
 ```
 

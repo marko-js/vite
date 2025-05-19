@@ -71,18 +71,19 @@ function renderAssets(slot) {
         // To avoid FOUC we will hide the page until all of these modules are loaded.
         const { preload } = entry;
         if (preload) {
+          let sep = "";
+          html += \`<style marko-vite-preload\${this.___viteInjectAttrs}>html{visibility:hidden !important}</style>\`;
           html += \`<script marko-vite-preload async blocking=render type=module\${this.___viteInjectAttrs}>\`;
-          html+= "await Promise.allSettled([";
+          html += "await Promise.allSettled([";
 
           for (const id of preload) {
-            html += \`import(\${JSON.stringify(base + id)}),\`;
+            html += sep + \`import(\${JSON.stringify(base + id)})\`;
+            sep = ",";
           }
 
           html += "]);";
-          html += "document.documentElement.style.visibility='';";
-          html += "if(document.documentElement.getAttribute('style')==='')document.documentElement.removeAttribute('style');";
-          html += "document.querySelectorAll('[marko-vite-preload]').forEach((el) => el.remove());";
-          html += \`</script><script marko-vite-preload\${this.___viteInjectAttrs}>document.documentElement.style.visibility='hidden'</script>\`;
+          html += "document.querySelectorAll('[marko-vite-preload]').forEach(el=>el.remove());";
+          html += \`</script>\`;
         }
       }`
       }

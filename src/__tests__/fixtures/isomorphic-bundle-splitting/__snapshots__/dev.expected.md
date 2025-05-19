@@ -1,66 +1,40 @@
 # Loading
 
 ```html
+<style
+  marko-vite-preload=""
+>
+  html{visibility:hidden !important}
+</style>
 <script
   async=""
   blocking="render"
-  class="marko-vite-preload"
+  marko-vite-preload=""
   type="module"
 >
-  import "/@vite/client";import "/src/components/class-[hash].marko?marko-browser-entry";document.querySelectorAll('.marko-vite-preload').forEach((el) =&gt; el.remove());document.documentElement.style.visibility='';if(document.documentElement.getAttribute('style')==='')document.documentElement.removeAttribute('style');
+  await Promise.allSettled([import("/@vite/client"),import("/src/components/class-[hash].marko?marko-browser-entry")]);document.querySelectorAll('[marko-vite-preload]').forEach(el=&gt;el.remove());
 </script>
 ```
 
 ```diff
 +</script>
-<script
-  class="marko-vite-preload"
->
-  document.documentElement.style.visibility='hidden'
-
-```
-
-```diff
--</script>+</script>
 <div
   class="clickable"
 >
   Mounted: false Clicks: 0
 </div>
-<script
-  async=""
-  src="/src/template.marko?marko-browser-entry"
-  type="module"
-/>
-```
-
-```diff
-+/>
-<script
-  async=""
-  src="/src/components/class-[hash].marko?marko-browser-entry"
-  type="module"
-
-```
-
-```diff
--/>+/>
+<style
+  marko-vite-preload=""
+>
+  html{visibility:hidden !important}
+</style>
 <script
   async=""
   blocking="render"
-  class="marko-vite-preload"
+  marko-vite-preload=""
   type="module"
 >
-  import "/@vite/client";import "/src/components/class-[hash].marko?marko-browser-entry";document.querySelectorAll('.marko-vite-preload').forEach((el) =&gt; el.remove());document.documentElement.style.visibility='';if(document.documentElement.getAttribute('style')==='')document.documentElement.removeAttribute('style');
-</script>
-```
-
-```diff
-+</script>
-<script
-  class="marko-vite-preload"
->
-  document.documentElement.style.visibility='hidden'
+  await Promise.allSettled([import("/@vite/client"),import("/src/components/class-[hash].marko?marko-browser-entry")]);document.querySelectorAll('[marko-vite-preload]').forEach(el=&gt;el.remove());
 
 ```
 
@@ -74,31 +48,31 @@
 ```
 
 ```diff
--<script
+-<style
+  marko-vite-preload=""
+>
+  html{visibility:hidden !important}
+</style>
+<script
   async=""
   blocking="render"
-  class="marko-vite-preload"
+  marko-vite-preload=""
   type="module"
 >
-  import "/@vite/client";import "/src/components/class-[hash].marko?marko-browser-entry";document.querySelectorAll('.marko-vite-preload').forEach((el) =&gt; el.remove());document.documentElement.style.visibility='';if(document.documentElement.getAttribute('style')==='')document.documentElement.removeAttribute('style');
+  await Promise.allSettled([import("/@vite/client"),import("/src/components/class-[hash].marko?marko-browser-entry")]);document.querySelectorAll('[marko-vite-preload]').forEach(el=&gt;el.remove());
 </script>
-<script
-  class="marko-vite-preload"
+-<style
+  marko-vite-preload=""
 >
-  document.documentElement.style.visibility='hidden'
-</script>
--<script
+  html{visibility:hidden !important}
+</style>
+<script
   async=""
   blocking="render"
-  class="marko-vite-preload"
+  marko-vite-preload=""
   type="module"
 >
-  import "/@vite/client";import "/src/components/class-[hash].marko?marko-browser-entry";document.querySelectorAll('.marko-vite-preload').forEach((el) =&gt; el.remove());document.documentElement.style.visibility='';if(document.documentElement.getAttribute('style')==='')document.documentElement.removeAttribute('style');
-</script>
-<script
-  class="marko-vite-preload"
->
-  document.documentElement.style.visibility='hidden'
+  await Promise.allSettled([import("/@vite/client"),import("/src/components/class-[hash].marko?marko-browser-entry")]);document.querySelectorAll('[marko-vite-preload]').forEach(el=&gt;el.remove());
 </script>
 
 ```
@@ -120,16 +94,6 @@ for(const el of await page.$$(".clickable")){await el.click()
 >
   Mounted: true Clicks: 1
 </div>
-<script
-  async=""
-  src="/src/template.marko?marko-browser-entry"
-  type="module"
-/>
-<script
-  async=""
-  src="/src/components/class-[hash].marko?marko-browser-entry"
-  type="module"
-/>
 <div
   class="clickable"
 >
