@@ -1,5 +1,11 @@
 # Changelog
 
+## 5.1.4
+
+### Patch Changes
+
+- [#203](https://github.com/marko-js/vite/pull/203) [`38b9ca5`](https://github.com/marko-js/vite/commit/38b9ca59dd28884ef5ec6d07bd2aa06c79ba94bf) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Ensure document visibilty always restored in dev mode even when initial scripts error while loading.
+
 ## 5.1.3
 
 ### Patch Changes
