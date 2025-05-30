@@ -345,6 +345,20 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         optimizeExtensions.push(".marko");
 
         const esbuildOptions = (optimizeDeps.esbuildOptions ??= {});
+        if (!esbuildOptions.resolveExtensions) {
+          esbuildOptions.resolveExtensions = [
+            ".marko",
+            ".ts",
+            ".js",
+            ".css",
+            ".json",
+          ];
+        } else if (!esbuildOptions.resolveExtensions.includes(".marko")) {
+          esbuildOptions.resolveExtensions = [
+            ".marko",
+            ...esbuildOptions.resolveExtensions,
+          ];
+        }
         const esbuildPlugins = (esbuildOptions.plugins ??= []);
         esbuildPlugins.push(esbuildPlugin(baseConfig));
 
