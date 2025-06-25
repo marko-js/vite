@@ -222,6 +222,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           runtimeId,
           sourceMaps: true,
           writeVersionComment: false,
+          resolveVirtualDependency,
           optimizeKnownTemplates:
             optimize && linked ? getKnownTemplates(root) : undefined,
           babelConfig: opts.babelConfig
@@ -267,7 +268,6 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
 
         ssrConfig = {
           ...baseConfig,
-          resolveVirtualDependency,
           output: "html",
         };
 
@@ -278,7 +278,6 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
 
         domConfig = {
           ...baseConfig,
-          resolveVirtualDependency,
           output: "dom",
         };
 
@@ -288,7 +287,6 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
 
         hydrateConfig = {
           ...baseConfig,
-          resolveVirtualDependency,
           output: "hydrate",
         };
 
