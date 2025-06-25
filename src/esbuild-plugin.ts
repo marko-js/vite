@@ -8,7 +8,6 @@ type ESBuildOptions = Exclude<
   undefined
 >;
 type ESBuildPlugin = Exclude<ESBuildOptions["plugins"], undefined>[number];
-type ESBuildLoader = Exclude<ESBuildOptions["loader"], undefined>[string];
 
 const markoErrorRegExp = /^(.+?)(?:\((\d+)(?:\s*,\s*(\d+))?\))?: (.*)$/gm;
 
@@ -20,14 +19,9 @@ export default function esbuildPlugin(config: compiler.Config): ESBuildPlugin {
       const isScan = build.initialOptions.plugins?.some(
         (v) => v.name === "vite:dep-scan",
       );
-      const virtualFiles = new Map<string, { code: string; map?: unknown }>();
       const finalConfig: compiler.Config = {
         ...config,
         output: platform === "browser" ? "dom" : "html",
-        resolveVirtualDependency(from, dep) {
-          virtualFiles.set(path.join(from, "..", dep.virtualPath), dep);
-          return dep.virtualPath;
-        },
       };
 
       const scanConfig: compiler.Config = {
@@ -37,19 +31,10 @@ export default function esbuildPlugin(config: compiler.Config): ESBuildPlugin {
 
       build.onResolve({ filter: /\.marko\./ }, (args) => {
         return {
-          namespace: "marko:virtual",
           path: path.resolve(args.resolveDir, args.path),
-          external: isScan,
+          external: true,
         };
       });
-
-      build.onLoad(
-        { filter: /\.marko\./, namespace: "marko:virtual" },
-        (args) => ({
-          contents: virtualFiles.get(args.path)!.code,
-          loader: path.extname(args.path).slice(1) as ESBuildLoader,
-        }),
-      );
 
       build.onLoad({ filter: /\.marko$/ }, async (args) => {
         try {
