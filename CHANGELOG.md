@@ -1,5 +1,11 @@
 # Changelog
 
+## 5.1.6
+
+### Patch Changes
+
+- [#208](https://github.com/marko-js/vite/pull/208) [`c114adf`](https://github.com/marko-js/vite/commit/c114adfe638d85b03718cdd7a354f0fbca259d2f) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Avoid esbuild processing virtual modules, mark them as external and use shared virtual file map.
+
 ## 5.1.5
 
 ### Patch Changes
