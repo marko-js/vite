@@ -1,5 +1,11 @@
 # Changelog
 
+## 5.1.7
+
+### Patch Changes
+
+- [#209](https://github.com/marko-js/vite/pull/209) [`2e094d7`](https://github.com/marko-js/vite/commit/2e094d72db3079a57892c1fb4bedfb8d1ae59ad7) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Add vite 7 peer dep.
+
 ## 5.1.6
 
 ### Patch Changes
