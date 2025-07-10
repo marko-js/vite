@@ -82,6 +82,7 @@ const virtualFiles = new Map<
 >();
 const extReg = /\.[^.]+$/;
 const queryReg = /\?marko-[^?]+$/;
+const importTagReg = /^<([^>]+)>$/;
 const browserEntryQuery = "?marko-browser-entry";
 const serverEntryQuery = "?marko-server-entry";
 const virtualFileQuery = "?marko-virtual";
@@ -538,6 +539,16 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
 
         if (importee === renderAssetsRuntimeId) {
           return { id: renderAssetsRuntimeId };
+        }
+
+        if (importer) {
+          const tagName = importTagReg.exec(importee)?.[1];
+          if (tagName) {
+            const tagDef = compiler.taglib
+              .buildLookup(path.dirname(importer))
+              .getTag(tagName);
+            return tagDef && (tagDef.template || tagDef.renderer);
+          }
         }
 
         let importeeQuery = getMarkoQuery(importee);
