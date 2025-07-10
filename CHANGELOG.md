@@ -1,5 +1,11 @@
 # Changelog
 
+## 5.2.0
+
+### Minor Changes
+
+- [#212](https://github.com/marko-js/vite/pull/212) [`4d36e92`](https://github.com/marko-js/vite/commit/4d36e9293a58e5da4170b46e2055f65c884f45c7) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Support shorthand tag imports outside of marko files.
+
 ## 5.1.7
 
 ### Patch Changes
