@@ -9,6 +9,7 @@ type ESBuildOptions = Exclude<
 >;
 type ESBuildPlugin = Exclude<ESBuildOptions["plugins"], undefined>[number];
 
+const importTagReg = /<([^>]+)>/;
 const markoErrorRegExp = /^(.+?)(?:\((\d+)(?:\s*,\s*(\d+))?\))?: (.*)$/gm;
 
 export default function esbuildPlugin(config: compiler.Config): ESBuildPlugin {
@@ -34,6 +35,19 @@ export default function esbuildPlugin(config: compiler.Config): ESBuildPlugin {
           path: path.resolve(args.resolveDir, args.path),
           external: true,
         };
+      });
+
+      build.onResolve({ filter: importTagReg }, (args) => {
+        const tagName = importTagReg.exec(args.path)?.[1];
+        if (tagName) {
+          const tagDef = compiler.taglib
+            .buildLookup(args.resolveDir)
+            .getTag(tagName);
+          const tagFile = tagDef && (tagDef.template || tagDef.renderer);
+          if (tagFile) {
+            return { path: tagFile };
+          }
+        }
       });
 
       build.onLoad({ filter: /\.marko$/ }, async (args) => {
