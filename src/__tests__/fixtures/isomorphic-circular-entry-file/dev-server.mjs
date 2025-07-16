@@ -18,6 +18,7 @@ const devServer = await createServer({
   plugins: [markoPlugin()],
   optimizeDeps: { force: true },
   server: {
+    hmr: false,
     middlewareMode: true,
     watch: {
       ignored: ["**/node_modules/**", "**/dist/**", "**/__snapshots__/**"],
