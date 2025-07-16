@@ -48,22 +48,23 @@ before(async () => {
   await context.addInitScript(() => {
     let errorContainer: HTMLElement | null = null;
     window.addEventListener("error", onError);
+    window.addEventListener("unhandledrejection", onError);
     document.addEventListener("error", onError, true);
 
     function onError(evt: ErrorEvent | PromiseRejectionEvent) {
-      if (!errorContainer) {
-        errorContainer = document.createElement("pre");
-        (document.getElementById("app") || document.body).appendChild(
-          errorContainer,
-        );
-      }
-
-      errorContainer.insertAdjacentText(
-        "beforeend",
+      const msg =
         evt instanceof PromiseRejectionEvent
           ? `${evt.reason}\n`
-          : `${evt.error || `Error loading ${(evt.target as any).outerHTML}`}\n`,
-      );
+          : `${evt.error || `Error loading ${(evt.target as any).outerHTML}`}\n`;
+      if (!msg.includes("WebSocket closed")) {
+        if (!errorContainer) {
+          errorContainer = document.createElement("pre");
+          (document.getElementById("app") || document.body).appendChild(
+            errorContainer,
+          );
+        }
+        errorContainer.insertAdjacentText("beforeend", msg);
+      }
     }
   });
 });
