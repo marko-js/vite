@@ -1,6 +1,7 @@
 import { types as t } from "@marko/compiler";
 import glob from "fast-glob";
 import path from "path";
+import { relativeImportPath } from "relative-import-path";
 
 type GlobArgs = [string | string[], { eager?: boolean; exhaustive?: boolean }];
 
@@ -32,13 +33,13 @@ export default {
     }
   },
   Program: {
-    exit(tag: t.NodePath<t.Program>) {
-      const globImports = programGlobImports.get(tag);
+    exit(program: t.NodePath<t.Program>) {
+      const globImports = programGlobImports.get(program);
       if (!globImports) {
         return;
       }
 
-      const { cwd, filename } = tag.hub.file.opts as {
+      const { cwd, filename } = program.hub.file.opts as {
         cwd: string;
         filename: string;
       };
@@ -46,12 +47,8 @@ export default {
       const seen = new Set();
 
       for (const [patterns, options] of globImports) {
-        const resolvedPatterns = Array.isArray(patterns)
-          ? patterns.map((p) => path.resolve(dir, p))
-          : path.resolve(dir, patterns);
-
-        const results = glob.globSync(resolvedPatterns, {
-          cwd,
+        const results = glob.globSync(patterns, {
+          cwd: dir,
           absolute: true,
           dot: !!options.exhaustive,
           ignore: options.exhaustive
@@ -62,7 +59,12 @@ export default {
         for (const file of results) {
           if (file.endsWith(".marko") && file !== filename && !seen.has(file)) {
             seen.add(file);
-            tag.node.body.push(t.importDeclaration([], t.stringLiteral(file)));
+            program.node.body.push(
+              t.importDeclaration(
+                [],
+                t.stringLiteral(relativeImportPath(filename, file)),
+              ),
+            );
           }
         }
       }
