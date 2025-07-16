@@ -3,7 +3,6 @@ import { diffLines } from "diff";
 import { once } from "events";
 import fs from "fs";
 import type http from "http";
-import type { Http2SecureServer } from "http2";
 import { JSDOM } from "jsdom";
 import snap from "mocha-snap";
 import { createRequire } from "module";
@@ -29,13 +28,11 @@ declare namespace globalThis {
   let page: playwright.Page;
 }
 
-declare const __track__: (html: string) => void;
 type Step = () => Promise<unknown> | unknown;
 
 const requireCwd = createRequire(process.cwd());
 let vite: typeof import("vite");
 let browser: playwright.Browser;
-let changes: string[] = [];
 
 before(async () => {
   vite = await import("vite");
@@ -48,60 +45,27 @@ before(async () => {
    * Then we report the list of mutations in a normalized way and snapshot it.
    */
 
-  await Promise.all([
-    context.exposeFunction("__track__", (html: string) => {
-      const formatted = defaultSerializer(
-        defaultNormalizer(JSDOM.fragment(html)),
-      )
-        .replace(/-[a-z0-9_-]+(\.\w+)/gi, "-[hash]$1")
-        .replace(/[?&][tv]=[\d.]+/, "");
+  await context.addInitScript(() => {
+    let errorContainer: HTMLElement | null = null;
+    window.addEventListener("error", onError);
+    document.addEventListener("error", onError, true);
 
-      if (changes.at(-1) !== formatted) {
-        changes.push(formatted);
-      }
-    }),
-    context.addInitScript(() => {
-      const getRoot = () => document.getElementById("app");
-      const observer = new MutationObserver(() => {
-        const html = getRoot()?.innerHTML;
-        if (html) {
-          __track__(html);
-          observer.disconnect();
-          queueMicrotask(observe);
-        }
-      });
-
-      let errorContainer: HTMLElement | null = null;
-      window.addEventListener("error", onError);
-      document.addEventListener("error", onError, true);
-
-      function onError(evt: ErrorEvent) {
-        if (!errorContainer) {
-          errorContainer = document.createElement("pre");
-          (getRoot() || document.body).appendChild(errorContainer);
-        }
-
-        errorContainer.insertAdjacentText(
-          "beforeend",
-          `${evt.error || `Error loading ${(evt.target as any).outerHTML}`}\n`,
+    function onError(evt: ErrorEvent | PromiseRejectionEvent) {
+      if (!errorContainer) {
+        errorContainer = document.createElement("pre");
+        (document.getElementById("app") || document.body).appendChild(
+          errorContainer,
         );
       }
 
-      observe();
-      function observe() {
-        observer.observe(getRoot() || document, {
-          subtree: true,
-          childList: true,
-          attributes: true,
-          characterData: true,
-        });
-      }
-    }),
-  ]);
-});
-
-beforeEach(() => {
-  changes = [];
+      errorContainer.insertAdjacentText(
+        "beforeend",
+        evt instanceof PromiseRejectionEvent
+          ? `${evt.reason}\n`
+          : `${evt.error || `Error loading ${(evt.target as any).outerHTML}`}\n`,
+      );
+    }
+  });
 });
 
 after(() => browser.close());
@@ -149,15 +113,17 @@ for (const fixture of fs.readdirSync(FIXTURES)) {
 
     if (config.ssr) {
       it("dev", async () => {
-        await testPage(
-          dir,
-          steps,
-          (
-            await import(
-              url.pathToFileURL(path.join(dir, "dev-server.mjs")).href
-            )
-          ).default.listen(0),
-        );
+        const port = await getAvailablePort();
+        const server = (
+          await import(url.pathToFileURL(path.join(dir, "dev-server.mjs")).href)
+        ).default.listen(port) as http.Server;
+        try {
+          await once(server, "listening");
+          await testPage(dir, steps, port);
+        } finally {
+          server.close();
+          await once(server, "close");
+        }
       });
 
       it("build", async () => {
@@ -186,19 +152,26 @@ for (const fixture of fs.readdirSync(FIXTURES)) {
           },
         });
 
-        await testPage(
-          dir,
-          steps,
-          (
-            await import(url.pathToFileURL(path.join(dir, "server.mjs")).href)
-          ).default.listen(0),
-        );
+        const port = await getAvailablePort();
+        const server = (
+          await import(url.pathToFileURL(path.join(dir, "server.mjs")).href)
+        ).default.listen(port) as http.Server;
+
+        try {
+          await once(server, "listening");
+          await testPage(dir, steps, port);
+        } finally {
+          server.close();
+          await once(server, "close");
+        }
       });
     } else {
       it("dev", async () => {
+        const port = await getAvailablePort();
         const devServer = await vite.createServer({
           root: dir,
           server: {
+            port,
             watch: {
               ignored: [
                 "**/node_modules/**",
@@ -212,9 +185,12 @@ for (const fixture of fs.readdirSync(FIXTURES)) {
           plugins: [markoPlugin({ ...config.options, linked: false })],
         });
 
-        devServer.listen(await getAvailablePort());
-        devServer.httpServer!.once("close", () => devServer.close());
-        await testPage(dir, steps, devServer.httpServer!);
+        try {
+          await devServer.listen();
+          await testPage(dir, steps, port);
+        } finally {
+          await devServer.close();
+        }
       });
 
       it("build", async () => {
@@ -228,96 +204,84 @@ for (const fixture of fs.readdirSync(FIXTURES)) {
           },
         });
 
-        await testPage(
-          dir,
-          steps,
-          (
-            await vite.preview({
-              root: dir,
-              server: {
-                watch: {
-                  ignored: [
-                    "**/node_modules/**",
-                    "**/dist/**",
-                    "**/__snapshots__/**",
-                  ],
-                },
-              },
-              preview: { port: await getAvailablePort() },
-            })
-          ).httpServer,
-        );
+        const port = await getAvailablePort();
+        const previewServer = await vite.preview({
+          root: dir,
+          server: {
+            watch: {
+              ignored: [
+                "**/node_modules/**",
+                "**/dist/**",
+                "**/__snapshots__/**",
+              ],
+            },
+          },
+          preview: { port },
+        });
+
+        try {
+          await testPage(dir, steps, port);
+        } finally {
+          await previewServer.close();
+        }
       });
     }
   });
 }
 
-async function testPage(
-  dir: string,
-  steps: Step[],
-  server: http.Server | Http2SecureServer,
-) {
-  try {
-    if (!server.listening) await once(server, "listening");
+async function testPage(dir: string, steps: Step[], port: number) {
+  await waitForPendingRequests(page, () =>
+    page.goto(`http://localhost:${port}`, { waitUntil: "networkidle" }),
+  );
 
-    const href = `http://localhost:${
-      (server.address() as net.AddressInfo).port
-    }`;
-    await waitForPendingRequests(page, () => page.goto(href));
-
-    const title = await page.title();
-    if (title === "Error") {
-      const error = new Error("Error in response");
-      const pre = await page.waitForSelector("pre");
-      const html = await pre.innerHTML();
-      if (html) {
-        error.stack = JSDOM.fragment(html.replace(/<br>/g, "\n")).textContent!;
-      }
-      throw error;
+  const title = await page.title();
+  if (title === "Error") {
+    const error = new Error("Error in response");
+    const pre = await page.waitForSelector("pre");
+    const html = await pre.innerHTML();
+    if (html) {
+      error.stack = JSDOM.fragment(html.replace(/<br>/g, "\n")).textContent!;
     }
-
-    let snapshot = "";
-
-    await page.waitForSelector("#app");
-
-    snapshot += `# Loading\n\n`;
-    let prevHtml: string | undefined;
-    await forEachChange((html) => {
-      snapshot += htmlSnapshot(html, prevHtml);
-      prevHtml = html;
-    });
-
-    for (const [i, step] of steps.entries()) {
-      await waitForPendingRequests(page, step);
-      snapshot += `# Step ${i}\n${getStepString(step)}\n\n`;
-
-      let prevHtml: string | undefined;
-      await forEachChange((html) => {
-        snapshot += htmlSnapshot(html, prevHtml);
-        prevHtml = html;
-      });
-    }
-
-    snap(snapshot, { ext: ".md", dir });
-  } finally {
-    server.close();
+    throw error;
   }
+
+  let snapshot = "";
+  let prevHtml: string | undefined;
+
+  await page.waitForSelector("#app");
+
+  snapshot += `# Loading\n\n`;
+  const html = await getHTML();
+  snapshot += htmlSnapshot(html, prevHtml);
+  prevHtml = html;
+
+  for (const [i, step] of steps.entries()) {
+    await waitForPendingRequests(page, step);
+    snapshot += `# Step ${i}\n${getStepString(step)}\n\n`;
+    const html = await getHTML();
+    if (html === prevHtml) continue;
+    snapshot += htmlSnapshot(html, prevHtml);
+    prevHtml = html;
+  }
+
+  await snap(snapshot, { ext: ".md", dir });
 }
 
 /**
  * Applies changes currently and ensures no new changes come in while processing.
  */
-async function forEachChange<F extends (html: string, i: number) => unknown>(
-  fn: F,
-) {
-  const len = changes.length;
-  await Promise.all(changes.map(fn));
-
-  if (len !== changes.length) {
-    throw new Error("A mutation occurred when the page should have been idle.");
-  }
-
-  changes = [];
+async function getHTML() {
+  return defaultSerializer(
+    defaultNormalizer(
+      JSDOM.fragment(
+        await page.evaluate(
+          () => (document.getElementById("app") || document.body).innerHTML,
+        ),
+      ),
+    ),
+  )
+    .replace(/-[a-z0-9_-]+(\.\w+)/gi, "-[hash]$1")
+    .replace(/[?&][tv]=[\d.]+/, "");
 }
 
 /**
@@ -330,8 +294,12 @@ async function waitForPendingRequests(page: playwright.Page, step: Step) {
   const addOne = () => remaining++;
   const finishOne = async () => {
     // wait a tick to see if new requests start from this one.
-    await page.evaluate(() => {});
-    if (!--remaining) resolve();
+    if (!--remaining) {
+      await new Promise((r) => setTimeout(r, 500));
+      if (!remaining) {
+        resolve();
+      }
+    }
   };
   const pending = new Promise<void>((_resolve) => (resolve = _resolve));
 
