@@ -20,8 +20,7 @@ static function flush($global, html) {
 static function setFlush($global) {
   $global.__flush__ = flush;
 }
-static const assets = [${opts.entryData.join(",")}];
-<const/writeSync=addAssets($global, assets) || setFlush($global)/>
+<const/writeSync=addAssets($global, [${opts.entryData.join(",")}]) || setFlush($global)/>
 -- $!{writeSync && getPrepend($global)}
 <Template ...input/>
 -- $!{writeSync && getAppend($global)}
@@ -31,8 +30,7 @@ static const assets = [${opts.entryData.join(",")}];
   return `import template from ${fileNameStr};
 export * from ${fileNameStr};
 import { addAssets, getPrepend, getAppend } from "${renderAssetsRuntimeId}";
-static const assets = [${opts.entryData.join(",")}];
-<if(addAssets($global, assets))>
+<if(addAssets($global, [${opts.entryData.join(",")}]))>
   $!{getPrepend($global)}
   <\${template} ...input/>
   $!{getAppend($global)}
