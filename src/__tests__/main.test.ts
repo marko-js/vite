@@ -28,6 +28,8 @@ declare namespace globalThis {
   let page: playwright.Page;
 }
 
+declare let __loading__: Promise<void> | undefined;
+
 type Step = () => Promise<unknown> | unknown;
 
 const requireCwd = createRequire(process.cwd());
@@ -38,27 +40,77 @@ before(async () => {
   vite = await import("vite");
   browser = await playwright.chromium.launch();
   const context = await browser.newContext();
-  await context.addInitScript("window.__name = v=>v");
-  globalThis.page = await context.newPage();
-  /**
-   * We add a mutation observer to track all mutations (batched)
-   * Then we report the list of mutations in a normalized way and snapshot it.
-   */
-
+  context.on("console", (msg) => console.log(`[${msg.type()}] ${msg.text()}`));
   await context.addInitScript(() => {
-    let errorContainer: HTMLElement | null = null;
+    // needed for esbuild.
+    (window as any).__name = (v: any) => v;
+    __loading__ = undefined;
+
+    const seen = new Set<string>();
+    let remaining = 0;
+    let resolve: undefined | (() => void);
     window.addEventListener("error", onError);
     window.addEventListener("unhandledrejection", onError);
-    document.addEventListener("error", onError, true);
+    onMutate(document, (_, obs) => {
+      if (!document.body) return;
+      obs.disconnect();
+      trackAssets();
+      onMutate(document.body, trackAssets);
+    });
 
-    function onError(evt: ErrorEvent | PromiseRejectionEvent) {
+    function onMutate(target: Node, fn: MutationCallback) {
+      new MutationObserver(fn).observe(target, {
+        childList: true,
+        subtree: true,
+      });
+    }
+    function trackAssets() {
+      for (const el of document.querySelectorAll<
+        HTMLScriptElement | HTMLLinkElement
+      >("script[src],link[rel=stylesheet][href]")) {
+        const href = "src" in el ? el.src : el.href;
+        if (href && !seen.has(href)) {
+          const link = document.createElement("link");
+          __loading__ ||= new Promise((r) => (resolve = r));
+          seen.add(href);
+          remaining++;
+
+          if ("src" in el) {
+            if (el.getAttribute("type") === "module") {
+              link.rel = "modulepreload";
+            } else {
+              link.rel = "preload";
+              link.as = "script";
+            }
+          } else {
+            link.rel = "preload";
+            link.as = "style";
+          }
+
+          link.href = href;
+          link.onload = link.onerror = () => {
+            link.onload = link.onerror = null;
+            link.remove();
+            seen.delete(href);
+            if (!--remaining) {
+              resolve?.();
+              resolve = __loading__ = undefined;
+            }
+          };
+          document.head.append(link);
+        }
+      }
+    }
+    function onError(ev: ErrorEvent | PromiseRejectionEvent) {
       const msg =
-        evt instanceof PromiseRejectionEvent
-          ? `${evt.reason}\n`
-          : `${evt.error || `Error loading ${(evt.target as any).outerHTML}`}\n`;
+        ev instanceof PromiseRejectionEvent
+          ? `${ev.reason}\n`
+          : `${ev.error || `Error loading ${(ev.target as any).outerHTML}`}\n`;
       if (!msg.includes("WebSocket closed")) {
+        let errorContainer = document.getElementById("error");
         if (!errorContainer) {
           errorContainer = document.createElement("pre");
+          errorContainer.id = "error";
           (document.getElementById("app") || document.body).appendChild(
             errorContainer,
           );
@@ -67,6 +119,8 @@ before(async () => {
       }
     }
   });
+
+  globalThis.page = await context.newPage();
 });
 
 after(() => browser.close());
@@ -123,7 +177,6 @@ for (const fixture of fs.readdirSync(FIXTURES)) {
           await testPage(dir, steps, port);
         } finally {
           server.close();
-          await once(server, "close");
         }
       });
 
@@ -163,7 +216,6 @@ for (const fixture of fs.readdirSync(FIXTURES)) {
           await testPage(dir, steps, port);
         } finally {
           server.close();
-          await once(server, "close");
         }
       });
     } else {
@@ -231,15 +283,12 @@ for (const fixture of fs.readdirSync(FIXTURES)) {
 }
 
 async function testPage(dir: string, steps: Step[], port: number) {
-  await waitForPendingRequests(page, () =>
-    page.goto(`http://localhost:${port}`, { waitUntil: "networkidle" }),
-  );
+  await page.goto(`http://localhost:${port}`);
 
   const title = await page.title();
   if (title === "Error") {
     const error = new Error("Error in response");
-    const pre = await page.waitForSelector("pre");
-    const html = await pre.innerHTML();
+    const html = await page.locator("pre").innerHTML();
     if (html) {
       error.stack = JSDOM.fragment(html.replace(/<br>/g, "\n")).textContent!;
     }
@@ -250,15 +299,14 @@ async function testPage(dir: string, steps: Step[], port: number) {
   let prevHtml: string | undefined;
 
   await page.waitForSelector("#app");
-
   snapshot += `# Loading\n\n`;
   const html = await getHTML();
   snapshot += htmlSnapshot(html, prevHtml);
   prevHtml = html;
 
   for (const [i, step] of steps.entries()) {
-    await waitForPendingRequests(page, step);
     snapshot += `# Step ${i}\n${getStepString(step)}\n\n`;
+    await step();
     const html = await getHTML();
     if (html === prevHtml) continue;
     snapshot += htmlSnapshot(html, prevHtml);
@@ -268,56 +316,29 @@ async function testPage(dir: string, steps: Step[], port: number) {
   await snap(snapshot, { ext: ".md", dir });
 }
 
-/**
- * Applies changes currently and ensures no new changes come in while processing.
- */
 async function getHTML() {
   return defaultSerializer(
     defaultNormalizer(
       JSDOM.fragment(
-        await page.evaluate(
-          () => (document.getElementById("app") || document.body).innerHTML,
-        ),
+        await page.evaluate(async () => {
+          do {
+            await __loading__;
+            await new Promise((r) => {
+              requestAnimationFrame(() => {
+                const { port1, port2 } = new MessageChannel();
+                port1.onmessage = r;
+                port2.postMessage(0);
+              });
+            });
+          } while (__loading__);
+
+          return document.getElementById("app")?.innerHTML || "";
+        }),
       ),
     ),
   )
     .replace(/-[a-z0-9_-]+(\.\w+)/gi, "-[hash]$1")
     .replace(/[?&][tv]=[\d.]+/, "");
-}
-
-/**
- * Utility to run a function against the current page and wait until every
- * in flight network request has completed before continuing.
- */
-async function waitForPendingRequests(page: playwright.Page, step: Step) {
-  let remaining = 0;
-  let resolve!: () => void;
-  const addOne = () => remaining++;
-  const finishOne = async () => {
-    // wait a tick to see if new requests start from this one.
-    if (!--remaining) {
-      await new Promise((r) => setTimeout(r, 500));
-      if (!remaining) {
-        resolve();
-      }
-    }
-  };
-  const pending = new Promise<void>((_resolve) => (resolve = _resolve));
-
-  page.on("request", addOne);
-  page.on("requestfinished", finishOne);
-  page.on("requestfailed", finishOne);
-
-  try {
-    addOne();
-    await step();
-    finishOne();
-    await pending;
-  } finally {
-    page.off("request", addOne);
-    page.off("requestfinished", finishOne);
-    page.off("requestfailed", finishOne);
-  }
 }
 
 async function getAvailablePort() {
