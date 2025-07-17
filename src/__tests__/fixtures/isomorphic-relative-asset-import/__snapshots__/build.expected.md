@@ -34,10 +34,6 @@
     />
   </div>
 </div>
-<pre>
-  Error loading &lt;link rel="stylesheet" href="/assets/styles-[hash].css"&gt;
-
-</pre>
 ```
 
 # Step 0
