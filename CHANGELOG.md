@@ -1,5 +1,11 @@
 # Changelog
 
+## 5.3.0
+
+### Minor Changes
+
+- [#216](https://github.com/marko-js/vite/pull/216) [`da8c649`](https://github.com/marko-js/vite/commit/da8c6490bb797dafe0aa7727c6b253439c136510) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Add support for linked mode with node client templates found. This makes it possible to have @marko/run apps with just handlers/middleware.
+
 ## 5.2.1
 
 ### Patch Changes
