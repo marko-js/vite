@@ -83,6 +83,7 @@ const virtualFiles = new Map<
 const extReg = /\.[^.]+$/;
 const queryReg = /\?marko-[^?]+$/;
 const importTagReg = /^<([^>]+)>$/;
+const noClientAssetsRuntimeId = "\0no_client_bundles.mjs";
 const browserEntryQuery = "?marko-browser-entry";
 const serverEntryQuery = "?marko-server-entry";
 const virtualFileQuery = "?marko-virtual";
@@ -502,23 +503,35 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
       },
 
       async options(inputOptions) {
-        if (isBuild && linked && !isSSRBuild) {
-          try {
-            serverManifest = await store.read();
-            inputOptions.input = toHTMLEntries(root, serverManifest.entries);
-            for (const entry in serverManifest.entrySources) {
-              const id = normalizePath(path.resolve(root, entry));
-              entryIds.add(id);
-              cachedSources.set(id, serverManifest.entrySources[entry]);
+        if (linked && isBuild) {
+          if (isSSRBuild) {
+            serverManifest = {
+              entries: {},
+              entrySources: {},
+              chunksNeedingAssets: [],
+              ssrAssetIds: [],
+            };
+          } else {
+            try {
+              serverManifest = await store.read();
+              if (isEmpty(serverManifest.entries)) {
+                inputOptions.input = noClientAssetsRuntimeId;
+              } else {
+                inputOptions.input = toHTMLEntries(
+                  root,
+                  serverManifest.entries,
+                );
+                for (const entry in serverManifest.entrySources) {
+                  const id = normalizePath(path.resolve(root, entry));
+                  entryIds.add(id);
+                  cachedSources.set(id, serverManifest.entrySources[entry]);
+                }
+              }
+            } catch (err) {
+              this.error(
+                `You must run the "ssr" build before the "browser" build.`,
+              );
             }
-          } catch (err) {
-            this.error(
-              `You must run the "ssr" build before the "browser" build.`,
-            );
-          }
-
-          if (isEmpty(inputOptions.input)) {
-            this.error("No Marko files were found when compiling the server.");
           }
         }
       },
@@ -537,8 +550,11 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           return importee;
         }
 
-        if (importee === renderAssetsRuntimeId) {
-          return { id: renderAssetsRuntimeId };
+        if (
+          importee === renderAssetsRuntimeId ||
+          importee === noClientAssetsRuntimeId
+        ) {
+          return { id: importee };
         }
 
         if (importer) {
@@ -630,6 +646,10 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           return renderAssetsRuntimeCode;
         }
 
+        if (id === noClientAssetsRuntimeId) {
+          return "NO_CLIENT_ASSETS";
+        }
+
         const query = getMarkoQuery(id);
         switch (query) {
           case serverEntryQuery: {
@@ -675,14 +695,8 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
                 path.relative(root, fileName),
               );
               const entryId = toEntryId(relativeFileName);
-              serverManifest ??= {
-                entries: {},
-                entrySources: {},
-                chunksNeedingAssets: [],
-                ssrAssetIds: [],
-              };
-              serverManifest.entries[entryId] = relativeFileName;
-              serverManifest.entrySources[relativeFileName] = source;
+              serverManifest!.entries[entryId] = relativeFileName;
+              serverManifest!.entrySources[relativeFileName] = source;
               mainEntryData = JSON.stringify(entryId);
             } else {
               mainEntryData = JSON.stringify(
@@ -846,12 +860,6 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           );
         }
 
-        if (!serverManifest) {
-          this.error(
-            "No Marko files were found when bundling the server in linked mode.",
-          );
-        }
-
         if (isSSRBuild) {
           const dir = outputOptions.dir
             ? path.resolve(outputOptions.dir)
@@ -885,34 +893,47 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         } else {
           const browserManifest: BrowserManifest = {};
 
-          for (const entryId in serverManifest!.entries) {
-            const fileName = serverManifest!.entries[entryId];
-            const chunkId = fileName + htmlExt;
-            const chunk = bundle[chunkId];
-
-            if (chunk?.type === "asset") {
-              browserManifest[entryId] = {
-                ...(await generateDocManifest(
-                  basePath,
-                  chunk.source.toString(),
-                )),
-                preload: undefined, // clear out preload for prod builds.
-              } as any;
-
-              delete bundle[chunkId];
-            } else {
-              this.error(
-                `Marko template had unexpected output from vite, ${fileName}`,
-              );
+          if (isEmpty(serverManifest!.entries)) {
+            for (const chunkId in bundle) {
+              const chunk = bundle[chunkId];
+              if (
+                chunk.type === "chunk" &&
+                chunk.facadeModuleId === noClientAssetsRuntimeId
+              ) {
+                delete bundle[chunkId];
+                delete bundle[chunkId + ".map"];
+              }
             }
-          }
+          } else {
+            for (const entryId in serverManifest!.entries) {
+              const fileName = serverManifest!.entries[entryId];
+              const chunkId = fileName + htmlExt;
+              const chunk = bundle[chunkId];
 
-          const manifestStr = `;var __MARKO_MANIFEST__=${JSON.stringify(
-            browserManifest,
-          )};\n`;
+              if (chunk?.type === "asset") {
+                browserManifest[entryId] = {
+                  ...(await generateDocManifest(
+                    basePath,
+                    chunk.source.toString(),
+                  )),
+                  preload: undefined, // clear out preload for prod builds.
+                } as any;
 
-          for (const fileName of serverManifest!.chunksNeedingAssets) {
-            await fs.promises.appendFile(fileName, manifestStr);
+                delete bundle[chunkId];
+              } else {
+                this.error(
+                  `Marko template had unexpected output from vite, ${fileName}`,
+                );
+              }
+            }
+
+            const manifestStr = `;var __MARKO_MANIFEST__=${JSON.stringify(
+              browserManifest,
+            )};\n`;
+
+            for (const fileName of serverManifest!.chunksNeedingAssets) {
+              await fs.promises.appendFile(fileName, manifestStr);
+            }
           }
         }
       },
