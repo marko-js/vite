@@ -1,5 +1,13 @@
 # Changelog
 
+## 5.2.1
+
+### Patch Changes
+
+- [#214](https://github.com/marko-js/vite/pull/214) [`3a892e5`](https://github.com/marko-js/vite/commit/3a892e5b81528dd48f577c2528f6a9696252892a) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Fix regression where asset list was calculated at module load time instead of render time. This change caused arc to be unable to lazily determine assets based on flag sets.
+
+- [#214](https://github.com/marko-js/vite/pull/214) [`bc8b0fc`](https://github.com/marko-js/vite/commit/bc8b0fcef9c851a333b1887437e740f5b9e0d7b9) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Fix issue with import.meta.glob in windows.
+
 ## 5.2.0
 
 ### Minor Changes
