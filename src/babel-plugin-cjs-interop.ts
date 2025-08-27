@@ -80,14 +80,18 @@ export default function plugin(options: {
                 t.objectPattern([
                   t.objectProperty(t.identifier("default"), defaultImportId),
                 ]),
-                t.conditionalExpression(
-                  t.optionalMemberExpression(
+                t.logicalExpression(
+                  "||",
+                  t.conditionalExpression(
+                    t.optionalMemberExpression(
+                      t.memberExpression(rawImport, t.identifier("default")),
+                      t.identifier("__esModule"),
+                      false,
+                      true,
+                    ),
                     t.memberExpression(rawImport, t.identifier("default")),
-                    t.identifier("__esModule"),
-                    false,
-                    true,
+                    rawImport,
                   ),
-                  t.memberExpression(rawImport, t.identifier("default")),
                   rawImport,
                 ),
               ),
@@ -100,15 +104,19 @@ export default function plugin(options: {
             t.variableDeclaration("const", [
               t.variableDeclarator(
                 namespaceId,
-                t.conditionalExpression(
-                  t.optionalMemberExpression(
+                t.logicalExpression(
+                  "||",
+                  t.conditionalExpression(
+                    t.optionalMemberExpression(
+                      rawImport,
+                      t.identifier("__esModule"),
+                      false,
+                      true,
+                    ),
                     rawImport,
-                    t.identifier("__esModule"),
-                    false,
-                    true,
+                    t.memberExpression(rawImport, t.identifier("default")),
                   ),
                   rawImport,
-                  t.memberExpression(rawImport, t.identifier("default")),
                 ),
               ),
             ]),
@@ -129,15 +137,19 @@ export default function plugin(options: {
                     ),
                   ),
                 ),
-                t.conditionalExpression(
-                  t.optionalMemberExpression(
+                t.logicalExpression(
+                  "||",
+                  t.conditionalExpression(
+                    t.optionalMemberExpression(
+                      rawImport,
+                      t.identifier("__esModule"),
+                      false,
+                      true,
+                    ),
                     rawImport,
-                    t.identifier("__esModule"),
-                    false,
-                    true,
+                    t.memberExpression(rawImport, t.identifier("default")),
                   ),
                   rawImport,
-                  t.memberExpression(rawImport, t.identifier("default")),
                 ),
               ),
             ]),
