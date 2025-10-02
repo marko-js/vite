@@ -1,5 +1,11 @@
 # Changelog
 
+## 5.3.1
+
+### Patch Changes
+
+- [#218](https://github.com/marko-js/vite/pull/218) [`7785b49`](https://github.com/marko-js/vite/commit/7785b49805546bb669c87bcf33a28694de385105) Thanks [@rturnq](https://github.com/rturnq)! - Add isEntry option to filter marko files used as entries
+
 ## 5.3.0
 
 ### Minor Changes
