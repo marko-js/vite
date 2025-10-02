@@ -1,0 +1,15 @@
+class {
+  onCreate() {
+    this.state = {
+      text: ''
+    };
+  }
+  onMount() {
+    fetch('/other').then((response) => response.text()).then((text) => {
+      this.state.text = text;
+    }).catch(() => this.state.text = 'broken');
+  }
+
+}
+
+<div>$!{state.text}</div>
