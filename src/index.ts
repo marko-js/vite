@@ -41,6 +41,8 @@ export interface Options {
   basePathVar?: string;
   // Overrides the Babel config that Marko will use.
   babelConfig?: compiler.Config["babelConfig"];
+  // Filter marko files used as entries
+  isEntry?: (importee: string, importer: string) => boolean;
 }
 
 interface BrowserManifest {
@@ -152,6 +154,8 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
   let serverManifest: ServerManifest | undefined;
   let basePath = "/";
   let getMarkoAssetFns: undefined | API.getMarkoAssetCodeForEntry[];
+  let checkIsEntry: NonNullable<Options["isEntry"]> = () => true;
+
   const entryIds = new Set<string>();
   const cachedSources = new Map<string, string>();
   const transformWatchFiles = new Map<string, string[]>();
@@ -211,6 +215,9 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
 
         runtimeId = opts.runtimeId;
         basePathVar = opts.basePathVar;
+        if (opts.isEntry) {
+          checkIsEntry = opts.isEntry;
+        }
 
         if ("BASE_URL" in process.env && config.base == null) {
           config.base = process.env.BASE_URL;
@@ -580,7 +587,12 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
             (importer !== devEntryFile ||
               normalizePath(importer) !== devEntryFilePosix) && // Vite tries to resolve against an `index.html` in some cases, we ignore it here.
             isMarkoFile(importee) &&
-            !isMarkoFile(importer.replace(queryReg, ""))
+            !queryReg.test(importer) &&
+            !isMarkoFile(importer) &&
+            checkIsEntry(
+              normalizePath(path.resolve(importer, "..", importee)),
+              importer,
+            )
           ) {
             importeeQuery = serverEntryQuery;
           } else if (
