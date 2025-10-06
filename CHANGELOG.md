@@ -1,5 +1,11 @@
 # Changelog
 
+## 5.3.2
+
+### Patch Changes
+
+- [#220](https://github.com/marko-js/vite/pull/220) [`c0f811a`](https://github.com/marko-js/vite/commit/c0f811a193ee580eb755b177bc07a4200e6f9b2a) Thanks [@rturnq](https://github.com/rturnq)! - Make vite asset injection optional to support non-entry templates
+
 ## 5.3.1
 
 ### Patch Changes
