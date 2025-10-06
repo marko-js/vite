@@ -10,12 +10,13 @@ export default (tag: types.NodePath<types.MarkoTag>, t: typeof types) => {
 
 function renderAssetsCall(t: typeof types, slot: string) {
   return t.markoPlaceholder(
-    t.callExpression(
+    t.optionalCallExpression(
       t.memberExpression(
         t.identifier("$global"),
         t.identifier("___viteRenderAssets"),
       ),
       [t.stringLiteral(slot)],
+      true,
     ),
     false,
   );
