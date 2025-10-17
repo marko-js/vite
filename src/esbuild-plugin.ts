@@ -1,4 +1,5 @@
 import * as compiler from "@marko/compiler";
+import type { Loader } from "esbuild";
 import fs from "fs";
 import path from "path";
 import type * as vite from "vite";
@@ -12,7 +13,11 @@ type ESBuildPlugin = Exclude<ESBuildOptions["plugins"], undefined>[number];
 const importTagReg = /<([^>]+)>/;
 const markoErrorRegExp = /^(.+?)(?:\((\d+)(?:\s*,\s*(\d+))?\))?: (.*)$/gm;
 
-export default function esbuildPlugin(config: compiler.Config): ESBuildPlugin {
+export default function esbuildPlugin(
+  config: compiler.Config,
+  virtualFiles: Map<string, { code: string } | Promise<{ code: string }>>,
+  cacheVirtualFile: (path: string) => void,
+): ESBuildPlugin {
   return {
     name: "marko",
     async setup(build) {
@@ -31,10 +36,27 @@ export default function esbuildPlugin(config: compiler.Config): ESBuildPlugin {
       };
 
       build.onResolve({ filter: /\.marko\./ }, (args) => {
+        const resolvedPath = path.resolve(args.resolveDir, args.path);
+        const isExternal = /\.css$/i.test(resolvedPath);
+        if (isExternal && !isScan) {
+          cacheVirtualFile(resolvedPath);
+        }
+
         return {
-          path: path.resolve(args.resolveDir, args.path),
-          external: true,
+          path: resolvedPath,
+          external: isExternal,
         };
+      });
+
+      build.onLoad({ filter: /\.marko\./ }, async (args) => {
+        const file = virtualFiles.get(args.path);
+        if (file) {
+          return {
+            contents: (await file).code,
+            loader: path.extname(args.path).slice(1) as Loader,
+            resolveDir: path.dirname(args.path),
+          };
+        }
       });
 
       build.onResolve({ filter: importTagReg }, (args) => {
