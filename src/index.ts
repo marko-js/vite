@@ -143,6 +143,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
     };
 
   let root: string;
+  let cacheDir: string | undefined;
   let rootResolveFile: string;
   let devEntryFile: string;
   let devEntryFilePosix: string;
@@ -353,7 +354,24 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
 
         const esbuildOptions = (optimizeDeps.esbuildOptions ??= {});
         const esbuildPlugins = (esbuildOptions.plugins ??= []);
-        esbuildPlugins.push(esbuildPlugin(baseConfig));
+
+        let cacheDirPromise: Promise<unknown> | undefined;
+        esbuildPlugins.push(
+          esbuildPlugin(baseConfig, virtualFiles, async (resolved) => {
+            if (cacheDir) {
+              const file = virtualFiles.get(resolved);
+              if (file) {
+                await (cacheDirPromise ||= fs.promises.mkdir(cacheDir, {
+                  recursive: true,
+                }));
+                await fs.promises.writeFile(
+                  virtualPathToCacheFile(resolved, root, cacheDir),
+                  (await file).code,
+                );
+              }
+            }
+          }),
+        );
 
         const ssr = (config.ssr ??= {});
         const { noExternal } = ssr;
@@ -450,6 +468,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
       },
       configResolved(config) {
         basePath = config.base;
+        cacheDir = config.cacheDir && normalizePath(config.cacheDir);
         getMarkoAssetFns = undefined;
         for (const plugin of config.plugins) {
           const fn = plugin.api?.getMarkoAssetCodeForEntry as
@@ -577,6 +596,13 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         let importeeQuery = getMarkoQuery(importee);
 
         if (importeeQuery) {
+          if (
+            importee[0] !== "." &&
+            importee[0] !== "\0" &&
+            importeeQuery.startsWith(virtualFileQuery)
+          ) {
+            return importee;
+          }
           importee = importee.slice(0, -importeeQuery.length);
         } else if (!(importOpts as any).scan) {
           if (
@@ -627,7 +653,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
               : await this.resolve(importee, importer, resolveOpts);
 
           if (resolved) {
-            resolved.id += importeeQuery;
+            resolved.id = stripVersionAndTimeStamp(resolved.id) + importeeQuery;
           }
 
           return resolved;
@@ -663,17 +689,36 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         }
 
         const query = getMarkoQuery(id);
-        switch (query) {
-          case serverEntryQuery: {
-            entryIds.add(id.slice(0, -query.length));
-            return null;
-          }
-          case browserEntryQuery:
-          case browserQuery: {
-            // The goal below is to cached source content when in linked mode
-            // to avoid loading from disk for both server and browser builds.
-            // This is to support virtual Marko entry files.
-            return cachedSources.get(id.slice(0, -query.length)) || null;
+        if (query) {
+          switch (query) {
+            case serverEntryQuery: {
+              entryIds.add(id.slice(0, -query.length));
+              return null;
+            }
+            case browserEntryQuery:
+            case browserQuery: {
+              // The goal below is to cached source content when in linked mode
+              // to avoid loading from disk for both server and browser builds.
+              // This is to support virtual Marko entry files.
+              return cachedSources.get(id.slice(0, -query.length)) || null;
+            }
+            default:
+              return (
+                virtualFiles.get(id) ||
+                (cacheDir &&
+                  fs.promises
+                    .readFile(
+                      virtualPathToCacheFile(id, root, cacheDir),
+                      "utf8",
+                    )
+                    .then((code) => {
+                      virtualFiles.set(id, { code });
+                      return code;
+                    })
+                    .catch(() => {
+                      return null;
+                    }))
+              );
           }
         }
 
@@ -1002,6 +1047,17 @@ function fileNameToURL(fileName: string, root: string) {
   }
 
   return `/${relativeURL}`;
+}
+
+function virtualPathToCacheFile(
+  virtualPath: string,
+  root: string,
+  cacheDir: string,
+) {
+  return path.join(
+    cacheDir,
+    normalizePath(path.relative(root, virtualPath)).replace(/[\\/]+/g, "_"),
+  );
 }
 
 function getPosixBasenameWithoutExt(file: string): string {
