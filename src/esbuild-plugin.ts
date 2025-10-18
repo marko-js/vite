@@ -11,7 +11,8 @@ type ESBuildOptions = Exclude<
 type ESBuildPlugin = Exclude<ESBuildOptions["plugins"], undefined>[number];
 
 const importTagReg = /<([^>]+)>/;
-const markoErrorRegExp = /^(.+?)(?:\((\d+)(?:\s*,\s*(\d+))?\))?: (.*)$/gm;
+const markoErrorReg = /^(.+?)(?:\((\d+)(?:\s*,\s*(\d+))?\))?: (.*)$/gm;
+const virtualFileReg = /\?marko-virtual&/;
 
 export default function esbuildPlugin(
   config: compiler.Config,
@@ -35,11 +36,11 @@ export default function esbuildPlugin(
         output: "hydrate",
       };
 
-      build.onResolve({ filter: /\.marko\./ }, (args) => {
+      build.onResolve({ filter: virtualFileReg }, (args) => {
         const resolvedPath = path.resolve(args.resolveDir, args.path);
-        const isExternal = /\.css$/i.test(resolvedPath);
+        const isExternal = !/\.(?:[cm]?[jt]s|json)$/i.test(resolvedPath);
         if (isExternal && !isScan) {
-          cacheVirtualFile(resolvedPath);
+          void cacheVirtualFile(resolvedPath);
         }
 
         return {
@@ -48,7 +49,7 @@ export default function esbuildPlugin(
         };
       });
 
-      build.onLoad({ filter: /\.marko\./ }, async (args) => {
+      build.onLoad({ filter: virtualFileReg }, async (args) => {
         const file = virtualFiles.get(args.path);
         if (file) {
           return {
@@ -91,7 +92,7 @@ export default function esbuildPlugin(
           let match: RegExpExecArray | null;
           let lines: string[] | undefined;
 
-          while ((match = markoErrorRegExp.exec(text))) {
+          while ((match = markoErrorReg.exec(text))) {
             const [, file, rawLine, rawCol, text] = match;
             const line = parseInt(rawLine, 10) || 1;
             const column = parseInt(rawCol, 10) || 1;
