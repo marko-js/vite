@@ -14,19 +14,20 @@ import { isCJSModule } from "./resolve";
  *   1. Source: ```import { bar as baz } from 'foo';```
  *      Becomes:```
  *        import _foo from 'foo';
- *        const { bar: baz } = _foo
+ *        const { bar: baz } = _foo?.default === void 0 || _foo.__esModule ? _foo : _foo.default;
  *      ```
  *
  *   2. Source:  ```import myFoo from 'foo';```
  *      Becomes: ```
  *        import * as _myFoo from 'foo';
- *        const myFoo = _myFoo?.__esModule ? _myFoo.default : _myFoo;
+ *        const { default: myFoo } = _myFoo?.__esModule ? _myFoo.default : _myFoo;
  *      ```
  *
  *   3. Source:  ```import foo, * as nsFoo from 'foo';```
  *      Becomes: ```
- *        import nsFoo from 'foo';
- *        const myFoo = nsFoo?.__esModule ? nsFoo.default : nsFoo
+ *        import * as _nsFoo from 'foo';
+ *        const nsFoo = _nsFoo?.default === void 0 || _nsFoo.__esModule ? _nsFoo : _nsFoo.default
+ *        const { default: myFoo } = _nsFoo?.__esModule ? _nsFoo.default : _nsFoo
  *      ```
  */
 export default function plugin(options: {
@@ -101,11 +102,19 @@ export default function plugin(options: {
               t.variableDeclarator(
                 namespaceId,
                 t.conditionalExpression(
-                  t.optionalMemberExpression(
-                    rawImport,
-                    t.identifier("__esModule"),
-                    false,
-                    true,
+                  t.logicalExpression(
+                    "||",
+                    t.binaryExpression(
+                      "===",
+                      t.optionalMemberExpression(
+                        rawImport,
+                        t.identifier("default"),
+                        false,
+                        true,
+                      ),
+                      t.unaryExpression("void", t.numericLiteral(0), true),
+                    ),
+                    t.memberExpression(rawImport, t.identifier("__esModule")),
                   ),
                   rawImport,
                   t.memberExpression(rawImport, t.identifier("default")),
@@ -130,11 +139,19 @@ export default function plugin(options: {
                   ),
                 ),
                 t.conditionalExpression(
-                  t.optionalMemberExpression(
-                    rawImport,
-                    t.identifier("__esModule"),
-                    false,
-                    true,
+                  t.logicalExpression(
+                    "||",
+                    t.binaryExpression(
+                      "===",
+                      t.optionalMemberExpression(
+                        rawImport,
+                        t.identifier("default"),
+                        false,
+                        true,
+                      ),
+                      t.unaryExpression("void", t.numericLiteral(0), true),
+                    ),
+                    t.memberExpression(rawImport, t.identifier("__esModule")),
                   ),
                   rawImport,
                   t.memberExpression(rawImport, t.identifier("default")),
