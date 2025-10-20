@@ -1,5 +1,12 @@
 # Changelog
 
+## 5.3.3
+
+### Patch Changes
+
+- [#222](https://github.com/marko-js/vite/pull/222) [`f7890ec`](https://github.com/marko-js/vite/commit/f7890ec58332e2912846224da21da9fb5434d3c2) Thanks [@rturnq](https://github.com/rturnq)! - Fix esbuild optimizing virtual files
+  Fix CJS interop babel plugin to handle rewritten imports receiving ESM modules
+
 ## 5.3.2
 
 ### Patch Changes
