@@ -1,5 +1,15 @@
 # Changelog
 
+## 5.3.4
+
+### Patch Changes
+
+- [#224](https://github.com/marko-js/vite/pull/224) [`bff4265`](https://github.com/marko-js/vite/commit/bff42658ddd672d1420fd789fb5e17effb9d5c89) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Improve support for vitest 4.
+
+- [#224](https://github.com/marko-js/vite/pull/224) [`64b64e1`](https://github.com/marko-js/vite/commit/64b64e18cc2aa2849a333b9e07d13f2b17601918) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Enable dep optimization by default in vitest4 client deps.
+
+- [#224](https://github.com/marko-js/vite/pull/224) [`e2fd7b5`](https://github.com/marko-js/vite/commit/e2fd7b52278d2d58850c51e0eb699fc8317c34c5) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Ensure cjs interop transform only applied for ssr modules.
+
 ## 5.3.3
 
 ### Patch Changes
