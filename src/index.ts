@@ -484,7 +484,10 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         }
       },
       configureServer(_server) {
-        ssrConfig.hot = ssrCjsConfig.hot = domConfig.hot = true;
+        if (!isTest) {
+          ssrConfig.hot = ssrCjsConfig.hot = domConfig.hot = true;
+        }
+
         devServer = _server;
         devServer.watcher.on("all", (type, originalFileName) => {
           const fileName = normalizePath(originalFileName);
@@ -832,7 +835,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
 
               return {
                 code,
-                map,
+                map: toSourceMap(map),
                 meta: { arcSourceCode: source, arcScanIds: meta.analyzedTags },
               };
             }
@@ -854,10 +857,15 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           ),
         );
 
-        const { map, meta } = compiled;
+        const { meta } = compiled;
         let { code } = compiled;
 
-        if (query !== browserEntryQuery && devServer && !isTagsApi()) {
+        if (
+          !isTest &&
+          query !== browserEntryQuery &&
+          devServer &&
+          !isTagsApi()
+        ) {
           code += `\nif (import.meta.hot) import.meta.hot.accept(() => {});`;
         }
 
@@ -883,7 +891,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         }
         return {
           code,
-          map,
+          map: toSourceMap(compiled.map),
           meta: isBuild
             ? { arcSourceCode: source, arcScanIds: meta.analyzedTags }
             : undefined,
@@ -1155,4 +1163,14 @@ function getKnownTemplates(cwd: string) {
     );
   }
   return knownTemplates;
+}
+
+/**
+ * Vitest does not properly handle sourcemaps with a sourceRoot and sources property (like Marko's).
+ * For most tooling we can pass Marko's sourcemaps right on through, however all that's really needed is
+ * the mappings property, so we are just passing that to side step the Vitest issue.
+ * https://github.com/vitest-dev/vitest/blob/c84a396431062dd0f445270b3f331d57714b4cd0/packages/coverage-v8/src/provider.ts#L358
+ */
+function toSourceMap(map: any) {
+  return map ? { mappings: map.mappings } : null;
 }
