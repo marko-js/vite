@@ -795,7 +795,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         }
 
         if (!isMarkoFile(id)) {
-          if (!isBuild) {
+          if (!isBuild && isSSR) {
             const ext = path.extname(id);
             if (
               ext === ".cjs" ||
