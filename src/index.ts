@@ -321,6 +321,8 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
             test.deps.optimizer ??= {};
             test.deps.optimizer.web ??= {};
             test.deps.optimizer.web.enabled ??= true;
+            test.deps.optimizer.client ??= {};
+            test.deps.optimizer.client.enabled ??= true;
           }
         }
 
