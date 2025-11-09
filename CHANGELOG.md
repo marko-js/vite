@@ -1,5 +1,11 @@
 # Changelog
 
+## 5.3.5
+
+### Patch Changes
+
+- [#226](https://github.com/marko-js/vite/pull/226) [`633f113`](https://github.com/marko-js/vite/commit/633f11326bf2a522c12fa1753df7d8d9bbb4733a) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Add missing names property to sourcemaps.
+
 ## 5.3.4
 
 ### Patch Changes
