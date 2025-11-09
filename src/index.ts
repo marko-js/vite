@@ -1174,5 +1174,10 @@ function getKnownTemplates(cwd: string) {
  * https://github.com/vitest-dev/vitest/blob/c84a396431062dd0f445270b3f331d57714b4cd0/packages/coverage-v8/src/provider.ts#L358
  */
 function toSourceMap(map: any) {
-  return map ? { mappings: map.mappings } : null;
+  return map
+    ? {
+        names: map.names,
+        mappings: map.mappings,
+      }
+    : null;
 }
