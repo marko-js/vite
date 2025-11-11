@@ -1,5 +1,11 @@
 # Changelog
 
+## 5.3.6
+
+### Patch Changes
+
+- [#228](https://github.com/marko-js/vite/pull/228) [`8f70ba8`](https://github.com/marko-js/vite/commit/8f70ba84723b912d6f0f30fde0b837157dc9de5a) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Improve vitest4 browser field support by adding the browser condition via a node exec arg.
+
 ## 5.3.5
 
 ### Patch Changes
