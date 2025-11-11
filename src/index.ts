@@ -317,12 +317,15 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
             config.resolve ??= {};
             config.resolve.conditions ??= [];
             config.resolve.conditions.push("browser");
+
+            // for vitest@3
             test.deps ??= {};
             test.deps.optimizer ??= {};
             test.deps.optimizer.web ??= {};
             test.deps.optimizer.web.enabled ??= true;
-            test.deps.optimizer.client ??= {};
-            test.deps.optimizer.client.enabled ??= true;
+
+            // for vitest@4
+            (test.execArgv ||= []).push("-C", "browser");
           }
         }
 
