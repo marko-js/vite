@@ -1,5 +1,11 @@
 # Changelog
 
+## 5.3.8
+
+### Patch Changes
+
+- [#232](https://github.com/marko-js/vite/pull/232) [`63fc7b9`](https://github.com/marko-js/vite/commit/63fc7b903972cb7bfd9c725871fa749682962899) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Support vitest with istanbul codecoverage.
+
 ## 5.3.7
 
 ### Patch Changes
