@@ -665,7 +665,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
               : await this.resolve(importee, importer, resolveOpts);
 
           if (resolved) {
-            resolved.id = stripVersionAndTimeStamp(resolved.id) + importeeQuery;
+            resolved.id = stripViteQueries(resolved.id) + importeeQuery;
           }
 
           return resolved;
@@ -690,7 +690,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         return null;
       },
       async load(rawId) {
-        const id = stripVersionAndTimeStamp(rawId);
+        const id = stripViteQueries(rawId);
 
         if (id === renderAssetsRuntimeId) {
           return renderAssetsRuntimeCode;
@@ -737,7 +737,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         return virtualFiles.get(id) || null;
       },
       async transform(source, rawId, ssr) {
-        let id = stripVersionAndTimeStamp(rawId);
+        let id = stripViteQueries(rawId);
         const info = isBuild ? this.getModuleInfo(id) : undefined;
         const arcSourceId = info?.meta.arcSourceId;
         if (arcSourceId) {
@@ -1107,11 +1107,13 @@ function isEmpty(obj: unknown) {
   return true;
 }
 
-function stripVersionAndTimeStamp(id: string) {
+function stripViteQueries(id: string) {
   const queryStart = id.indexOf("?");
   if (queryStart === -1) return id;
   const url = id.slice(0, queryStart);
-  const query = id.slice(queryStart + 1).replace(/(?:^|[&])[vt]=[^&]+/g, "");
+  const query = id
+    .slice(queryStart + 1)
+    .replace(/(?:^|[&])(?:cache|[vt])=[^&]+/g, "");
   if (query) return `${url}?${query}`;
   return url;
 }
