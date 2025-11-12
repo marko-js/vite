@@ -128,17 +128,21 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
   const resolveVirtualDependency: compiler.Config["resolveVirtualDependency"] =
     (from, dep) => {
       const normalizedFrom = normalizePath(from);
-      const query = `${virtualFileQuery}&id=${encodeURIComponent(dep.virtualPath)}`;
+      const query = `${virtualFileQuery}&id=${dep.virtualPath.replace(/^\.\//, "").replace(/[^a-z0-9_.-]+/gi, "_")}`;
       const id = normalizedFrom + query;
+      const virtualFile = {
+        code: dep.code,
+        map: stripSourceRoot(dep.map),
+      };
 
       if (devServer) {
         const prev = virtualFiles.get(id);
         if (isDeferredPromise(prev)) {
-          prev.resolve(dep);
+          prev.resolve(virtualFile);
         }
       }
 
-      virtualFiles.set(id, dep);
+      virtualFiles.set(id, virtualFile);
       return `./${path.posix.basename(normalizedFrom) + query}`;
     };
 
@@ -840,7 +844,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
 
               return {
                 code,
-                map: toSourceMap(map),
+                map: stripSourceRoot(map),
                 meta: { arcSourceCode: source, arcScanIds: meta.analyzedTags },
               };
             }
@@ -896,7 +900,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         }
         return {
           code,
-          map: toSourceMap(compiled.map),
+          map: stripSourceRoot(compiled.map),
           meta: isBuild
             ? { arcSourceCode: source, arcScanIds: meta.analyzedTags }
             : undefined,
@@ -1170,17 +1174,12 @@ function getKnownTemplates(cwd: string) {
   return knownTemplates;
 }
 
-/**
- * Vitest does not properly handle sourcemaps with a sourceRoot and sources property (like Marko's).
- * For most tooling we can pass Marko's sourcemaps right on through, however all that's really needed is
- * the mappings property, so we are just passing that to side step the Vitest issue.
- * https://github.com/vitest-dev/vitest/blob/c84a396431062dd0f445270b3f331d57714b4cd0/packages/coverage-v8/src/provider.ts#L358
- */
-function toSourceMap(map: any) {
-  return map
-    ? {
-        names: map.names,
-        mappings: map.mappings,
-      }
-    : null;
+function stripSourceRoot(map: any) {
+  if (map && map.sourceRoot) {
+    // Always strip the sourceRoot path since otherwise file system information
+    // is sent to the browser.
+    // Without `sourceRoot` everything implicitly becomes relative to the project root.
+    map.sourceRoot = undefined;
+  }
+  return map;
 }
