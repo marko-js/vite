@@ -1,5 +1,11 @@
 # Changelog
 
+## 5.3.7
+
+### Patch Changes
+
+- [#230](https://github.com/marko-js/vite/pull/230) [`8400f7a`](https://github.com/marko-js/vite/commit/8400f7ad2fca1bb27169a354465b533a61b50afc) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Fix sourcemap generation.
+
 ## 5.3.6
 
 ### Patch Changes
