@@ -1,4 +1,3 @@
-import type { PluginObj } from "@babel/core";
 import * as compiler from "@marko/compiler";
 import anyMatch from "anymatch";
 import crypto from "crypto";
@@ -8,7 +7,10 @@ import { createRequire } from "module";
 import path from "path";
 import type * as vite from "vite";
 
-import interopBabelPlugin from "./babel-plugin-cjs-interop";
+import cjsInteropTranslate, {
+  cjsInteropHelpersCode,
+  cjsInteropHelpersId,
+} from "./cjs-interop-translate";
 import esbuildPlugin from "./esbuild-plugin";
 import globImportTransformer from "./glob-import-transform";
 import {
@@ -265,20 +267,10 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           (baseConfig as any).markoViteLinked = linked;
         }
 
-        const getCJSInteropBabelConfig = () => ({
-          ...baseConfig.babelConfig,
-          plugins: (
-            (baseConfig.babelConfig!.plugins || []) as (
-              | PluginObj<any>
-              | string
-            )[]
-          ).concat(
-            interopBabelPlugin({
-              filter:
-                isBuild || isTest ? undefined : (path) => !/^\./.test(path),
-            }),
-          ),
-        });
+        const cjsInteropMarkoVite = {
+          filter:
+            isBuild || isTest ? undefined : (path: string) => !/^\./.test(path),
+        };
 
         ssrConfig = {
           ...baseConfig,
@@ -287,8 +279,8 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
 
         ssrCjsConfig = {
           ...ssrConfig,
-          babelConfig: getCJSInteropBabelConfig(),
-        };
+          cjsInteropMarkoVite,
+        } as any;
 
         domConfig = {
           ...baseConfig,
@@ -296,7 +288,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         };
 
         if (isTest) {
-          domConfig.babelConfig = getCJSInteropBabelConfig();
+          (domConfig as any).cjsInteropMarkoVite = cjsInteropMarkoVite;
         }
 
         hydrateConfig = {
@@ -336,6 +328,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         if (!registeredTagLib) {
           registeredTagLib = true;
           compiler.taglib.register("@marko/vite", {
+            translate: cjsInteropTranslate,
             transform: globImportTransformer,
             "<head>": { transformer: renderAssetsTransform },
             "<body>": { transformer: renderAssetsTransform },
@@ -584,6 +577,10 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         }
       },
       async resolveId(importee, importer, importOpts, ssr = importOpts.ssr) {
+        if (importee === cjsInteropHelpersId) {
+          return cjsInteropHelpersId;
+        }
+
         if (virtualFiles.has(importee)) {
           return importee;
         }
@@ -691,6 +688,10 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
       },
       async load(rawId) {
         const id = stripViteQueries(rawId);
+
+        if (id === cjsInteropHelpersId) {
+          return cjsInteropHelpersCode;
+        }
 
         if (id === renderAssetsRuntimeId) {
           return renderAssetsRuntimeCode;
