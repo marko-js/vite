@@ -1,5 +1,11 @@
 # Changelog
 
+## 5.3.9
+
+### Patch Changes
+
+- [#234](https://github.com/marko-js/vite/pull/234) [`7965113`](https://github.com/marko-js/vite/commit/79651131680d94125cc459eae81f2bb0ebbd3404) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Update cjs interop to use shared helper code which avoids coverage false positives and reduces generated code.
+
 ## 5.3.8
 
 ### Patch Changes
