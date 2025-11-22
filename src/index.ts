@@ -633,7 +633,8 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         if (
           isBuild &&
           linked &&
-          (!isSSRBuild || this?.environment?.name === "client")
+          !isSSRBuild &&
+          this?.environment?.name !== "ssr"
         ) {
           for (const assetId of serverManifest!.ssrAssetIds) {
             this.load({
