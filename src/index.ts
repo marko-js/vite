@@ -211,6 +211,10 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           return;
         }
         // vite environment api build
+        if (builder?.config?.builder?.buildApp) {
+          // let custom builder take priority
+          return;
+        }
         if (linked) {
           await builder.build(ssr);
         }
