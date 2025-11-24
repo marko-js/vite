@@ -429,7 +429,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
             !isCJSModule(id, rootResolveFile);
         }
 
-        if (!isSSRBuild) {
+        if (linked && !isSSRBuild) {
           config.build ??= {};
           config.build.emptyOutDir = false;
         }
@@ -529,8 +529,10 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
               !isCJSModule(id, rootResolveFile);
           }
         } else {
-          options.build ??= {};
-          options.build.emptyOutDir = false;
+          if (linked) {
+            options.build ??= {};
+            options.build.emptyOutDir = false;
+          }
         }
 
         return options;
