@@ -211,7 +211,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           return;
         }
         // vite environment api build
-        if (builder?.config?.builder?.buildApp) {
+        if (builder.config?.builder?.buildApp) {
           // let custom builder take priority
           return;
         }
@@ -604,7 +604,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
 
       async options(inputOptions) {
         if (linked && isBuild) {
-          if (isSSRBuild || this?.environment?.name === "ssr") {
+          if (isSSRBuild || this.environment?.name === "ssr") {
             serverManifest = {
               entries: {},
               entrySources: {},
@@ -640,7 +640,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           isBuild &&
           linked &&
           !isSSRBuild &&
-          this?.environment?.name !== "ssr"
+          this.environment?.name !== "ssr"
         ) {
           for (const assetId of serverManifest!.ssrAssetIds) {
             this.load({
@@ -1010,7 +1010,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           );
         }
 
-        if (isSSRBuild || this?.environment?.name === "ssr") {
+        if (isSSRBuild || this.environment?.name === "ssr") {
           const dir = outputOptions.dir
             ? path.resolve(outputOptions.dir)
             : path.resolve(outputOptions.file!, "..");
