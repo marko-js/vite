@@ -1,5 +1,11 @@
 # Changelog
 
+## 5.4.0
+
+### Minor Changes
+
+- [#236](https://github.com/marko-js/vite/pull/236) [`c49203b`](https://github.com/marko-js/vite/commit/c49203bb81e8411931d80ff5addebef3270c5b94) Thanks [@mpeg](https://github.com/mpeg)! - compatibility with the vite environments api
+
 ## 5.3.9
 
 ### Patch Changes
