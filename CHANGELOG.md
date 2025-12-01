@@ -1,5 +1,11 @@
 # Changelog
 
+## 5.4.1
+
+### Patch Changes
+
+- [#238](https://github.com/marko-js/vite/pull/238) [`d710d5a`](https://github.com/marko-js/vite/commit/d710d5a47f755e28bbe1e5e209a2618d08dda448) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Fix regression where deleting the outDir by default was causing Marko Run to be unable to find generated files.
+
 ## 5.4.0
 
 ### Minor Changes
