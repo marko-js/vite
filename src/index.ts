@@ -429,11 +429,6 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
             !isCJSModule(id, rootResolveFile);
         }
 
-        if (linked && !isSSRBuild) {
-          config.build ??= {};
-          config.build.emptyOutDir = false;
-        }
-
         if (basePathVar) {
           config.experimental ??= {};
 
@@ -508,7 +503,6 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           }
 
           options.build ??= {};
-          options.build.emptyOutDir = true;
 
           if (!options.build?.rollupOptions?.output) {
             // For the server build vite will still output code split chunks to the `assets` directory by default.
@@ -527,11 +521,6 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
             options.build.commonjsOptions ??= {};
             options.build.commonjsOptions.esmExternals = (id) =>
               !isCJSModule(id, rootResolveFile);
-          }
-        } else {
-          if (linked) {
-            options.build ??= {};
-            options.build.emptyOutDir = false;
           }
         }
 
