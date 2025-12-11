@@ -1,0 +1,15 @@
+static {
+  if (typeof window === "object") {
+    document.body.firstElementChild.append("Loaded layout tag");
+  }
+}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Hello World</title>
+</head>
+<body>
+  <${input.content}/>
+</body>
+</html>

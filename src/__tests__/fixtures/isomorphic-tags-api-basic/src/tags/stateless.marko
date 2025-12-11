@@ -1,0 +1,9 @@
+static {
+  if (typeof window === "object") {
+    document.body.firstElementChild.append("Loaded stateless tag");
+  }
+}
+
+<div#implicit>
+  <stateful/>
+</div>

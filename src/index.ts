@@ -172,9 +172,13 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
   );
 
   const isTagsApi = (() => {
-    let tagsAPI: undefined | boolean;
-    return () => {
-      if (tagsAPI === undefined) {
+    let defaultIsTagsAPI: undefined | boolean;
+    return (api: undefined | string) => {
+      if (api) {
+        return api === "tags";
+      }
+
+      if (defaultIsTagsAPI === undefined) {
         const translatorPackage =
           opts.translator ||
           compiler.globalConfig?.translator ||
@@ -184,18 +188,18 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
             translatorPackage,
           )
         ) {
-          tagsAPI = false;
+          defaultIsTagsAPI = false;
         } else {
           try {
             const require = createRequire(import.meta.url);
-            tagsAPI = require(translatorPackage).preferAPI !== "class";
+            defaultIsTagsAPI = require(translatorPackage).preferAPI !== "class";
           } catch {
-            tagsAPI = true;
+            defaultIsTagsAPI = true;
           }
         }
       }
 
-      return tagsAPI;
+      return defaultIsTagsAPI;
     };
   })();
 
@@ -781,6 +785,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
             default:
               return (
                 virtualFiles.get(id) ||
+                cachedSources.get(id) ||
                 (cacheDir &&
                   fs.promises
                     .readFile(
@@ -798,7 +803,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           }
         }
 
-        return virtualFiles.get(id) || null;
+        return virtualFiles.get(id) || cachedSources.get(id) || null;
       },
       async transform(source, rawId, ssr) {
         let id = stripViteQueries(rawId);
@@ -860,7 +865,13 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
               entryData,
               runtimeId,
               basePathVar: isBuild ? basePathVar : undefined,
-              tagsAPI: isTagsApi(),
+              tagsAPI: isTagsApi(
+                ("transformRequest" in this.environment
+                  ? (await this.environment.transformRequest(fileName),
+                    this.getModuleInfo(fileName))
+                  : await this.load({ id: fileName })
+                )?.meta.markoAPI,
+              ),
             });
           }
         }
@@ -909,7 +920,11 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
               return {
                 code,
                 map: stripSourceRoot(map),
-                meta: { arcSourceCode: source, arcScanIds: meta.analyzedTags },
+                meta: {
+                  markoAPI: meta.api,
+                  arcSourceCode: source,
+                  arcScanIds: meta.analyzedTags,
+                },
               };
             }
           }
@@ -937,7 +952,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           !isTest &&
           query !== browserEntryQuery &&
           devServer &&
-          !isTagsApi()
+          !isTagsApi(meta.api)
         ) {
           code += `\nif (import.meta.hot) import.meta.hot.accept(() => {});`;
         }
@@ -966,8 +981,12 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           code,
           map: stripSourceRoot(compiled.map),
           meta: isBuild
-            ? { arcSourceCode: source, arcScanIds: meta.analyzedTags }
-            : undefined,
+            ? {
+                markoAPI: meta.api,
+                arcSourceCode: source,
+                arcScanIds: meta.analyzedTags,
+              }
+            : { markoAPI: meta.api },
         };
       },
     },

@@ -11,7 +11,9 @@ export default async (opts: {
   const fileNameStr = JSON.stringify(`./${path.basename(opts.fileName)}`);
 
   if (opts.tagsAPI) {
-    return `import Template from ${fileNameStr};
+    return `
+<!-- use tags -->
+import Template from ${fileNameStr};
 export * from ${fileNameStr};
 import { addAssets, getPrepend, getAppend } from "${renderAssetsRuntimeId}";
 static function flush($global, html) {
@@ -27,17 +29,19 @@ static function setFlush($global) {
 `;
   }
 
-  return `import template from ${fileNameStr};
+  return `
+<!-- use class -->
+import Template from ${fileNameStr};
 export * from ${fileNameStr};
 import { addAssets, getPrepend, getAppend } from "${renderAssetsRuntimeId}";
 <if(addAssets($global, [${opts.entryData.join(",")}]))>
   $!{getPrepend($global)}
-  <\${template} ...input/>
+  <Template ...input/>
   $!{getAppend($global)}
 </>
 <else>
   <__flush_here_and_after__>$!{getPrepend($global)}</>
-  <\${template} ...input/>
+  <Template ...input/>
   <init-components/>
   <await-reorderer/>
   <__flush_here_and_after__>$!{getAppend($global)}</>
