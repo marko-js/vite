@@ -1,5 +1,13 @@
 # Changelog
 
+## 5.4.2
+
+### Patch Changes
+
+- [#240](https://github.com/marko-js/vite/pull/240) [`9bbed0c`](https://github.com/marko-js/vite/commit/9bbed0ce722ed7e446c940459813b8623f9b00f3) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Improve handling of interop translator.
+
+- [#240](https://github.com/marko-js/vite/pull/240) [`d9f8221`](https://github.com/marko-js/vite/commit/d9f82214cba6d456874b0ccb5f0a81df5b3f0569) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Fix issue with live reload of tags api files with changing child templates.
+
 ## 5.4.1
 
 ### Patch Changes
