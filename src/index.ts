@@ -968,14 +968,24 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
             this.addWatchFile(file);
           }
 
-          transformOptionalFiles.set(id, [
-            `${optionalFilePrefix}style.*`,
-            `${optionalFilePrefix}component.*`,
-            `${optionalFilePrefix}component-browser.*`,
-            `${optionalFilePrefix}marko-tag.json`,
-          ]);
+          transformOptionalFiles.set(
+            id,
+            meta.api === "tags"
+              ? [`${optionalFilePrefix}style.*`]
+              : [
+                  `${optionalFilePrefix}style.*`,
+                  `${optionalFilePrefix}marko-tag.json`,
+                  `${optionalFilePrefix}component.*`,
+                  `${optionalFilePrefix}component-browser.*`,
+                ],
+          );
 
-          transformWatchFiles.set(id, meta.watchFiles);
+          transformWatchFiles.set(
+            id,
+            meta.analyzedTags
+              ? meta.analyzedTags.concat(meta.watchFiles)
+              : meta.watchFiles,
+          );
         }
         return {
           code,
