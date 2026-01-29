@@ -87,6 +87,8 @@ const virtualFiles = new Map<
 const extReg = /\.[^.]+$/;
 const queryReg = /\?marko-[^?]+$/;
 const importTagReg = /^<([^>]+)>$/;
+const optionalWatchFileReg =
+  /[\\/](?:([^\\/]+)\.)?(?:marko-tag.json|(?:style|component|component-browser)\.\w+)$/;
 const noClientAssetsRuntimeId = "\0no_client_bundles.mjs";
 const browserEntryQuery = "?marko-browser-entry";
 const serverEntryQuery = "?marko-server-entry";
@@ -166,7 +168,6 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
   const entryIds = new Set<string>();
   const cachedSources = new Map<string, string>();
   const transformWatchFiles = new Map<string, string[]>();
-  const transformOptionalFiles = new Map<string, string[]>();
   const store = new ReadOncePersistedStore<ServerManifest>(
     `vite-marko${runtimeId ? `-${runtimeId}` : ""}`,
   );
@@ -560,7 +561,6 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           if (type === "unlink") {
             entryIds.delete(fileName);
             transformWatchFiles.delete(fileName);
-            transformOptionalFiles.delete(fileName);
           }
 
           for (const [id, files] of transformWatchFiles) {
@@ -569,10 +569,15 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
             }
           }
 
-          if (type === "add" || type === "unlink") {
-            for (const [id, files] of transformOptionalFiles) {
-              if (anyMatch(files, fileName)) {
-                devServer.watcher.emit("change", id);
+          if (type === "unlink" || type === "add") {
+            const optionalMatch = optionalWatchFileReg.exec(fileName);
+            if (optionalMatch) {
+              const markoFile =
+                fileName.slice(0, optionalMatch.index + 1) +
+                (optionalMatch[1] || "index") +
+                ".marko";
+              if (transformWatchFiles.has(markoFile)) {
+                devServer.watcher.emit("change", markoFile);
               }
             }
           }
@@ -958,35 +963,13 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         }
 
         if (devServer) {
-          const templateName = getPosixBasenameWithoutExt(id);
-          const optionalFilePrefix =
-            path.dirname(id) +
-            path.sep +
-            (templateName === "index" ? "" : `${templateName}.`);
-
+          transformWatchFiles.set(id, meta.watchFiles);
+        } else {
           for (const file of meta.watchFiles) {
             this.addWatchFile(file);
           }
-
-          transformOptionalFiles.set(
-            id,
-            meta.api === "tags"
-              ? [`${optionalFilePrefix}style.*`]
-              : [
-                  `${optionalFilePrefix}style.*`,
-                  `${optionalFilePrefix}marko-tag.json`,
-                  `${optionalFilePrefix}component.*`,
-                  `${optionalFilePrefix}component-browser.*`,
-                ],
-          );
-
-          transformWatchFiles.set(
-            id,
-            meta.analyzedTags
-              ? meta.analyzedTags.concat(meta.watchFiles)
-              : meta.watchFiles,
-          );
         }
+
         return {
           code,
           map: stripSourceRoot(compiled.map),
@@ -1169,12 +1152,6 @@ function virtualPathToCacheFile(
     cacheDir,
     normalizePath(path.relative(root, virtualPath)).replace(/[\\/]+/g, "_"),
   );
-}
-
-function getPosixBasenameWithoutExt(file: string): string {
-  const baseStart = file.lastIndexOf(POSIX_SEP) + 1;
-  const extStart = file.indexOf(".", baseStart + 1);
-  return file.slice(baseStart, extStart);
 }
 
 function createDeferredPromise<T>() {
