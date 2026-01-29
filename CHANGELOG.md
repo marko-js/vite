@@ -1,5 +1,11 @@
 # Changelog
 
+## 5.4.3
+
+### Patch Changes
+
+- [#242](https://github.com/marko-js/vite/pull/242) [`3f10138`](https://github.com/marko-js/vite/commit/3f101380bcb82498cb3a78a69fb0de6352dfac41) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Improve logic around optional watch file tracking.
+
 ## 5.4.2
 
 ### Patch Changes
