@@ -93,7 +93,6 @@ const noClientAssetsRuntimeId = "\0no_client_bundles.mjs";
 const browserEntryQuery = "?marko-browser-entry";
 const serverEntryQuery = "?marko-server-entry";
 const virtualFileQuery = "?marko-virtual";
-const browserQuery = "?marko-browser";
 const markoExt = ".marko";
 const htmlExt = ".html";
 const resolveOpts = { skipSelf: true };
@@ -720,14 +719,6 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
             this.getModuleInfo(importer)?.isEntry
           ) {
             importeeQuery = browserEntryQuery;
-          } else if (
-            !isBuild &&
-            linked &&
-            !ssr &&
-            !importeeQuery &&
-            isMarkoFile(importee)
-          ) {
-            importeeQuery = browserQuery;
           }
         }
 
@@ -790,8 +781,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
               entryIds.add(id.slice(0, -query.length));
               return null;
             }
-            case browserEntryQuery:
-            case browserQuery: {
+            case browserEntryQuery: {
               // The goal below is to cached source content when in linked mode
               // to avoid loading from disk for both server and browser builds.
               // This is to support virtual Marko entry files.
