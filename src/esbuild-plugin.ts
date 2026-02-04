@@ -28,6 +28,7 @@ export default function esbuildPlugin(
       );
       const finalConfig: compiler.Config = {
         ...config,
+        sourceMaps: "inline",
         output: platform === "browser" ? "dom" : "html",
       };
 
