@@ -125,6 +125,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
   let basePathVar: string | undefined;
   let baseConfig: compiler.Config;
   let ssrConfig: compiler.Config;
+  let ssrEntryConfig: compiler.Config;
   let ssrCjsConfig: compiler.Config;
   let domConfig: compiler.Config;
   let hydrateConfig: compiler.Config;
@@ -298,6 +299,10 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           ...baseConfig,
           output: "html",
         };
+        ssrEntryConfig = {
+          ...ssrConfig,
+          sourceMaps: false,
+        };
 
         ssrCjsConfig = {
           ...ssrConfig,
@@ -316,6 +321,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         hydrateConfig = {
           ...baseConfig,
           output: "hydrate",
+          sourceMaps: false,
         };
 
         compiler.configure(baseConfig);
@@ -550,7 +556,11 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
       },
       configureServer(_server) {
         if (!isTest) {
-          ssrConfig.hot = ssrCjsConfig.hot = domConfig.hot = true;
+          ssrConfig.hot =
+            ssrEntryConfig.hot =
+            ssrCjsConfig.hot =
+            domConfig.hot =
+              true;
         }
 
         devServer = _server;
@@ -943,7 +953,9 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
             isSSR
               ? isCJSModule(id, rootResolveFile)
                 ? ssrCjsConfig
-                : ssrConfig
+                : query === serverEntryQuery
+                  ? ssrEntryConfig
+                  : ssrConfig
               : query === browserEntryQuery
                 ? hydrateConfig
                 : domConfig,
