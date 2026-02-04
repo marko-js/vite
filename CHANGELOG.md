@@ -1,5 +1,13 @@
 # Changelog
 
+## 5.4.4
+
+### Patch Changes
+
+- [#244](https://github.com/marko-js/vite/pull/244) [`2d1f426`](https://github.com/marko-js/vite/commit/2d1f4263e10b1993b7d07237147688825f46db9b) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Fix sourcemaps for marko files in node_modules dev mode.
+
+- [#244](https://github.com/marko-js/vite/pull/244) [`3691297`](https://github.com/marko-js/vite/commit/36912978e0e391b4e63865631d8d5c4eca3c61b7) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Fix issue with server/browser entries having incorrect sourcemaps due to virtual files.
+
 ## 5.4.3
 
 ### Patch Changes
