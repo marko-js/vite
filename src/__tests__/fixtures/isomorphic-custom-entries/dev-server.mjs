@@ -16,10 +16,11 @@ const __dirname = path.dirname(url.fileURLToPath(import.meta.url));
 const devServer = await createServer({
   root: __dirname,
   appType: "custom",
-  logLevel: "silent",
+  logLevel: "warn",
   plugins: [markoPlugin(testConfig.options)],
   optimizeDeps: { force: true },
   server: {
+    ws: false,
     hmr: false,
     middlewareMode: true,
     watch: {
