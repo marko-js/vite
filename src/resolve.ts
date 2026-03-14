@@ -23,7 +23,7 @@ export function isCJSModule(id: string, fromFile: string): boolean {
   if (isCJS === undefined) {
     try {
       if (isAbsolute) {
-        const pkgPath = modulePathReg.exec(id)![0] + "/package.json";
+        const pkgPath = path.join(modulePathReg.exec(id)![0], "package.json");
         const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8"));
         isCJS = pkg.type !== "module" && !pkg.exports;
       } else {
