@@ -1,5 +1,11 @@
 # Changelog
 
+## 5.4.5
+
+### Patch Changes
+
+- [#247](https://github.com/marko-js/vite/pull/247) [`fc1964a`](https://github.com/marko-js/vite/commit/fc1964a21372294cbdba19d92b7236992f0a15c2) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Fix --build support with environments api
+
 ## 5.4.4
 
 ### Patch Changes
