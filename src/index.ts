@@ -656,7 +656,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
             this.environment == null
               ? isSSRBuild
               : this.environment.name === "ssr";
-          if (isSSR) {
+          if (!isSSR) {
             for (const assetId of serverManifest!.ssrAssetIds) {
               this.load({
                 id: normalizePath(path.resolve(root, assetId)),
