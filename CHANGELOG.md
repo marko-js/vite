@@ -1,5 +1,11 @@
 # Changelog
 
+## 5.4.6
+
+### Patch Changes
+
+- [#249](https://github.com/marko-js/vite/pull/249) [`1c138d8`](https://github.com/marko-js/vite/commit/1c138d8abe566245a377e47fb11936e6f002b0df) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Fix regression with server only assets.
+
 ## 5.4.5
 
 ### Patch Changes
