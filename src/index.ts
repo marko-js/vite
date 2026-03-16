@@ -3,21 +3,21 @@ import anyMatch from "anymatch";
 import crypto from "crypto";
 import glob from "fast-glob";
 import fs from "fs";
-import { createRequire } from "module";
 import path from "path";
+import { relativeImportPath } from "relative-import-path";
 import type * as vite from "vite";
 
 import cjsInteropTranslate, {
   cjsInteropHelpersCode,
   cjsInteropHelpersId,
 } from "./cjs-interop-translate";
-import esbuildPlugin from "./esbuild-plugin";
 import globImportTransformer from "./glob-import-transform";
 import {
   type DocManifest,
   generateDocManifest,
   generateInputDoc,
 } from "./manifest-generator";
+import { normalizePath, POSIX_SEP, WINDOWS_SEP } from "./normalize-path";
 import { ReadOncePersistedStore } from "./read-once-persisted-store";
 import relativeAssetsTransform from "./relative-assets-transform";
 import {
@@ -26,6 +26,7 @@ import {
 } from "./render-assets-runtime";
 import renderAssetsTransform from "./render-assets-transform";
 import { isCJSModule } from "./resolve";
+import rolldownPlugin from "./rolldown-plugin";
 import getServerEntryTemplate from "./server-entry-template";
 
 export namespace API {
@@ -47,7 +48,13 @@ export interface Options {
   isEntry?: (importee: string, importer: string) => boolean;
 }
 
-interface BrowserManifest {
+enum InternalFileKind {
+  clientEntry,
+  serverEntry,
+  virtual,
+}
+
+interface ClientManifest {
   [id: string]: DocManifest;
 }
 
@@ -72,41 +79,34 @@ type DeferredPromise<T> = Promise<T> & {
   reject: (error: Error) => void;
 };
 
-const POSIX_SEP = "/";
-const WINDOWS_SEP = "\\";
 const TEMPLATE_ID_HASH_OPTS = { outputLength: 3 };
-
-const normalizePath =
-  path.sep === WINDOWS_SEP
-    ? (id: string) => id.replace(/\\/g, POSIX_SEP)
-    : (id: string) => id;
 const virtualFiles = new Map<
   string,
   VirtualFile | DeferredPromise<VirtualFile>
 >();
-const extReg = /\.[^.]+$/;
-const queryReg = /\?marko-[^?]+$/;
 const importTagReg = /^<([^>]+)>$/;
 const optionalWatchFileReg =
   /[\\/](?:([^\\/]+)\.)?(?:marko-tag.json|(?:style|component|component-browser)\.\w+)$/;
 const noClientAssetsRuntimeId = "\0no_client_bundles.mjs";
-const browserEntryQuery = "?marko-browser-entry";
-const serverEntryQuery = "?marko-server-entry";
-const virtualFileQuery = "?marko-virtual";
 const markoExt = ".marko";
 const htmlExt = ".html";
+const clientEntryExt = ".client-entry.marko";
+const serverEntryExt = ".server-entry.marko";
+const virtualFileInfix = "-virtual";
+const virtualFileReg = /^(.*\.marko)-virtual((?:\.[^\\/?]+)+)$/;
 const resolveOpts = { skipSelf: true };
-const configsByFileSystem = new Map<
-  typeof fs,
-  Map<compiler.Config, compiler.Config>
->();
 const cache = new Map<unknown, unknown>();
-const babelCaller = {
-  name: "@marko/vite",
-  supportsStaticESM: true,
-  supportsDynamicImport: true,
-  supportsTopLevelAwait: true,
-  supportsExportNamespaceFrom: true,
+const babelConfig = {
+  babelrc: false,
+  configFile: false,
+  browserslistConfigFile: false,
+  caller: {
+    name: "@marko/vite",
+    supportsStaticESM: true,
+    supportsDynamicImport: true,
+    supportsTopLevelAwait: true,
+    supportsExportNamespaceFrom: true,
+  },
 };
 const optimizeKnownTemplatesForRoot = new Map<string, string[]>();
 let registeredTagLib = false;
@@ -116,24 +116,32 @@ let registeredTagLib = false;
 // with a dynamic import to avoid everything failing.
 let cjsToEsm: typeof import("@chialab/cjs-to-esm").transform | null | undefined;
 
-function noop() {}
+function noop(): undefined {}
 
 export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
   let { linked = true } = opts;
   let runtimeId: string | undefined;
   let basePathVar: string | undefined;
   let baseConfig: compiler.Config;
-  let ssrConfig: compiler.Config;
-  let ssrEntryConfig: compiler.Config;
-  let ssrCjsConfig: compiler.Config;
-  let domConfig: compiler.Config;
-  let hydrateConfig: compiler.Config;
+  let clientConfig: compiler.Config;
+  let clientEntryConfig: compiler.Config;
+  let serverConfig: compiler.Config;
+  let serverCJSConfig: compiler.Config;
+  let serverEntryConfig: compiler.Config;
+  let virtualFileCacheDirPromise: Promise<unknown> | undefined;
 
   const resolveVirtualDependency: compiler.Config["resolveVirtualDependency"] =
     (from, dep) => {
+      const { virtualPath } = dep;
       const normalizedFrom = normalizePath(from);
-      const query = `${virtualFileQuery}&id=${dep.virtualPath.replace(/^\.\//, "").replace(/[^a-z0-9_.-]+/gi, "_")}`;
-      const id = normalizedFrom + query;
+      const sourceBaseName = path.basename(from);
+      const virtualBaseName = path.basename(virtualPath);
+      const virtualExt =
+        virtualFileInfix +
+        (virtualBaseName.startsWith(sourceBaseName)
+          ? virtualBaseName.slice(sourceBaseName.length)
+          : `.${virtualBaseName.replace(/[^a-z0-9_.-]+/gi, "_")}`);
+      const id = normalizedFrom + virtualExt;
       const virtualFile = {
         code: dep.code,
         map: stripSourceRoot(dep.map),
@@ -147,7 +155,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
       }
 
       virtualFiles.set(id, virtualFile);
-      return `./${path.posix.basename(normalizedFrom) + query}`;
+      return `./${sourceBaseName + virtualExt}`;
     };
 
   let root: string;
@@ -158,9 +166,8 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
   let renderAssetsRuntimeCode: string;
   let isTest = false;
   let isBuild = false;
-  let isSSRBuild = false;
-  let hasBuilder = false;
   let hasBuildApp = false;
+  let isBuildApp = false;
   let devServer: vite.ViteDevServer;
   let serverManifest: ServerManifest | undefined;
   let basePath = "/";
@@ -173,38 +180,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
   const store = new ReadOncePersistedStore<ServerManifest>(
     `vite-marko${runtimeId ? `-${runtimeId}` : ""}`,
   );
-
-  const isTagsApi = (() => {
-    let defaultIsTagsAPI: undefined | boolean;
-    return (api: undefined | string) => {
-      if (api) {
-        return api === "tags";
-      }
-
-      if (defaultIsTagsAPI === undefined) {
-        const translatorPackage =
-          opts.translator ||
-          compiler.globalConfig?.translator ||
-          "marko/translator";
-        if (
-          /^@marko\/translator-(?:default|interop-class-tags)$/.test(
-            translatorPackage,
-          )
-        ) {
-          defaultIsTagsAPI = false;
-        } else {
-          try {
-            const require = createRequire(import.meta.url);
-            defaultIsTagsAPI = require(translatorPackage).preferAPI !== "class";
-          } catch {
-            defaultIsTagsAPI = true;
-          }
-        }
-      }
-
-      return defaultIsTagsAPI;
-    };
-  })();
+  const isTagsApi = (api: undefined | string) => api === "tags";
 
   return [
     {
@@ -213,25 +189,26 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
       sharedDuringBuild: true,
       async buildApp(builder) {
         const { ssr, client } = builder.environments;
-        if (hasBuildApp || !ssr || !client) {
-          // vite on legacy linked build, or manual builder.
-          return;
-        }
-
-        if (linked) {
-          await builder.build(ssr);
-        }
+        isBuildApp = true;
+        if (hasBuildApp || !linked || !ssr || !client) return;
+        await builder.build(ssr);
         await builder.build(client);
       },
       async config(config, env) {
         let optimize = env.mode === "production";
         isTest = env.mode === "test";
         isBuild = env.command === "build";
-        hasBuilder ||= !!config.builder;
-        hasBuildApp ||= !!config.builder?.buildApp;
+        hasBuildApp = !!config.builder?.buildApp;
 
         if (isTest) {
+          const { test } = config as any;
           linked = false;
+          if ((test.environment as string | undefined)?.includes("dom")) {
+            config.resolve ??= {};
+            config.resolve.conditions ??= [];
+            config.resolve.conditions.push("browser");
+            (test.execArgv ||= []).push("-C", "browser");
+          }
         }
 
         if ("MARKO_DEBUG" in process.env) {
@@ -244,9 +221,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
 
         runtimeId = opts.runtimeId;
         basePathVar = opts.basePathVar;
-        if (opts.isEntry) {
-          checkIsEntry = opts.isEntry;
-        }
+        checkIsEntry = opts.isEntry || checkIsEntry;
 
         if ("BASE_URL" in process.env && config.base == null) {
           config.base = process.env.BASE_URL;
@@ -258,31 +233,13 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           cache,
           optimize,
           runtimeId,
+          babelConfig,
           sourceMaps: true,
           writeVersionComment: false,
           resolveVirtualDependency,
-          optimizeKnownTemplates:
-            optimize && linked ? getKnownTemplates(root) : undefined,
-          babelConfig: opts.babelConfig
-            ? {
-                ...opts.babelConfig,
-                caller: opts.babelConfig.caller
-                  ? {
-                      name: "@marko/vite",
-                      supportsStaticESM: true,
-                      supportsDynamicImport: true,
-                      supportsTopLevelAwait: true,
-                      supportsExportNamespaceFrom: true,
-                      ...opts.babelConfig.caller,
-                    }
-                  : babelCaller,
-              }
-            : {
-                babelrc: false,
-                configFile: false,
-                browserslistConfigFile: false,
-                caller: babelCaller,
-              },
+          optimizeKnownTemplates: optimize
+            ? getKnownTemplates(root)
+            : undefined,
         };
 
         if (linked) {
@@ -294,63 +251,36 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
             isBuild || isTest ? undefined : (path: string) => !/^\./.test(path),
         };
 
-        ssrConfig = {
-          ...baseConfig,
-          output: "html",
-        };
-        ssrEntryConfig = {
-          ...ssrConfig,
-          sourceMaps: false,
-        };
-
-        ssrCjsConfig = {
-          ...ssrConfig,
-          cjsInteropMarkoVite,
-        } as any;
-
-        domConfig = {
+        clientConfig = {
           ...baseConfig,
           output: "dom",
         };
-
-        if (isTest) {
-          (domConfig as any).cjsInteropMarkoVite = cjsInteropMarkoVite;
-        }
-
-        hydrateConfig = {
+        clientEntryConfig = {
           ...baseConfig,
           output: "hydrate",
+          sourceMaps: false,
+        };
+        serverConfig = {
+          ...baseConfig,
+          output: "html",
+        };
+        serverCJSConfig = {
+          ...serverConfig,
+          cjsInteropMarkoVite,
+        } as any;
+        serverEntryConfig = {
+          ...serverConfig,
           sourceMaps: false,
         };
 
         compiler.configure(baseConfig);
         devEntryFile = path.join(root, "index.html");
         devEntryFilePosix = normalizePath(devEntryFile);
-        isSSRBuild = isBuild && linked && Boolean(config.build!.ssr);
         renderAssetsRuntimeCode = getRenderAssetsRuntime({
           isBuild,
           basePathVar,
           runtimeId,
         });
-
-        if (isTest) {
-          const { test } = config as any;
-
-          if ((test.environment as string | undefined)?.includes("dom")) {
-            config.resolve ??= {};
-            config.resolve.conditions ??= [];
-            config.resolve.conditions.push("browser");
-
-            // for vitest@3
-            test.deps ??= {};
-            test.deps.optimizer ??= {};
-            test.deps.optimizer.web ??= {};
-            test.deps.optimizer.web.enabled ??= true;
-
-            // for vitest@4
-            (test.execArgv ||= []).push("-C", "browser");
-          }
-        }
 
         if (!registeredTagLib) {
           registeredTagLib = true;
@@ -361,86 +291,6 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
             "<body>": { transformer: renderAssetsTransform },
             "<*>": { transformer: relativeAssetsTransform },
           });
-        }
-
-        const optimizeDeps = (config.optimizeDeps ??= {});
-        if (!isTest) {
-          optimizeDeps.entries ??= [
-            "**/*.marko",
-            "!**/__snapshots__/**",
-            `!**/__tests__/**`,
-            `!**/coverage/**`,
-          ];
-        }
-
-        const domDeps = compiler.getRuntimeEntryFiles("dom", opts.translator);
-        optimizeDeps.include = optimizeDeps.include
-          ? [...optimizeDeps.include, ...domDeps]
-          : domDeps;
-
-        const optimizeExtensions = (optimizeDeps.extensions ??= []);
-        optimizeExtensions.push(".marko");
-
-        const esbuildOptions = (optimizeDeps.esbuildOptions ??= {});
-        const esbuildPlugins = (esbuildOptions.plugins ??= []);
-
-        let cacheDirPromise: Promise<unknown> | undefined;
-        esbuildPlugins.push(
-          esbuildPlugin(baseConfig, virtualFiles, async (resolved) => {
-            if (cacheDir) {
-              const file = virtualFiles.get(resolved);
-              if (file) {
-                await (cacheDirPromise ||= fs.promises.mkdir(cacheDir, {
-                  recursive: true,
-                }));
-                await fs.promises.writeFile(
-                  virtualPathToCacheFile(resolved, root, cacheDir),
-                  (await file).code,
-                );
-              }
-            }
-          }),
-        );
-
-        const ssr = (config.ssr ??= {});
-        const { noExternal } = ssr;
-        if (noExternal !== true) {
-          const noExternalReg = /\.marko$/;
-          if (noExternal) {
-            if (Array.isArray(noExternal)) {
-              ssr.noExternal = [...noExternal, noExternalReg];
-            } else {
-              ssr.noExternal = [noExternal, noExternalReg];
-            }
-          } else {
-            ssr.noExternal = noExternalReg;
-          }
-        }
-
-        if (!hasBuilder && isSSRBuild && !config.build?.rollupOptions?.output) {
-          // For the server build vite will still output code split chunks to the `assets` directory by default.
-          // this is problematic since you might have server assets in your client assets folder.
-          // Here we change the default chunkFileNames config to instead output to the outDir directly.
-          config.build ??= {};
-          config.build.rollupOptions ??= {};
-          config.build.rollupOptions.output = {
-            chunkFileNames: `[name]-[hash].js`,
-          };
-        }
-
-        if (
-          !hasBuilder &&
-          isSSRBuild &&
-          !config.build?.commonjsOptions?.esmExternals
-        ) {
-          // Rollup rewrites `require` calls to default imports for commonjs dependencies; however, if the
-          // dependency is inlined, its require calls which were assumed to be commonjs are also rewritten but
-          // now resolve from an ESM context and the default import is no longer safe due to conditional exports.
-          // This tells Rollup which dependencies are ESM so it uses a namespace import instead.
-          config.build ??= {};
-          config.build.commonjsOptions ??= {};
-          config.build.commonjsOptions.esmExternals = (id) =>
-            !isCJSModule(id, rootResolveFile);
         }
 
         if (basePathVar) {
@@ -499,46 +349,91 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           },
         };
       },
-      configEnvironment(name, options) {
-        if (name === "ssr") {
-          options.resolve ??= {};
-          const { noExternal } = options.resolve;
+      configEnvironment(name, config) {
+        const isSSR = name === "ssr";
+
+        if (isSSR) {
+          const { noExternal } = (config.resolve ??= {});
           if (noExternal !== true) {
             const noExternalReg = /\.marko$/;
             if (noExternal) {
               if (Array.isArray(noExternal)) {
-                options.resolve.noExternal = [...noExternal, noExternalReg];
+                config.resolve.noExternal = [...noExternal, noExternalReg];
               } else {
-                options.resolve.noExternal = [noExternal, noExternalReg];
+                config.resolve.noExternal = [noExternal, noExternalReg];
               }
             } else {
-              options.resolve.noExternal = noExternalReg;
+              config.resolve.noExternal = noExternalReg;
             }
-          }
-
-          options.build ??= {};
-
-          if (!options.build?.rollupOptions?.output) {
-            // For the server build vite will still output code split chunks to the `assets` directory by default.
-            // this is problematic since you might have server assets in your client assets folder.
-            // Here we change the default chunkFileNames config to instead output to the outDir directly.
-            options.build.rollupOptions ??= {};
-            options.build.rollupOptions.output = {
-              chunkFileNames: `[name]-[hash].js`,
-            };
-          }
-          if (!options.build?.commonjsOptions?.esmExternals) {
-            // Rollup rewrites `require` calls to default imports for commonjs dependencies; however, if the
-            // dependency is inlined, its require calls which were assumed to be commonjs are also rewritten but
-            // now resolve from an ESM context and the default import is no longer safe due to conditional exports.
-            // This tells Rollup which dependencies are ESM so it uses a namespace import instead.
-            options.build.commonjsOptions ??= {};
-            options.build.commonjsOptions.esmExternals = (id) =>
-              !isCJSModule(id, rootResolveFile);
           }
         }
 
-        return options;
+        if (isBuild) {
+          config.build ??= {};
+          if (!config.build.rolldownOptions?.output) {
+            config.build.rolldownOptions ??= {};
+            config.build.rolldownOptions.output = {
+              // By default use `_[hash]` instead of `[name]-[hash]` because for chunk names the `[name]` is
+              // not deterministic (it's based on chunk.moduleIds order).
+              // For the server build vite will still output code split chunks to the `assets` directory by default.
+              // this is problematic since you might have server assets in your client assets folder.
+              // Here we change the default chunkFileNames config to instead output to the outDir directly.
+              chunkFileNames: isSSR
+                ? "_[hash].js"
+                : `${config.build?.assetsDir?.replace(/[/\\]$/, "") ?? "assets"}/_[hash].js`,
+            };
+          }
+        } else {
+          const optimizeDeps = (config.optimizeDeps ??= {});
+          (optimizeDeps.extensions ??= []).push(".marko");
+
+          if (!isSSR) {
+            const domDeps = compiler.getRuntimeEntryFiles(
+              "dom",
+              opts.translator,
+            );
+            optimizeDeps.include = optimizeDeps.include
+              ? [...optimizeDeps.include, ...domDeps]
+              : domDeps;
+          }
+
+          if (!isTest) {
+            optimizeDeps.entries ??= [
+              "**/*.marko",
+              "!**/__snapshots__/**",
+              `!**/__tests__/**`,
+              `!**/coverage/**`,
+            ];
+          }
+
+          (optimizeDeps.rolldownOptions ??= {}).plugins = [
+            optimizeDeps.rolldownOptions.plugins || [],
+            rolldownPlugin(
+              isSSR ? serverConfig : clientConfig,
+              virtualFiles,
+              async (id) => {
+                if (cacheDir) {
+                  const file = virtualFiles.get(id);
+                  if (file) {
+                    await (virtualFileCacheDirPromise ||= fs.promises.mkdir(
+                      cacheDir,
+                      {
+                        recursive: true,
+                      },
+                    ));
+                    const virtualId = virtualPathToCacheFile(
+                      id,
+                      root,
+                      cacheDir,
+                    );
+                    await fs.promises.writeFile(virtualId, (await file).code);
+                    return virtualId;
+                  }
+                }
+              },
+            ),
+          ];
+        }
       },
       configResolved(config) {
         basePath = config.base;
@@ -559,11 +454,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
       },
       configureServer(_server) {
         if (!isTest) {
-          ssrConfig.hot =
-            ssrEntryConfig.hot =
-            ssrCjsConfig.hot =
-            domConfig.hot =
-              true;
+          clientConfig.hot = serverConfig.hot = serverEntryConfig.hot = true;
         }
 
         devServer = _server;
@@ -600,11 +491,6 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
       handleHotUpdate(ctx) {
         compiler.taglib.clearCaches();
         baseConfig.cache!.clear();
-        optimizeKnownTemplatesForRoot.clear();
-
-        for (const [, cache] of configsByFileSystem) {
-          cache.clear();
-        }
 
         for (const mod of ctx.modules) {
           if (mod.id && virtualFiles.has(mod.id)) {
@@ -615,11 +501,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
 
       async options(inputOptions) {
         if (linked && isBuild) {
-          const isSSR =
-            this.environment == null
-              ? isSSRBuild
-              : this.environment.name === "ssr";
-          if (isSSR) {
+          if (this.environment.name === "ssr") {
             serverManifest = {
               entries: {},
               entrySources: {},
@@ -627,8 +509,11 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
               ssrAssetIds: [],
             };
           } else {
-            try {
-              serverManifest = await store.read();
+            if (!isBuildApp && !serverManifest) {
+              serverManifest = await store.read().catch(noop);
+            }
+
+            if (serverManifest) {
               if (isEmpty(serverManifest.entries)) {
                 inputOptions.input = noClientAssetsRuntimeId;
               } else {
@@ -642,7 +527,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
                   cachedSources.set(id, serverManifest.entrySources[entry]);
                 }
               }
-            } catch (err) {
+            } else {
               this.error(
                 `You must run the "ssr" build before the "browser" build.`,
               );
@@ -650,40 +535,22 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           }
         }
       },
-      async buildStart() {
-        if (isBuild && linked) {
-          const isSSR =
-            this.environment == null
-              ? isSSRBuild
-              : this.environment.name === "ssr";
-          if (!isSSR) {
-            for (const assetId of serverManifest!.ssrAssetIds) {
-              this.load({
-                id: normalizePath(path.resolve(root, assetId)),
-                resolveDependencies: false,
-              }).catch(noop);
-            }
-          }
-        }
-      },
       async resolveId(importee, importer, importOpts, ssr = importOpts.ssr) {
-        if (importee === cjsInteropHelpersId) {
-          return cjsInteropHelpersId;
+        switch (importee) {
+          case cjsInteropHelpersId:
+          case renderAssetsRuntimeId:
+          case noClientAssetsRuntimeId:
+            return importee;
         }
 
         if (virtualFiles.has(importee)) {
           return importee;
         }
 
-        if (
-          importee === renderAssetsRuntimeId ||
-          importee === noClientAssetsRuntimeId
-        ) {
-          return { id: importee };
-        }
-
         if (importer) {
           const tagName = importTagReg.exec(importee)?.[1];
+          importer = stripViteQueries(importer);
+
           if (tagName) {
             const tagDef = compiler.taglib
               .buildLookup(path.dirname(importer))
@@ -692,17 +559,17 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           }
         }
 
-        let importeeQuery = getMarkoQuery(importee);
+        let importeeInfo = getMarkoFileInfo(importee);
 
-        if (importeeQuery) {
+        if (importeeInfo) {
           if (
             importee[0] !== "." &&
             importee[0] !== "\0" &&
-            importeeQuery.startsWith(virtualFileQuery)
+            importeeInfo.kind === InternalFileKind.virtual
           ) {
             return importee;
           }
-          importee = importee.slice(0, -importeeQuery.length);
+          importee = importeeInfo.sourceId;
         } else if (!(importOpts as any).scan) {
           if (
             ssr &&
@@ -712,14 +579,17 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
             (importer !== devEntryFile ||
               normalizePath(importer) !== devEntryFilePosix) && // Vite tries to resolve against an `index.html` in some cases, we ignore it here.
             isMarkoFile(importee) &&
-            !queryReg.test(importer) &&
+            !getMarkoFileInfo(importer) &&
             !isMarkoFile(importer) &&
             checkIsEntry(
               normalizePath(path.resolve(importer, "..", importee)),
               importer,
             )
           ) {
-            importeeQuery = serverEntryQuery;
+            importeeInfo = {
+              kind: InternalFileKind.serverEntry,
+              sourceId: importee as `${string}.marko`,
+            };
           } else if (
             !ssr &&
             isBuild &&
@@ -727,11 +597,14 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
             isMarkoFile(importee) &&
             this.getModuleInfo(importer)?.isEntry
           ) {
-            importeeQuery = browserEntryQuery;
+            importeeInfo = {
+              kind: InternalFileKind.clientEntry,
+              sourceId: importee as `${string}.marko`,
+            };
           }
         }
 
-        if (importeeQuery) {
+        if (importeeInfo) {
           const resolved =
             importee[0] === "."
               ? {
@@ -744,16 +617,19 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
               : await this.resolve(importee, importer, resolveOpts);
 
           if (resolved) {
-            resolved.id = stripViteQueries(resolved.id) + importeeQuery;
+            resolved.id = toMarkoFileId(
+              stripViteQueries(resolved.id),
+              importeeInfo,
+            );
           }
 
           return resolved;
         }
 
         if (importer) {
-          const importerQuery = getMarkoQuery(importer);
-          if (importerQuery) {
-            importer = importer.slice(0, -importerQuery.length);
+          const importerInfo = getMarkoFileInfo(importer);
+          if (importerInfo) {
+            importer = importerInfo.sourceId;
 
             if (importee[0] === ".") {
               const resolved = normalizePath(
@@ -771,32 +647,41 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
       async load(rawId) {
         const id = stripViteQueries(rawId);
 
-        if (id === cjsInteropHelpersId) {
-          return cjsInteropHelpersCode;
+        switch (id) {
+          case cjsInteropHelpersId:
+            return cjsInteropHelpersCode;
+          case renderAssetsRuntimeId:
+            return renderAssetsRuntimeCode;
+          case noClientAssetsRuntimeId:
+            return "NO_CLIENT_ASSETS";
         }
 
-        if (id === renderAssetsRuntimeId) {
-          return renderAssetsRuntimeCode;
-        }
-
-        if (id === noClientAssetsRuntimeId) {
-          return "NO_CLIENT_ASSETS";
-        }
-
-        const query = getMarkoQuery(id);
-        if (query) {
-          switch (query) {
-            case serverEntryQuery: {
-              entryIds.add(id.slice(0, -query.length));
-              return null;
+        const info = getMarkoFileInfo(id);
+        if (info) {
+          switch (info.kind) {
+            case InternalFileKind.serverEntry: {
+              entryIds.add(info.sourceId);
+              return (
+                cachedSources.get(info.sourceId) ||
+                (await fs.promises
+                  .readFile(info.sourceId, "utf8")
+                  .catch(noop)) ||
+                null
+              );
             }
-            case browserEntryQuery: {
+            case InternalFileKind.clientEntry: {
               // The goal below is to cached source content when in linked mode
               // to avoid loading from disk for both server and browser builds.
               // This is to support virtual Marko entry files.
-              return cachedSources.get(id.slice(0, -query.length)) || null;
+              return (
+                cachedSources.get(info.sourceId) ||
+                (await fs.promises
+                  .readFile(info.sourceId, "utf8")
+                  .catch(noop)) ||
+                null
+              );
             }
-            default:
+            case InternalFileKind.virtual:
               return (
                 virtualFiles.get(id) ||
                 cachedSources.get(id) ||
@@ -819,75 +704,66 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
 
         return virtualFiles.get(id) || cachedSources.get(id) || null;
       },
-      async transform(source, rawId, ssr) {
-        let id = stripViteQueries(rawId);
-        const info = isBuild ? this.getModuleInfo(id) : undefined;
-        const arcSourceId = info?.meta.arcSourceId;
-        if (arcSourceId) {
-          const arcFlagSet = info.meta.arcFlagSet;
-          id = arcFlagSet
-            ? arcSourceId.replace(extReg, `[${arcFlagSet.join("+")}]$&`)
-            : arcSourceId;
-        }
+      async transform(source, rawId) {
+        const resolvedId = stripViteQueries(rawId);
+        const info = getMarkoFileInfo(resolvedId);
+        let id =
+          info?.kind === InternalFileKind.virtual
+            ? resolvedId
+            : info?.sourceId || resolvedId;
+        const isSSR = this.environment.name === "ssr";
 
-        const isSSR = typeof ssr === "object" ? ssr.ssr : ssr;
-        const query = getMarkoQuery(id);
+        if (info?.kind === InternalFileKind.serverEntry) {
+          const fileName = id;
+          let mainEntryData: string;
+          id = resolvedId;
+          cachedSources.set(fileName, source);
 
-        if (query && !query.startsWith(virtualFileQuery)) {
-          id = id.slice(0, -query.length);
-
-          if (query === serverEntryQuery) {
-            const fileName = id;
-            let mainEntryData: string;
-            id = `${id.slice(0, -markoExt.length)}.entry.marko`;
-            cachedSources.set(fileName, source);
-
-            if (isBuild) {
-              const relativeFileName = normalizePath(
-                path.relative(root, fileName),
-              );
-              const entryId = toEntryId(relativeFileName);
-              serverManifest!.entries[entryId] = relativeFileName;
-              serverManifest!.entrySources[relativeFileName] = source;
-              mainEntryData = JSON.stringify(entryId);
-            } else {
-              mainEntryData = JSON.stringify(
-                await generateDocManifest(
-                  basePath,
-                  await devServer.transformIndexHtml(
-                    "/",
-                    generateInputDoc(
-                      fileNameToURL(fileName, root) + browserEntryQuery,
-                    ),
+          if (isBuild) {
+            const relativeFileName = normalizePath(
+              path.relative(root, fileName),
+            );
+            const entryId = toEntryId(relativeFileName);
+            serverManifest!.entries[entryId] = relativeFileName;
+            serverManifest!.entrySources[relativeFileName] = source;
+            mainEntryData = JSON.stringify(entryId);
+          } else {
+            mainEntryData = JSON.stringify(
+              await generateDocManifest(
+                basePath,
+                await devServer.transformIndexHtml(
+                  "/",
+                  generateInputDoc(
+                    fileNameToURL(toClientEntryId(fileName), root),
                   ),
                 ),
-              );
-            }
+              ),
+            );
+          }
 
-            const entryData = [mainEntryData];
-            if (getMarkoAssetFns) {
-              for (const getMarkoAsset of getMarkoAssetFns) {
-                const asset = getMarkoAsset(fileName);
-                if (asset) {
-                  entryData.push(asset);
-                }
+          const entryData = [mainEntryData];
+          if (getMarkoAssetFns) {
+            for (const getMarkoAsset of getMarkoAssetFns) {
+              const asset = getMarkoAsset(fileName);
+              if (asset) {
+                entryData.push(asset);
               }
             }
-
-            source = await getServerEntryTemplate({
-              fileName,
-              entryData,
-              runtimeId,
-              basePathVar: isBuild ? basePathVar : undefined,
-              tagsAPI: isTagsApi(
-                ("transformRequest" in this.environment
-                  ? (await this.environment.transformRequest(fileName),
-                    this.getModuleInfo(fileName))
-                  : await this.load({ id: fileName })
-                )?.meta.markoAPI,
-              ),
-            });
           }
+
+          source = await getServerEntryTemplate({
+            fileName,
+            entryData,
+            runtimeId,
+            basePathVar: isBuild ? basePathVar : undefined,
+            tagsAPI: isTagsApi(
+              ("transformRequest" in this.environment
+                ? (await this.environment.transformRequest(fileName),
+                  this.getModuleInfo(fileName))
+                : await this.load({ id: fileName })
+              )?.meta.markoAPI,
+            ),
+          });
         }
 
         if (!isMarkoFile(id)) {
@@ -900,7 +776,8 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
               if (cjsToEsm === undefined) {
                 try {
                   cjsToEsm = (await import("@chialab/cjs-to-esm")).transform;
-                } catch {
+                } catch (err) {
+                  console.error(err);
                   cjsToEsm = null;
                   return null;
                 }
@@ -923,22 +800,18 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
             cachedSources.set(id, source);
           }
 
-          if (!query && isCJSModule(id, rootResolveFile)) {
+          if (!info && isCJSModule(id, rootResolveFile)) {
             if (isBuild) {
               const { code, map, meta } = await compiler.compile(
                 source,
                 id,
-                getConfigForFileSystem(info, ssrCjsConfig),
+                serverCJSConfig,
               );
 
               return {
                 code,
                 map: stripSourceRoot(map),
-                meta: {
-                  markoAPI: meta.api,
-                  arcSourceCode: source,
-                  arcScanIds: meta.analyzedTags,
-                },
+                meta: { markoAPI: meta.api },
               };
             }
           }
@@ -947,29 +820,27 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         const compiled = await compiler.compile(
           source,
           id,
-          getConfigForFileSystem(
-            info,
-            isSSR
-              ? isCJSModule(id, rootResolveFile)
-                ? ssrCjsConfig
-                : query === serverEntryQuery
-                  ? ssrEntryConfig
-                  : ssrConfig
-              : query === browserEntryQuery
-                ? hydrateConfig
-                : domConfig,
-          ),
+          isSSR
+            ? isCJSModule(id, rootResolveFile)
+              ? serverCJSConfig
+              : info?.kind === InternalFileKind.serverEntry
+                ? serverEntryConfig
+                : serverConfig
+            : info?.kind === InternalFileKind.clientEntry
+              ? clientEntryConfig
+              : clientConfig,
         );
 
         const { meta } = compiled;
         let { code } = compiled;
 
-        if (
-          !isTest &&
-          query !== browserEntryQuery &&
-          devServer &&
-          !isTagsApi(meta.api)
-        ) {
+        if (serverManifest && info?.kind === InternalFileKind.clientEntry) {
+          for (const assetId of serverManifest.ssrAssetIds) {
+            code += `\nimport "${relativeImportPath(id, path.resolve(root, assetId))}";`;
+          }
+        }
+
+        if (!info && !isTest && devServer && !isTagsApi(meta.api)) {
           code += `\nif (import.meta.hot) import.meta.hot.accept(() => {});`;
         }
 
@@ -984,13 +855,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         return {
           code,
           map: stripSourceRoot(compiled.map),
-          meta: isBuild
-            ? {
-                markoAPI: meta.api,
-                arcSourceCode: source,
-                arcScanIds: meta.analyzedTags,
-              }
-            : { markoAPI: meta.api },
+          meta: { markoAPI: meta.api },
         };
       },
     },
@@ -1012,7 +877,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         }
       },
       async generateBundle(outputOptions, bundle, isWrite) {
-        if (!linked) {
+        if (!serverManifest) {
           return;
         }
 
@@ -1022,11 +887,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           );
         }
 
-        const isSSR =
-          this.environment == null
-            ? isSSRBuild
-            : this.environment.name === "ssr";
-        if (isSSR) {
+        if (this.environment.name === "ssr") {
           const dir = outputOptions.dir
             ? path.resolve(outputOptions.dir)
             : path.resolve(outputOptions.file!, "..");
@@ -1036,30 +897,32 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
 
             if (chunk.type === "chunk") {
               if (chunk.moduleIds.includes(renderAssetsRuntimeId)) {
-                serverManifest!.chunksNeedingAssets.push(
+                serverManifest.chunksNeedingAssets.push(
                   path.resolve(dir, fileName),
                 );
               }
             }
           }
 
-          serverManifest!.ssrAssetIds = [];
+          serverManifest.ssrAssetIds = [];
           for (const moduleId of this.getModuleIds()) {
             if (moduleId.startsWith(root)) {
               const module = this.getModuleInfo(moduleId);
               if (module?.meta["vite:asset"]) {
-                serverManifest!.ssrAssetIds.push(
+                serverManifest.ssrAssetIds.push(
                   "." + moduleId.slice(root.length),
                 );
               }
             }
           }
 
-          store.write(serverManifest!);
+          if (!isBuildApp) {
+            store.write(serverManifest);
+          }
         } else {
-          const browserManifest: BrowserManifest = {};
+          const clientManifest: ClientManifest = {};
 
-          if (isEmpty(serverManifest!.entries)) {
+          if (isEmpty(serverManifest.entries)) {
             for (const chunkId in bundle) {
               const chunk = bundle[chunkId];
               if (
@@ -1071,13 +934,13 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
               }
             }
           } else {
-            for (const entryId in serverManifest!.entries) {
-              const fileName = serverManifest!.entries[entryId];
+            for (const entryId in serverManifest.entries) {
+              const fileName = serverManifest.entries[entryId];
               const chunkId = fileName + htmlExt;
               const chunk = bundle[chunkId];
 
               if (chunk?.type === "asset") {
-                browserManifest[entryId] = {
+                clientManifest[entryId] = {
                   ...(await generateDocManifest(
                     basePath,
                     chunk.source.toString(),
@@ -1094,10 +957,10 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
             }
 
             const manifestStr = `\n;var __MARKO_MANIFEST__=${JSON.stringify(
-              browserManifest,
+              clientManifest,
             )};\n`;
 
-            for (const fileName of serverManifest!.chunksNeedingAssets) {
+            for (const fileName of serverManifest.chunksNeedingAssets) {
               await fs.promises.appendFile(fileName, manifestStr);
             }
           }
@@ -1105,10 +968,6 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
       },
     },
   ];
-}
-
-function getMarkoQuery(id: string) {
-  return queryReg.exec(id)?.[0] || "";
 }
 
 function isMarkoFile(id: string) {
@@ -1122,12 +981,59 @@ function toHTMLEntries(root: string, serverEntries: ServerManifest["entries"]) {
     const markoFile = normalizePath(path.join(root, serverEntries[id]));
     const htmlFile = markoFile + htmlExt;
     virtualFiles.set(htmlFile, {
-      code: generateInputDoc(markoFile + browserEntryQuery),
+      code: generateInputDoc(toClientEntryId(markoFile)),
     });
     result.push(htmlFile);
   }
 
   return result;
+}
+
+function getMarkoFileInfo(id: string) {
+  if (id.endsWith(serverEntryExt)) {
+    return {
+      kind: InternalFileKind.serverEntry,
+      sourceId: `${id.slice(0, -serverEntryExt.length)}${markoExt}`,
+    } as const;
+  }
+
+  if (id.endsWith(clientEntryExt)) {
+    return {
+      kind: InternalFileKind.clientEntry,
+      sourceId: `${id.slice(0, -clientEntryExt.length)}${markoExt}`,
+    } as const;
+  }
+
+  const virtualMatch = virtualFileReg.exec(id);
+  if (virtualMatch) {
+    return {
+      kind: InternalFileKind.virtual,
+      sourceId: virtualMatch[1],
+      virtualSuffix: virtualMatch[2],
+    } as const;
+  }
+}
+
+function toMarkoFileId(
+  id: string,
+  info: NonNullable<ReturnType<typeof getMarkoFileInfo>>,
+) {
+  switch (info.kind) {
+    case InternalFileKind.serverEntry:
+      return toServerEntryId(id);
+    case InternalFileKind.clientEntry:
+      return toClientEntryId(id);
+    case InternalFileKind.virtual:
+      return `${id}${virtualFileInfix}${info.virtualSuffix}`;
+  }
+}
+
+function toServerEntryId(id: string) {
+  return id.slice(0, -markoExt.length) + serverEntryExt;
+}
+
+function toClientEntryId(id: string) {
+  return id.slice(0, -markoExt.length) + clientEntryExt;
 }
 
 function toEntryId(id: string) {
@@ -1165,7 +1071,7 @@ function virtualPathToCacheFile(
 ) {
   return path.join(
     cacheDir,
-    normalizePath(path.relative(root, virtualPath)).replace(/[\\/]+/g, "_"),
+    normalizePath(path.relative(root, virtualPath)).replace(/[\\/?=&]+/g, "_"),
   );
 }
 
@@ -1204,36 +1110,6 @@ function stripViteQueries(id: string) {
   return url;
 }
 
-/**
- * For integration with arc-vite.
- * We create a unique Marko config tied to each arcFileSystem.
- */
-function getConfigForFileSystem(
-  info: vite.Rollup.ModuleInfo | undefined | null,
-  config: compiler.Config,
-) {
-  const fileSystem = info?.meta.arcFS;
-  if (!fileSystem) return config;
-
-  let configsForFileSystem = configsByFileSystem.get(fileSystem);
-  if (!configsForFileSystem) {
-    configsForFileSystem = new Map();
-    configsByFileSystem.set(fileSystem, configsForFileSystem);
-  }
-
-  let configForFileSystem = configsForFileSystem.get(config);
-  if (!configForFileSystem) {
-    configForFileSystem = {
-      ...config,
-      fileSystem,
-      cache: configsForFileSystem,
-    };
-    configsForFileSystem.set(config, configForFileSystem);
-  }
-
-  return configForFileSystem;
-}
-
 function getKnownTemplates(cwd: string) {
   let knownTemplates = optimizeKnownTemplatesForRoot.get(cwd);
   if (!knownTemplates) {
@@ -1248,7 +1124,6 @@ function getKnownTemplates(cwd: string) {
             "**/*.d.marko",
             "**/*build*/**",
             "**/*coverage*/**",
-            "**/*dist*/**",
             "**/*example*/**",
             "**/*fixture*/**",
             "**/*snapshot*/**",

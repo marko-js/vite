@@ -11,7 +11,7 @@
   </div>
 </div>
 <div>
-  PRELOAD: /my-prefix/read-[hash].js
+  PRELOAD: /my-prefix/[hash].js
 </div>
 ```
 
