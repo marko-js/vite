@@ -338,6 +338,7 @@ async function getHTML() {
     ),
   )
     .replace(/-[a-z0-9_-]+(\.\w+)/gi, "-[hash]$1")
+    .replace(/\/_[a-z0-9_-]+(\.\w+)/gi, "/[hash]$1")
     .replace(/[?&][tv]=[\d.]+/, "");
 }
 

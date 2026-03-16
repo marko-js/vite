@@ -9,7 +9,7 @@
 />
 <link
   crossorigin=""
-  href="/assets/modulepreload-[hash].js"
+  href="/assets/[hash].js"
   rel="modulepreload"
 />
 <div

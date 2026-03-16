@@ -4,5 +4,5 @@ export async function steps() {
 }
 
 export const env = {
-  BASE_URL: "some/base/path/",
+  BASE_URL: "/some/base/path/",
 };
