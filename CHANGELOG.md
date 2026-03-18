@@ -1,5 +1,11 @@
 # Changelog
 
+## 6.0.0
+
+### Major Changes
+
+- [#251](https://github.com/marko-js/vite/pull/251) [`e2a58c6`](https://github.com/marko-js/vite/commit/e2a58c6b4898861aa39367f019577aefbeb36611) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Implement full rolldown support. Drop support for vite < 8.
+
 ## 5.4.6
 
 ### Patch Changes
