@@ -27,6 +27,7 @@ import {
 import renderAssetsTransform from "./render-assets-transform";
 import { isCJSModule } from "./resolve";
 import rolldownPlugin from "./rolldown-plugin";
+import { clearScanCache } from "./scan";
 import getServerEntryTemplate from "./server-entry-template";
 
 export namespace API {
@@ -491,6 +492,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
       handleHotUpdate(ctx) {
         compiler.taglib.clearCaches();
         baseConfig.cache!.clear();
+        clearScanCache();
 
         for (const mod of ctx.modules) {
           if (mod.id && virtualFiles.has(mod.id)) {
