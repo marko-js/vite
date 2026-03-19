@@ -3,8 +3,10 @@ import path from "path";
 import type { ModuleType, Plugin } from "rolldown";
 
 import { normalizePath } from "./normalize-path";
+import { scan } from "./scan";
 
 const virtualFileReg = /\.marko-virtual\./;
+const nodeModulesReg = /[\\/]node_modules[\\/]/;
 
 export default function rolldownPlugin(
   config: compiler.Config,
@@ -74,7 +76,9 @@ export default function rolldownPlugin(
           const code = await this.fs.readFile(id, { encoding: "utf8" });
           const compiled = await compiler.compile(code, id, baseConfig);
           return {
-            code: compiled.code,
+            code: nodeModulesReg.test(id)
+              ? compiled.code
+              : compiled.code + scan(id, code),
             moduleType: "js",
           };
         },
