@@ -1,5 +1,11 @@
 # Changelog
 
+## 6.0.1
+
+### Patch Changes
+
+- [#253](https://github.com/marko-js/vite/pull/253) [`a4f803e`](https://github.com/marko-js/vite/commit/a4f803e2344802cab3a96dc38f00fd05ccd68122) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Improve dev mode optimize deps scanning to avoid multiple passes.
+
 ## 6.0.0
 
 ### Major Changes
