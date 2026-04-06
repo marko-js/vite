@@ -11,6 +11,7 @@ import cjsInteropTranslate, {
   cjsInteropHelpersCode,
   cjsInteropHelpersId,
 } from "./cjs-interop-translate";
+import { transformCjsToEsm } from "./cjs-to-esm";
 import globImportTransformer from "./glob-import-transform";
 import {
   type DocManifest,
@@ -111,11 +112,6 @@ const babelConfig = {
 };
 const optimizeKnownTemplatesForRoot = new Map<string, string[]>();
 let registeredTagLib = false;
-
-// This package has a dependency on @parcel/source-map which uses native addons.
-// Some environments like Stackblitz don't support loading these. So... load it
-// with a dynamic import to avoid everything failing.
-let cjsToEsm: typeof import("@chialab/cjs-to-esm").transform | null | undefined;
 
 function noop(): undefined {}
 
@@ -809,21 +805,10 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
               ext === ".cjs" ||
               (ext === ".js" && isCJSModule(id, rootResolveFile))
             ) {
-              if (cjsToEsm === undefined) {
-                try {
-                  cjsToEsm = (await import("@chialab/cjs-to-esm")).transform;
-                } catch (err) {
-                  console.error(err);
-                  cjsToEsm = null;
-                  return null;
-                }
-              }
-              if (cjsToEsm) {
-                try {
-                  return await cjsToEsm(source);
-                } catch {
-                  return null;
-                }
+              try {
+                return await transformCjsToEsm(source, id);
+              } catch {
+                return null;
               }
             }
           }
