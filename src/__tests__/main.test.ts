@@ -31,6 +31,16 @@ declare namespace globalThis {
 declare let __loading__: Promise<void> | undefined;
 
 type Step = () => Promise<unknown> | unknown;
+type HMRChange = [file: string, find: string, replace: string];
+type HMRStep = { changes: HMRChange[]; steps?: Step | Step[] };
+
+interface FixtureConfig {
+  ssr: boolean;
+  steps?: Step | Step[];
+  hmr?: HMRStep[];
+  options?: Options;
+  env?: Record<string, string>;
+}
 
 const requireCwd = createRequire(process.cwd());
 let vite: typeof import("vite");
@@ -130,12 +140,9 @@ const FIXTURES = path.join(__dirname, "fixtures");
 for (const fixture of fs.readdirSync(FIXTURES)) {
   describe(fixture, () => {
     const dir = path.join(FIXTURES, fixture);
-    const config = requireCwd(path.join(dir, "test.config.ts")) as {
-      ssr: boolean;
-      steps?: Step | Step[];
-      options?: Options;
-      env?: Record<string, string>;
-    };
+    const config = requireCwd(
+      path.join(dir, "test.config.ts"),
+    ) as FixtureConfig;
 
     if (config.env) {
       const preservedEnv: [string, string | undefined | false][] = [];
@@ -218,6 +225,12 @@ for (const fixture of fs.readdirSync(FIXTURES)) {
           server.close();
         }
       });
+
+      if (config.hmr) {
+        it("dev (hmr)", async () => {
+          await testHMR(dir, config);
+        });
+      }
     } else {
       it("dev", async () => {
         const port = await getAvailablePort();
@@ -278,8 +291,179 @@ for (const fixture of fs.readdirSync(FIXTURES)) {
           await previewServer.close();
         }
       });
+
+      if (config.hmr) {
+        it("dev (hmr)", async () => {
+          await testHMR(dir, config);
+        });
+      }
     }
   });
+}
+
+async function testHMR(dir: string, config: FixtureConfig) {
+  const hmrSteps = config.hmr!;
+  const port = await getAvailablePort();
+  const originalFiles = new Map<string, string>();
+
+  // Create a dev server with HMR enabled.
+  // We use mode "development" (not "test") so the plugin enables HMR features
+  // (hot compiler flag, import.meta.hot.accept injection).
+  const devServer = await vite.createServer({
+    root: dir,
+    mode: "development",
+    appType: "custom",
+    logLevel: "error",
+    plugins: [markoPlugin(config.options)],
+    optimizeDeps: { force: true },
+    server: {
+      port,
+      hmr: true,
+      watch: {
+        ignored: ["**/node_modules/**", "**/dist/**", "**/__snapshots__/**"],
+      },
+    },
+    build: {
+      assetsInlineLimit: 0,
+    },
+  });
+
+  if (config.ssr) {
+    // For SSR fixtures, add middleware that handles SSR rendering.
+    devServer.middlewares.use(async (req, res, next) => {
+      try {
+        const { handler } = await devServer.ssrLoadModule(
+          path.join(dir, "./src/index.js"),
+        );
+        await handler(req, res, next);
+      } catch (err: any) {
+        devServer.ssrFixStacktrace(err);
+        return next(err);
+      }
+    });
+  }
+
+  try {
+    await devServer.listen();
+
+    // Navigate to the page and capture initial state.
+    await page.goto(`http://localhost:${port}`);
+
+    const title = await page.title();
+    if (title === "Error") {
+      const error = new Error("Error in response");
+      const html = await page.locator("pre").innerHTML();
+      if (html) {
+        error.stack = JSDOM.fragment(html.replace(/<br>/g, "\n")).textContent!;
+      }
+      throw error;
+    }
+
+    let snapshot = "";
+    let prevHtml: string | undefined;
+    let prevRawHtml: string | undefined;
+
+    await page.waitForSelector("#app");
+    snapshot += `# Loading\n\n`;
+    const html = await getHTML();
+    prevRawHtml = await getRawHTML();
+    snapshot += htmlSnapshot(html, prevHtml);
+    prevHtml = html;
+
+    // Run initial interaction steps if provided at top-level.
+    const initialSteps: Step[] = config.steps
+      ? Array.isArray(config.steps)
+        ? config.steps
+        : [config.steps]
+      : [];
+
+    for (const [i, step] of initialSteps.entries()) {
+      snapshot += `# Step ${i}\n${getStepString(step)}\n\n`;
+      await step();
+      const stepHtml = await getHTML();
+      if (stepHtml === prevHtml) continue;
+      snapshot += htmlSnapshot(stepHtml, prevHtml);
+      prevHtml = stepHtml;
+      prevRawHtml = await getRawHTML();
+    }
+
+    // Run HMR steps.
+    for (const [hmrIdx, hmrStep] of hmrSteps.entries()) {
+      // Apply file changes.
+      for (const [file, find, replace] of hmrStep.changes) {
+        const filePath = path.join(dir, file);
+        if (!originalFiles.has(filePath)) {
+          originalFiles.set(filePath, fs.readFileSync(filePath, "utf8"));
+        }
+        const content = fs.readFileSync(filePath, "utf8");
+        const newContent = content.replace(find, replace);
+        if (newContent === content) {
+          throw new Error(
+            `HMR change failed: could not find ${JSON.stringify(find)} in ${file}`,
+          );
+        }
+        fs.writeFileSync(filePath, newContent);
+      }
+
+      // Wait for HMR update to propagate to the browser.
+      // We watch for DOM changes on #app as a signal that HMR has taken effect.
+      await page
+        .waitForFunction(
+          (prev) => {
+            const app = document.getElementById("app");
+            return app && app.innerHTML !== prev;
+          },
+          prevRawHtml,
+          { timeout: 10000 },
+        )
+        .catch(() => {
+          // Timeout is acceptable — the HMR update may not change the #app content,
+          // or the page may have been fully reloaded.
+        });
+
+      const hmrHtml = await getHTML();
+      const changesDesc = hmrStep.changes
+        .map(
+          ([file, find, replace]) =>
+            `${file}: ${JSON.stringify(find)} → ${JSON.stringify(replace)}`,
+        )
+        .join("\n");
+      snapshot += `# HMR ${hmrIdx}\n${changesDesc}\n\n`;
+
+      if (hmrHtml !== prevHtml) {
+        snapshot += htmlSnapshot(hmrHtml, prevHtml);
+        prevHtml = hmrHtml;
+        prevRawHtml = await getRawHTML();
+      } else {
+        snapshot += `(no change)\n\n`;
+      }
+
+      // Run any post-HMR interaction steps.
+      const postSteps: Step[] = hmrStep.steps
+        ? Array.isArray(hmrStep.steps)
+          ? hmrStep.steps
+          : [hmrStep.steps]
+        : [];
+
+      for (const [i, step] of postSteps.entries()) {
+        snapshot += `# HMR ${hmrIdx} Step ${i}\n${getStepString(step)}\n\n`;
+        await step();
+        const stepHtml = await getHTML();
+        if (stepHtml === prevHtml) continue;
+        snapshot += htmlSnapshot(stepHtml, prevHtml);
+        prevHtml = stepHtml;
+        prevRawHtml = await getRawHTML();
+      }
+    }
+
+    await snap(snapshot, { ext: ".md", dir });
+  } finally {
+    // Restore all mutated files.
+    for (const [filePath, content] of originalFiles) {
+      fs.writeFileSync(filePath, content);
+    }
+    await devServer.close();
+  }
 }
 
 async function testPage(dir: string, steps: Step[], port: number) {
@@ -340,6 +524,10 @@ async function getHTML() {
     .replace(/-[a-z0-9_-]+(\.\w+)/gi, "-[hash]$1")
     .replace(/\/_[a-z0-9_-]+(\.\w+)/gi, "/[hash]$1")
     .replace(/[?&][tv]=[\d.]+/, "");
+}
+
+async function getRawHTML() {
+  return page.evaluate(() => document.getElementById("app")?.innerHTML || "");
 }
 
 async function getAvailablePort() {

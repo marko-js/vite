@@ -178,6 +178,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
   const entryIds = new Set<string>();
   const cachedSources = new Map<string, string>();
   const transformWatchFiles = new Map<string, string[]>();
+  const transformAnalyzedTags = new Map<string, Set<string>>();
   const store = new ReadOncePersistedStore<ServerManifest>(
     `vite-marko${runtimeId ? `-${runtimeId}` : ""}`,
   );
@@ -466,6 +467,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           if (type === "unlink") {
             entryIds.delete(fileName);
             transformWatchFiles.delete(fileName);
+            transformAnalyzedTags.delete(fileName);
           }
 
           for (const [id, files] of transformWatchFiles) {
@@ -489,7 +491,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         });
       },
 
-      handleHotUpdate(ctx) {
+      hotUpdate(ctx) {
         compiler.taglib.clearCaches();
         baseConfig.cache!.clear();
         clearScanCache();
@@ -498,6 +500,27 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           if (mod.id && virtualFiles.has(mod.id)) {
             virtualFiles.set(mod.id, createDeferredPromise());
           }
+        }
+
+        // When a child tag template changes, parent templates that analyzed
+        // it may need recompilation (e.g., input destructuring changes in
+        // Tags API affect the parent's compiled output).
+        const fileName = normalizePath(ctx.file);
+        let extraModules: undefined | typeof ctx.modules;
+        for (const [parent, files] of transformAnalyzedTags) {
+          if (parent !== fileName && files.has(fileName)) {
+            const mods = this.environment.moduleGraph.getModulesByFile(parent);
+            if (mods) {
+              extraModules ||= [];
+              for (const mod of mods) {
+                extraModules.push(mod);
+              }
+            }
+          }
+        }
+
+        if (extraModules) {
+          return [...ctx.modules, ...extraModules];
         }
       },
 
@@ -753,18 +776,29 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
             }
           }
 
+          let markoAPI: string | undefined;
+          if ("transformRequest" in this.environment) {
+            const entryMod =
+              this.environment.moduleGraph.getModuleById(fileName);
+            await this.environment.transformRequest(fileName);
+            markoAPI = this.getModuleInfo(fileName)?.meta.markoAPI;
+            // transformRequest above re-populates the module's transformResult
+            // which prevents the SSR module runner from detecting that it was
+            // invalidated. Re-invalidate so the runner properly re-evaluates it.
+
+            if (entryMod) {
+              this.environment.moduleGraph.invalidateModule(entryMod);
+            }
+          } else {
+            markoAPI = (await this.load({ id: fileName }))?.meta.markoAPI;
+          }
+
           source = await getServerEntryTemplate({
             fileName,
             entryData,
             runtimeId,
             basePathVar: isBuild ? basePathVar : undefined,
-            tagsAPI: isTagsApi(
-              ("transformRequest" in this.environment
-                ? (await this.environment.transformRequest(fileName),
-                  this.getModuleInfo(fileName))
-                : await this.load({ id: fileName })
-              )?.meta.markoAPI,
-            ),
+            tagsAPI: isTagsApi(markoAPI),
           });
         }
 
@@ -848,6 +882,13 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
 
         if (devServer) {
           transformWatchFiles.set(id, meta.watchFiles);
+          if (meta.analyzedTags) {
+            const files = new Set<string>();
+            transformAnalyzedTags.set(id, files);
+            for (const file of meta.analyzedTags) {
+              files.add(normalizePath(file));
+            }
+          }
         } else {
           for (const file of meta.watchFiles) {
             this.addWatchFile(file);
