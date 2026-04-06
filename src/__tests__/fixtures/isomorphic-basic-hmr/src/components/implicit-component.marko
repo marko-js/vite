@@ -1,0 +1,9 @@
+static {
+  if (typeof window === "object") {
+    document.body.firstElementChild.append("Loaded Implicit Component");
+  }
+}
+
+<div#implicit>
+  <class-component/>
+</div>
