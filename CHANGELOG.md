@@ -1,5 +1,11 @@
 # Changelog
 
+## 6.0.2
+
+### Patch Changes
+
+- [#260](https://github.com/marko-js/vite/pull/260) [`fe862a1`](https://github.com/marko-js/vite/commit/fe862a1ba4352e905d22e4f914cb220793c8cf7c) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Fix issue with child template analysis in marko 6 not causing parent modules to invalidate.
+
 ## 6.0.1
 
 ### Patch Changes
