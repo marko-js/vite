@@ -33,7 +33,7 @@
     "lint:eslint": "eslint -f unix .",
     "lint:prettier": "prettier \"./**/*{.ts,.js,.json,.md,.yml,rc}\"",
     "prepare": "husky",
-    "release": "npm run build && REF=${GITHUB_REF_NAME:-main}; npm publish --tag \"${REF/main/latest}\"",
+    "release": "npm run build && npm publish",
     "report": "open ./coverage/lcov-report/index.html",
     "test": "cross-env NODE_ENV=test mocha \"./src/**/__tests__/*.test.ts\"",
     "test:inspect": "npm test -- --inspect",

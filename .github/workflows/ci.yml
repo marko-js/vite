@@ -89,3 +89,4 @@ jobs:
           title: "[ci] release"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NPM_CONFIG_TAG: ${{ github.ref_name == 'main' && 'latest' || github.ref_name }}
