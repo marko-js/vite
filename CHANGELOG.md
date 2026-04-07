@@ -1,5 +1,11 @@
 # Changelog
 
+## 6.0.3
+
+### Patch Changes
+
+- [#264](https://github.com/marko-js/vite/pull/264) [`8cba092`](https://github.com/marko-js/vite/commit/8cba092bc9fff1337743d0ddaea5c2b00722973c) Thanks [@rturnq](https://github.com/rturnq)! - Fix handling of commonjs dependencies in dev mode SSR
+
 ## 6.0.2
 
 ### Patch Changes
