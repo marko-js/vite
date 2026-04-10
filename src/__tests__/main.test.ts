@@ -12,6 +12,7 @@ import * as playwright from "playwright";
 import url from "url";
 
 import markoPlugin, { type Options } from "..";
+import injectHmrEventsPlugin from "./utils/inject-hmr-events-plugin";
 
 const __dirname = path.dirname(url.fileURLToPath(import.meta.url));
 
@@ -238,13 +239,15 @@ for (const fixture of fs.readdirSync(FIXTURES)) {
           root: dir,
           server: {
             port,
-            watch: {
-              ignored: [
-                "**/node_modules/**",
-                "**/dist/**",
-                "**/__snapshots__/**",
-              ],
-            },
+            hmr: false,
+            watch: null,
+            // watch: {
+            //   ignored: [
+            //     "**/node_modules/**",
+            //     "**/dist/**",
+            //     "**/__snapshots__/**",
+            //   ],
+            // },
           },
           logLevel: "error",
           optimizeDeps: { force: true },
@@ -314,7 +317,7 @@ async function testHMR(dir: string, config: FixtureConfig) {
     mode: "development",
     appType: "custom",
     logLevel: "error",
-    plugins: [markoPlugin(config.options)],
+    plugins: [markoPlugin(config.options), injectHmrEventsPlugin()],
     optimizeDeps: { force: true },
     server: {
       port,
@@ -405,21 +408,20 @@ async function testHMR(dir: string, config: FixtureConfig) {
         fs.writeFileSync(filePath, newContent);
       }
 
-      // Wait for HMR update to propagate to the browser.
-      // We watch for DOM changes on #app as a signal that HMR has taken effect.
-      await page
-        .waitForFunction(
+      // // Wait for HMR update to propagate to the browser.
+      // // We listen for Vite HMR events and watch for DOM changes on #app as a signal that HMR has taken effect.
+
+      await Promise.any([
+        page.evaluate(() => (window as any).__nextHmr),
+        page.waitForFunction(
           (prev) => {
             const app = document.getElementById("app");
             return app && app.innerHTML !== prev;
           },
           prevRawHtml,
-          { timeout: 10000 },
-        )
-        .catch(() => {
-          // Timeout is acceptable — the HMR update may not change the #app content,
-          // or the page may have been fully reloaded.
-        });
+          { timeout: 5000 },
+        ),
+      ]).catch(() => {});
 
       const hmrHtml = await getHTML();
       const changesDesc = hmrStep.changes

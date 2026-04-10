@@ -86,6 +86,7 @@ const virtualFiles = new Map<
   string,
   VirtualFile | DeferredPromise<VirtualFile>
 >();
+const virtualFilesForTemplate = new Map<string, Set<string>>();
 const importTagReg = /^<([^>]+)>$/;
 const optionalWatchFileReg =
   /[\\/](?:([^\\/]+)\.)?(?:marko-tag.json|(?:style|component|component-browser)\.\w+)$/;
@@ -146,8 +147,16 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
 
       if (devServer) {
         const prev = virtualFiles.get(id);
-        if (isDeferredPromise(prev)) {
-          prev.resolve(virtualFile);
+        if (prev) {
+          if (isDeferredPromise(prev)) {
+            prev.resolve(virtualFile);
+          } else {
+            let files = virtualFilesForTemplate.get(normalizedFrom);
+            if (!files) {
+              virtualFilesForTemplate.set(normalizedFrom, (files = new Set()));
+            }
+            files.add(id);
+          }
         }
       }
 
@@ -492,31 +501,43 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         baseConfig.cache!.clear();
         clearScanCache();
 
-        for (const mod of ctx.modules) {
-          if (mod.id && virtualFiles.has(mod.id)) {
-            virtualFiles.set(mod.id, createDeferredPromise());
-          }
-        }
+        const modules = new Set(ctx.modules);
+        const fileName = normalizePath(ctx.file);
 
         // When a child tag template changes, parent templates that analyzed
         // it may need recompilation (e.g., input destructuring changes in
         // Tags API affect the parent's compiled output).
-        const fileName = normalizePath(ctx.file);
-        let extraModules: undefined | typeof ctx.modules;
         for (const [parent, files] of transformAnalyzedTags) {
-          if (parent !== fileName && files.has(fileName)) {
+          if (files.has(fileName)) {
             const mods = this.environment.moduleGraph.getModulesByFile(parent);
             if (mods) {
-              extraModules ||= [];
               for (const mod of mods) {
-                extraModules.push(mod);
+                modules.add(mod);
               }
             }
           }
         }
 
-        if (extraModules) {
-          return [...ctx.modules, ...extraModules];
+        // When a .marko file changes, its virtual dependencies (e.g.,
+        // extracted CSS from style {} blocks) also need to be included
+        // in the HMR update so the browser receives the new content.
+        const virtualFileIds = virtualFilesForTemplate.get(fileName);
+        if (virtualFileIds) {
+          for (const id of virtualFileIds) {
+            if (!isDeferredPromise(virtualFiles.get(id))) {
+              virtualFiles.set(id, createDeferredPromise());
+            }
+            const mods = this.environment.moduleGraph.getModulesByFile(id);
+            if (mods) {
+              for (const mod of mods) {
+                modules.add(mod);
+              }
+            }
+          }
+        }
+
+        if (modules.size !== ctx.modules.length) {
+          return [...modules];
         }
       },
 
@@ -726,18 +747,15 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         return virtualFiles.get(id) || cachedSources.get(id) || null;
       },
       async transform(source, rawId) {
-        const resolvedId = stripViteQueries(rawId);
-        const info = getMarkoFileInfo(resolvedId);
-        let id =
-          info?.kind === InternalFileKind.virtual
-            ? resolvedId
-            : info?.sourceId || resolvedId;
+        const id = stripViteQueries(rawId);
+        const info = getMarkoFileInfo(id);
         const isSSR = this.environment.name === "ssr";
+        const isClientEntry = info?.kind === InternalFileKind.clientEntry;
+        const isServerEntry = info?.kind === InternalFileKind.serverEntry;
 
-        if (info?.kind === InternalFileKind.serverEntry) {
-          const fileName = id;
+        if (isServerEntry) {
+          const fileName = info.sourceId;
           let mainEntryData: string;
-          id = resolvedId;
           cachedSources.set(fileName, source);
 
           if (isBuild) {
@@ -840,14 +858,14 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
 
         const compiled = await compiler.compile(
           source,
-          id,
+          isClientEntry ? info.sourceId : id,
           isSSR
             ? isCJSModule(id, rootResolveFile)
               ? serverCJSConfig
-              : info?.kind === InternalFileKind.serverEntry
+              : isServerEntry
                 ? serverEntryConfig
                 : serverConfig
-            : info?.kind === InternalFileKind.clientEntry
+            : isClientEntry
               ? clientEntryConfig
               : clientConfig,
         );
@@ -855,13 +873,18 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         const { meta } = compiled;
         let { code } = compiled;
 
-        if (serverManifest && info?.kind === InternalFileKind.clientEntry) {
+        if (serverManifest && isClientEntry) {
           for (const assetId of serverManifest.ssrAssetIds) {
             code += `\nimport "${relativeImportPath(id, path.resolve(root, assetId))}";`;
           }
         }
 
-        if (!info && !isTest && devServer && !isTagsApi(meta.api)) {
+        if (
+          (!info || isClientEntry) &&
+          !isTest &&
+          devServer &&
+          !isTagsApi(meta.api)
+        ) {
           code += `\nif (import.meta.hot) import.meta.hot.accept(() => {});`;
         }
 
@@ -870,6 +893,9 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           if (meta.analyzedTags) {
             const files = new Set<string>();
             transformAnalyzedTags.set(id, files);
+            if (isClientEntry) {
+              files.add(normalizePath(info.sourceId));
+            }
             for (const file of meta.analyzedTags) {
               files.add(normalizePath(file));
             }
