@@ -1,0 +1,10 @@
+static {
+  if (typeof window === "object") {
+    document.body.firstElementChild.append("Loaded Implicit Component");
+  }
+}
+
+<div#implicit>
+  <h2>Server text</h2>
+  <class-component/>
+</div>

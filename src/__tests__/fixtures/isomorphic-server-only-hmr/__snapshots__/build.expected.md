@@ -1,9 +1,15 @@
 # Loading
 
 ```html
+<h1>
+  Hello
+</h1>
 <div
   id="implicit"
 >
+  <h2>
+    Server text
+  </h2>
   <div
     id="clickable"
   >
@@ -18,15 +24,6 @@ await page.click("#clickable")
 ```diff
 -    Mounted: true Clicks: 0
 +    Mounted: true Clicks: 1
-
-```
-
-# HMR 0 (No Reload)
-src/components/class-component.marko: "Clicks: ${state.clickCount}" → "Click count: ${state.clickCount}"
-
-```diff
--    Mounted: true Clicks: 1
-+    Mounted: true Click count: 1
 
 ```
 

@@ -6,7 +6,7 @@
 </div>
 ```
 
-# HMR 0
+# HMR 0 (Reload)
 src/tags/child-tag.marko: "Hello ${input.name}" → "Hi ${input.name}"
 
 ```diff
@@ -15,7 +15,7 @@ src/tags/child-tag.marko: "Hello ${input.name}" → "Hi ${input.name}"
 
 ```
 
-# HMR 1
+# HMR 1 (Reload)
 src/tags/child-tag.marko: "Hi ${input.name}" → "Hey ${JSON.parse(JSON.stringify(input)).name}"
 
 ```diff

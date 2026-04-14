@@ -1,0 +1,18 @@
+class {
+  onCreate() {
+    this.state = {
+      color: undefined
+    };
+  }
+  onMount() {
+    this.updateColor();
+  }
+
+  updateColor() {
+    this.state.color = document.querySelector("#clickable").computedStyleMap().get("color");
+  }
+}
+
+<div#clickable onClick("updateColor")>
+  Color: ${state.color}
+</div>

@@ -12,6 +12,7 @@ import * as playwright from "playwright";
 import url from "url";
 
 import markoPlugin, { type Options } from "..";
+import injectHmrEventsPlugin from "./utils/inject-hmr-events-plugin";
 
 const __dirname = path.dirname(url.fileURLToPath(import.meta.url));
 
@@ -238,13 +239,8 @@ for (const fixture of fs.readdirSync(FIXTURES)) {
           root: dir,
           server: {
             port,
-            watch: {
-              ignored: [
-                "**/node_modules/**",
-                "**/dist/**",
-                "**/__snapshots__/**",
-              ],
-            },
+            hmr: false,
+            watch: null,
           },
           logLevel: "error",
           optimizeDeps: { force: true },
@@ -314,7 +310,7 @@ async function testHMR(dir: string, config: FixtureConfig) {
     mode: "development",
     appType: "custom",
     logLevel: "error",
-    plugins: [markoPlugin(config.options)],
+    plugins: [markoPlugin(config.options), injectHmrEventsPlugin()],
     optimizeDeps: { force: true },
     server: {
       port,
@@ -341,6 +337,11 @@ async function testHMR(dir: string, config: FixtureConfig) {
         return next(err);
       }
     });
+  }
+
+  let hmrReloads = 0;
+  function trackReloads() {
+    hmrReloads++;
   }
 
   try {
@@ -387,6 +388,8 @@ async function testHMR(dir: string, config: FixtureConfig) {
       prevRawHtml = await getRawHTML();
     }
 
+    page.on("framenavigated", trackReloads);
+
     // Run HMR steps.
     for (const [hmrIdx, hmrStep] of hmrSteps.entries()) {
       // Apply file changes.
@@ -405,21 +408,26 @@ async function testHMR(dir: string, config: FixtureConfig) {
         fs.writeFileSync(filePath, newContent);
       }
 
-      // Wait for HMR update to propagate to the browser.
-      // We watch for DOM changes on #app as a signal that HMR has taken effect.
-      await page
-        .waitForFunction(
-          (prev) => {
-            const app = document.getElementById("app");
-            return app && app.innerHTML !== prev;
-          },
-          prevRawHtml,
-          { timeout: 10000 },
-        )
-        .catch(() => {
-          // Timeout is acceptable — the HMR update may not change the #app content,
-          // or the page may have been fully reloaded.
-        });
+      // // Wait for HMR update to propagate to the browser.
+      // // We listen for Vite HMR events and watch for DOM changes on #app as a signal that HMR has taken effect.
+
+      await Promise.any([
+        page.evaluate(() => (window as any).__nextHmr),
+        page
+          .waitForFunction(
+            (prev) => {
+              const app = document.getElementById("app");
+              return app && app.innerHTML !== prev;
+            },
+            prevRawHtml,
+            { timeout: 5000 },
+          )
+          .catch(() => {
+            /* Timeout */
+          }),
+      ]);
+
+      await page.waitForTimeout(100);
 
       const hmrHtml = await getHTML();
       const changesDesc = hmrStep.changes
@@ -428,7 +436,17 @@ async function testHMR(dir: string, config: FixtureConfig) {
             `${file}: ${JSON.stringify(find)} → ${JSON.stringify(replace)}`,
         )
         .join("\n");
-      snapshot += `# HMR ${hmrIdx}\n${changesDesc}\n\n`;
+
+      snapshot += `# HMR ${hmrIdx}`;
+
+      if (hmrReloads) {
+        snapshot += ` (Reload${hmrReloads > 1 ? ` x${hmrReloads}` : ""})`;
+        hmrReloads = 0;
+      } else {
+        snapshot += ` (No Reload)`;
+      }
+
+      snapshot += `\n${changesDesc}\n\n`;
 
       if (hmrHtml !== prevHtml) {
         snapshot += htmlSnapshot(hmrHtml, prevHtml);
@@ -462,6 +480,8 @@ async function testHMR(dir: string, config: FixtureConfig) {
     for (const [filePath, content] of originalFiles) {
       fs.writeFileSync(filePath, content);
     }
+    page.off("framenavigated", trackReloads);
+
     await devServer.close();
   }
 }
