@@ -1,5 +1,11 @@
 # Changelog
 
+## 6.0.4
+
+### Patch Changes
+
+- [#266](https://github.com/marko-js/vite/pull/266) [`1e2bf28`](https://github.com/marko-js/vite/commit/1e2bf28481ab0341450b95d889e14fdc289a6e21) Thanks [@rturnq](https://github.com/rturnq)! - Fix marko virtual file HMR
+
 ## 6.0.3
 
 ### Patch Changes
