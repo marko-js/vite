@@ -87,6 +87,7 @@ const virtualFiles = new Map<
   VirtualFile | DeferredPromise<VirtualFile>
 >();
 const virtualFilesForTemplate = new Map<string, Set<string>>();
+const ssrTransformCache = new Map<string, string>();
 const importTagReg = /^<([^>]+)>$/;
 const optionalWatchFileReg =
   /[\\/](?:([^\\/]+)\.)?(?:marko-tag.json|(?:style|component|component-browser)\.\w+)$/;
@@ -147,17 +148,15 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
 
       if (devServer) {
         const prev = virtualFiles.get(id);
-        if (prev) {
-          if (isDeferredPromise(prev)) {
-            prev.resolve(virtualFile);
-          } else {
-            let files = virtualFilesForTemplate.get(normalizedFrom);
-            if (!files) {
-              virtualFilesForTemplate.set(normalizedFrom, (files = new Set()));
-            }
-            files.add(id);
-          }
+        if (isDeferredPromise(prev)) {
+          prev.resolve(virtualFile);
         }
+
+        let files = virtualFilesForTemplate.get(normalizedFrom);
+        if (!files) {
+          virtualFilesForTemplate.set(normalizedFrom, (files = new Set()));
+        }
+        files.add(id);
       }
 
       virtualFiles.set(id, virtualFile);
@@ -473,6 +472,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
             entryIds.delete(fileName);
             transformWatchFiles.delete(fileName);
             transformAnalyzedTags.delete(fileName);
+            virtualFilesForTemplate.delete(fileName);
           }
 
           for (const [id, files] of transformWatchFiles) {
@@ -496,7 +496,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         });
       },
 
-      hotUpdate(ctx) {
+      async hotUpdate(ctx) {
         compiler.taglib.clearCaches();
         baseConfig.cache!.clear();
         clearScanCache();
@@ -530,8 +530,39 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
             const mods = this.environment.moduleGraph.getModulesByFile(id);
             if (mods) {
               for (const mod of mods) {
+                this.environment.moduleGraph.invalidateModule(mod);
                 modules.add(mod);
               }
+            }
+          }
+        }
+
+        if (linked && this.environment.name === "ssr") {
+          const previous = new Map<vite.EnvironmentModuleNode, string>();
+
+          for (const mod of modules) {
+            const code = ssrTransformCache.get(mod.id!);
+            if (code !== undefined) {
+              previous.set(mod, code);
+            }
+          }
+
+          if (previous.size) {
+            let reload = false;
+            for (const [mod, prevCode] of previous) {
+              await this.environment.transformRequest(mod.id!);
+              if (
+                prevCode !== ssrTransformCache.get(mod.id!) &&
+                !devServer.environments.client.moduleGraph.getModulesByFile(
+                  mod.id!,
+                )
+              ) {
+                reload = true;
+              }
+            }
+
+            if (reload) {
+              devServer.hot.send({ type: "full-reload" });
             }
           }
         }
@@ -834,6 +865,12 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           return null;
         }
 
+        const fileName = isClientEntry ? info.sourceId : id;
+
+        if (devServer) {
+          virtualFilesForTemplate.delete(normalizePath(fileName));
+        }
+
         if (isSSR) {
           if (linked) {
             cachedSources.set(id, source);
@@ -858,7 +895,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
 
         const compiled = await compiler.compile(
           source,
-          isClientEntry ? info.sourceId : id,
+          fileName,
           isSSR
             ? isCJSModule(id, rootResolveFile)
               ? serverCJSConfig
@@ -879,17 +916,17 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           }
         }
 
-        if (
-          (!info || isClientEntry) &&
-          !isTest &&
-          devServer &&
-          !isTagsApi(meta.api)
-        ) {
+        if (!isTest && devServer && !isTagsApi(meta.api)) {
           code += `\nif (import.meta.hot) import.meta.hot.accept(() => {});`;
         }
 
         if (devServer) {
-          transformWatchFiles.set(id, meta.watchFiles);
+          if (isSSR && !isServerEntry) {
+            ssrTransformCache.set(id, code);
+          }
+          if (!info) {
+            transformWatchFiles.set(id, meta.watchFiles);
+          }
           if (meta.analyzedTags) {
             const files = new Set<string>();
             transformAnalyzedTags.set(id, files);

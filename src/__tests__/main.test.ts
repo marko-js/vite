@@ -241,13 +241,6 @@ for (const fixture of fs.readdirSync(FIXTURES)) {
             port,
             hmr: false,
             watch: null,
-            // watch: {
-            //   ignored: [
-            //     "**/node_modules/**",
-            //     "**/dist/**",
-            //     "**/__snapshots__/**",
-            //   ],
-            // },
           },
           logLevel: "error",
           optimizeDeps: { force: true },
@@ -346,6 +339,11 @@ async function testHMR(dir: string, config: FixtureConfig) {
     });
   }
 
+  let hmrReloads = 0;
+  function trackReloads() {
+    hmrReloads++;
+  }
+
   try {
     await devServer.listen();
 
@@ -390,6 +388,8 @@ async function testHMR(dir: string, config: FixtureConfig) {
       prevRawHtml = await getRawHTML();
     }
 
+    page.on("framenavigated", trackReloads);
+
     // Run HMR steps.
     for (const [hmrIdx, hmrStep] of hmrSteps.entries()) {
       // Apply file changes.
@@ -413,15 +413,21 @@ async function testHMR(dir: string, config: FixtureConfig) {
 
       await Promise.any([
         page.evaluate(() => (window as any).__nextHmr),
-        page.waitForFunction(
-          (prev) => {
-            const app = document.getElementById("app");
-            return app && app.innerHTML !== prev;
-          },
-          prevRawHtml,
-          { timeout: 5000 },
-        ),
-      ]).catch(() => {});
+        page
+          .waitForFunction(
+            (prev) => {
+              const app = document.getElementById("app");
+              return app && app.innerHTML !== prev;
+            },
+            prevRawHtml,
+            { timeout: 5000 },
+          )
+          .catch(() => {
+            /* Timeout */
+          }),
+      ]);
+
+      await page.waitForTimeout(100);
 
       const hmrHtml = await getHTML();
       const changesDesc = hmrStep.changes
@@ -430,7 +436,17 @@ async function testHMR(dir: string, config: FixtureConfig) {
             `${file}: ${JSON.stringify(find)} → ${JSON.stringify(replace)}`,
         )
         .join("\n");
-      snapshot += `# HMR ${hmrIdx}\n${changesDesc}\n\n`;
+
+      snapshot += `# HMR ${hmrIdx}`;
+
+      if (hmrReloads) {
+        snapshot += ` (Reload${hmrReloads > 1 ? ` x${hmrReloads}` : ""})`;
+        hmrReloads = 0;
+      } else {
+        snapshot += ` (No Reload)`;
+      }
+
+      snapshot += `\n${changesDesc}\n\n`;
 
       if (hmrHtml !== prevHtml) {
         snapshot += htmlSnapshot(hmrHtml, prevHtml);
@@ -464,6 +480,8 @@ async function testHMR(dir: string, config: FixtureConfig) {
     for (const [filePath, content] of originalFiles) {
       fs.writeFileSync(filePath, content);
     }
+    page.off("framenavigated", trackReloads);
+
     await devServer.close();
   }
 }

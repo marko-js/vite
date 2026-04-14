@@ -6,7 +6,7 @@
 </div>
 ```
 
-# HMR 0
+# HMR 0 (Reload)
 src/template.marko: "div { color: green }" → "div { color: blue }"
 
 ```diff

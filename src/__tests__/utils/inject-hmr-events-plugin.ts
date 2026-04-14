@@ -12,10 +12,8 @@ export default (): Plugin => {
           `
 if (import.meta.hot) {
   import.meta.hot.on("vite:afterUpdate", () => {
-    requestAnimationFrame(() => {
-      window.__nextHmr.resolve();
-      window.__nextHmr = createDeferred();
-    });
+    window.__nextHmr.resolve();
+    window.__nextHmr = createDeferred();
   });
   import.meta.hot.on("vite:error", (err) => {
     window.__nextHmr.reject(err);

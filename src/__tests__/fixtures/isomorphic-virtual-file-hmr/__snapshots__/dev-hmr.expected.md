@@ -12,7 +12,7 @@
 </div>
 ```
 
-# HMR 0
+# HMR 0 (No Reload)
 src/template.marko: "div { color: green }" → "div { color: blue }"
 
 (no change)
@@ -26,7 +26,7 @@ await page.click("#clickable")
 
 ```
 
-# HMR 1
+# HMR 1 (No Reload)
 src/template.marko: "div { color: blue }" → "div { color: red }"
 
 (no change)
