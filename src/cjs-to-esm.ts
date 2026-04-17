@@ -6,19 +6,44 @@ const REQUIRE_RE = /([^.\w$]|^)require\s*\(\s*(['"])(.*?)\2\s*\)/g;
 const REQUIRE_TEST_RE = /([^.\w$]|^)require\s*\(\s*['"]/;
 const EXPORTS_RE = /\b(module\.exports|exports)\b/;
 const CJS_INTEROP_HELPER = `function __cjs_default__(ns) {
-  var keys = Object.getOwnPropertyNames(ns);
-  var hasNamed = false;
-  var hasDefault = false;
-  for (var i = 0; i < keys.length; i++) {
-    var k = keys[i];
+  let hasDefault = false;
+  let hasNamed = false;
+  const mod = Object.create(null);
+
+  Object.defineProperty(mod, '__esModule', {
+    value: true,
+    enumerable: false,
+    configurable: true,
+  });
+
+  for (const k of Object.getOwnPropertyNames(ns)) {
     if (k === "default") {
       hasDefault = true;
-    } else if (k !== "__esModule" && k !== "module.exports") {
-      try { if (ns[k] != null) hasNamed = true; } catch(e) {}
+    } else if (!hasNamed && !(k === "__esModule" || k === "module.exports")) {
+      try {
+        if (ns[k] == null) continue;
+        if (ns.__esModule) return ns;
+      } catch {}      
+      hasNamed = true;
     }
+
+    Object.defineProperty(mod, k, {
+      get() { return ns[k]; },
+      enumerable: true,
+      configurable: false,
+    });
   }
-  if (hasNamed) return ns;
-  if (hasDefault) return ns["default"];
+  
+  for (const k of Object.getOwnPropertySymbols(ns)) {
+    Object.defineProperty(mod, k, {
+      get() { return ns[k]; },
+      enumerable: false,
+      configurable: false,
+    });
+  }
+  
+  if (hasNamed) return mod;
+  if (hasDefault) return mod.default;
   return ns;
 }`;
 
