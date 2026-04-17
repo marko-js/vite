@@ -1,5 +1,11 @@
 # Changelog
 
+## 5.4.9
+
+### Patch Changes
+
+- [#270](https://github.com/marko-js/vite/pull/270) [`3eb6590`](https://github.com/marko-js/vite/commit/3eb6590d638289e0932004561dfd3cc60f0bf58a) Thanks [@rturnq](https://github.com/rturnq)! - Improve default import helper for commonjs translation in dev SSR
+
 ## 5.4.8
 
 ### Patch Changes
