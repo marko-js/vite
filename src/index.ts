@@ -11,7 +11,7 @@ import cjsInteropTranslate, {
   cjsInteropHelpersCode,
   cjsInteropHelpersId,
 } from "./cjs-interop-translate";
-import { transformCjsToEsm } from "./cjs-to-esm";
+import transformCjsToEsm from "./cjs-to-esm";
 import globImportTransformer from "./glob-import-transform";
 import {
   type DocManifest,
