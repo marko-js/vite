@@ -1,5 +1,11 @@
 # Changelog
 
+## 6.0.6
+
+### Patch Changes
+
+- [#274](https://github.com/marko-js/vite/pull/274) [`aca09c6`](https://github.com/marko-js/vite/commit/aca09c67b0c50f85d7acbaffcd7643b91653e530) Thanks [@rturnq](https://github.com/rturnq)! - Revert back to @chialabs/estransform for handling SSR commonjs deps in dev mode
+
 ## 6.0.5
 
 ### Patch Changes
