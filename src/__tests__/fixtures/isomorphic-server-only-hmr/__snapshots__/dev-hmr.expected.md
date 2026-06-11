@@ -19,7 +19,7 @@
 ```
 
 # Step 0
-await page.click("#clickable")
+browser.window.document.querySelector("#clickable").click()
 
 ```diff
 -    Mounted: true Clicks: 0
@@ -39,7 +39,7 @@ src/template.marko: "<h1>Hello</h1>" → "<h1>Goodbye</h1>"
 ```
 
 # HMR 0 Step 0
-await page.click("#clickable")
+browser.window.document.querySelector("#clickable").click()
 
 ```diff
 -    Mounted: true Clicks: 0

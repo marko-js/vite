@@ -18,7 +18,7 @@ src/template.marko: "div { color: green }" → "div { color: blue }"
 (no change)
 
 # HMR 0 Step 0
-await page.click("#clickable")
+browser.window.document.querySelector("#clickable").click()
 
 ```diff
 -    Color: rgb(0, 128, 0)
@@ -32,7 +32,7 @@ src/template.marko: "div { color: blue }" → "div { color: red }"
 (no change)
 
 # HMR 1 Step 0
-await page.click("#clickable")
+browser.window.document.querySelector("#clickable").click()
 
 ```diff
 -    Color: rgb(0, 0, 255)

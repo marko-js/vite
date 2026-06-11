@@ -25,7 +25,7 @@
 ```
 
 # Step 0
-for(const el of await page.$$(".clickable")){await el.click()
+for(const el of browser.window.document.querySelectorAll(".clickable")){el.click()
 
 ```diff
 -  Mounted: true Clicks: 0

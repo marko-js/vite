@@ -2,12 +2,9 @@ import assert from "assert";
 
 import type { Options } from "../../..";
 
-async function hasScript(pattern: RegExp) {
-  const headScripts = await page.locator("head > script");
-  const len = await headScripts.count();
-  for (let i = 0; i < len; i++) {
-    const script = await headScripts.nth(i).innerHTML();
-    if (pattern.test(script)) {
+function hasScript(pattern: RegExp) {
+  for (const el of browser.window.document.querySelectorAll("head > script")) {
+    if (pattern.test(el.innerHTML)) {
       return true;
     }
   }
@@ -15,12 +12,12 @@ async function hasScript(pattern: RegExp) {
 }
 
 export const ssr = true;
-export async function steps() {
+export function steps() {
   assert(
-    await hasScript(/\$mbp[a-z0-1-_\s]*=/i),
+    hasScript(/\$mbp[a-z0-1-_\s]*=/i),
     "Base path script not found in head",
   );
-  await page.click("#clickable");
+  browser.window.document.querySelector<HTMLElement>("#clickable")!.click();
 }
 export const options: Options = {
   basePathVar: "assetsPath",

@@ -1,5 +1,5 @@
 <let/color>
 <script>
-  color = $el().computedStyleMap().get("color");
+  color = getComputedStyle($el()).color;
 </script>
 <div/$el>Color: ${color}</div>

@@ -13,7 +13,7 @@
 ```
 
 # Step 0
-(0,import_assert.default)(await hasScript(/\$mbp[a-z0-1-_\s]*=/i),"Base path script not found in head");await page.click("#clickable")
+(0,import_assert.default)(hasScript(/\$mbp[a-z0-1-_\s]*=/i),"Base path script not found in head");browser.window.document.querySelector("#clickable").click()
 
 ```diff
 -    Mounted: true Clicks: 0 LOGO_PATH: /my-prefix/logo-[hash].svg ENV: /

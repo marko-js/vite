@@ -2,8 +2,6 @@ export const x = 1;
 
 import { x as y } from './template.marko';
 
-$ console.log(y);
-
 style {
   div { color: green }
 }
@@ -11,5 +9,6 @@ style {
 <layout-component>
   <div#app>
     <implicit-component/>
+    <div id="circular">Circular import value: ${y}</div>
   </div>
 </layout-component>

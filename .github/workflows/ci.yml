@@ -44,7 +44,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest]
-        node: [20, 22, 24]
+        node: [22, 24]
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
@@ -55,8 +55,6 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm i npm@11.6.0 -g && npm ci
-      - name: Playwright Install
-        run: npx playwright install --with-deps chromium
       - name: Run tests
         run: npm run ci:test
       - name: Report code coverage

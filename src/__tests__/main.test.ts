@@ -8,28 +8,20 @@ import snap from "mocha-snap";
 import { createRequire } from "module";
 import net from "net";
 import path from "path";
-import * as playwright from "playwright";
 import url from "url";
 
 import markoPlugin, { type Options } from "..";
+import { type Browser, fromURL } from "./utils/create-browser";
 import injectHmrEventsPlugin from "./utils/inject-hmr-events-plugin";
 
 const __dirname = path.dirname(url.fileURLToPath(import.meta.url));
 
 declare global {
-  const page: playwright.Page;
-  namespace NodeJS {
-    interface Global {
-      page: playwright.Page;
-    }
+  var browser: Browser;
+  interface Window {
+    __nextHmr?: Promise<void>;
   }
 }
-
-declare namespace globalThis {
-  let page: playwright.Page;
-}
-
-declare let __loading__: Promise<void> | undefined;
 
 type Step = () => Promise<unknown> | unknown;
 type HMRChange = [file: string, find: string, replace: string];
@@ -45,96 +37,11 @@ interface FixtureConfig {
 
 const requireCwd = createRequire(process.cwd());
 let vite: typeof import("vite");
-let browser: playwright.Browser;
+let browser: Browser;
 
 before(async () => {
   vite = await import("vite");
-  browser = await playwright.chromium.launch();
-  const context = await browser.newContext();
-  context.on("console", (msg) => console.log(`[${msg.type()}] ${msg.text()}`));
-  await context.addInitScript(() => {
-    // needed for esbuild.
-    (window as any).__name = (v: any) => v;
-    __loading__ = undefined;
-
-    const seen = new Set<string>();
-    let remaining = 0;
-    let resolve: undefined | (() => void);
-    window.addEventListener("error", onError);
-    window.addEventListener("unhandledrejection", onError);
-    onMutate(document, (_, obs) => {
-      if (!document.body) return;
-      obs.disconnect();
-      trackAssets();
-      onMutate(document.body, trackAssets);
-    });
-
-    function onMutate(target: Node, fn: MutationCallback) {
-      new MutationObserver(fn).observe(target, {
-        childList: true,
-        subtree: true,
-      });
-    }
-    function trackAssets() {
-      for (const el of document.querySelectorAll<
-        HTMLScriptElement | HTMLLinkElement
-      >("script[src],link[rel=stylesheet][href]")) {
-        const href = "src" in el ? el.src : el.href;
-        if (href && !seen.has(href)) {
-          const link = document.createElement("link");
-          __loading__ ||= new Promise((r) => (resolve = r));
-          seen.add(href);
-          remaining++;
-
-          if ("src" in el) {
-            if (el.getAttribute("type") === "module") {
-              link.rel = "modulepreload";
-            } else {
-              link.rel = "preload";
-              link.as = "script";
-            }
-          } else {
-            link.rel = "preload";
-            link.as = "style";
-          }
-
-          link.href = href;
-          link.onload = link.onerror = () => {
-            link.onload = link.onerror = null;
-            link.remove();
-            seen.delete(href);
-            if (!--remaining) {
-              resolve?.();
-              resolve = __loading__ = undefined;
-            }
-          };
-          document.head.append(link);
-        }
-      }
-    }
-    function onError(ev: ErrorEvent | PromiseRejectionEvent) {
-      const msg =
-        ev instanceof PromiseRejectionEvent
-          ? `${ev.reason}\n`
-          : `${ev.error || `Error loading ${(ev.target as any).outerHTML}`}\n`;
-      if (!msg.includes("WebSocket closed")) {
-        let errorContainer = document.getElementById("error");
-        if (!errorContainer) {
-          errorContainer = document.createElement("pre");
-          errorContainer.id = "error";
-          (document.getElementById("app") || document.body).appendChild(
-            errorContainer,
-          );
-        }
-        errorContainer.insertAdjacentText("beforeend", msg);
-      }
-    }
-  });
-
-  globalThis.page = await context.newPage();
 });
-
-after(() => browser.close());
 
 const FIXTURES = path.join(__dirname, "fixtures");
 
@@ -168,21 +75,16 @@ for (const fixture of fs.readdirSync(FIXTURES)) {
       });
     }
 
-    const steps: Step[] = config.steps
-      ? Array.isArray(config.steps)
-        ? config.steps
-        : [config.steps]
-      : [];
+    const steps = toSteps(config.steps);
 
     if (config.ssr) {
       it("dev", async () => {
-        const port = await getAvailablePort();
         const server = (
           await import(url.pathToFileURL(path.join(dir, "dev-server.mjs")).href)
-        ).default.listen(port) as http.Server;
+        ).default.listen(0) as http.Server;
         try {
           await once(server, "listening");
-          await testPage(dir, steps, port);
+          await testPage(dir, steps, getPort(server));
         } finally {
           server.close();
         }
@@ -214,14 +116,13 @@ for (const fixture of fs.readdirSync(FIXTURES)) {
           },
         });
 
-        const port = await getAvailablePort();
         const server = (
           await import(url.pathToFileURL(path.join(dir, "server.mjs")).href)
-        ).default.listen(port) as http.Server;
+        ).default.listen(0) as http.Server;
 
         try {
           await once(server, "listening");
-          await testPage(dir, steps, port);
+          await testPage(dir, steps, getPort(server));
         } finally {
           server.close();
         }
@@ -234,11 +135,10 @@ for (const fixture of fs.readdirSync(FIXTURES)) {
       }
     } else {
       it("dev", async () => {
-        const port = await getAvailablePort();
         const devServer = await vite.createServer({
           root: dir,
           server: {
-            port,
+            port: 0,
             hmr: false,
             watch: null,
           },
@@ -249,7 +149,7 @@ for (const fixture of fs.readdirSync(FIXTURES)) {
 
         try {
           await devServer.listen();
-          await testPage(dir, steps, port);
+          await testPage(dir, steps, getPort(devServer.httpServer!));
         } finally {
           await devServer.close();
         }
@@ -266,7 +166,6 @@ for (const fixture of fs.readdirSync(FIXTURES)) {
           },
         });
 
-        const port = await getAvailablePort();
         const previewServer = await vite.preview({
           root: dir,
           server: {
@@ -278,11 +177,11 @@ for (const fixture of fs.readdirSync(FIXTURES)) {
               ],
             },
           },
-          preview: { port },
+          preview: { port: 0 },
         });
 
         try {
-          await testPage(dir, steps, port);
+          await testPage(dir, steps, getPort(previewServer.httpServer));
         } finally {
           await previewServer.close();
         }
@@ -299,12 +198,8 @@ for (const fixture of fs.readdirSync(FIXTURES)) {
 
 async function testHMR(dir: string, config: FixtureConfig) {
   const hmrSteps = config.hmr!;
-  const port = await getAvailablePort();
   const originalFiles = new Map<string, string>();
 
-  // Create a dev server with HMR enabled.
-  // We use mode "development" (not "test") so the plugin enables HMR features
-  // (hot compiler flag, import.meta.hot.accept injection).
   const devServer = await vite.createServer({
     root: dir,
     mode: "development",
@@ -313,7 +208,7 @@ async function testHMR(dir: string, config: FixtureConfig) {
     plugins: [markoPlugin(config.options), injectHmrEventsPlugin()],
     optimizeDeps: { force: true },
     server: {
-      port,
+      port: 0,
       hmr: true,
       watch: {
         ignored: ["**/node_modules/**", "**/dist/**", "**/__snapshots__/**"],
@@ -325,7 +220,6 @@ async function testHMR(dir: string, config: FixtureConfig) {
   });
 
   if (config.ssr) {
-    // For SSR fixtures, add middleware that handles SSR rendering.
     devServer.middlewares.use(async (req, res, next) => {
       try {
         const { handler } = await devServer.ssrLoadModule(
@@ -339,60 +233,35 @@ async function testHMR(dir: string, config: FixtureConfig) {
     });
   }
 
-  let hmrReloads = 0;
-  function trackReloads() {
-    hmrReloads++;
-  }
-
   try {
     await devServer.listen();
-
-    // Navigate to the page and capture initial state.
-    await page.goto(`http://localhost:${port}`);
-
-    const title = await page.title();
-    if (title === "Error") {
-      const error = new Error("Error in response");
-      const html = await page.locator("pre").innerHTML();
-      if (html) {
-        error.stack = JSDOM.fragment(html.replace(/<br>/g, "\n")).textContent!;
-      }
-      throw error;
-    }
+    const port = getPort(devServer.httpServer!);
+    await openPage(port);
 
     let snapshot = "";
     let prevHtml: string | undefined;
     let prevRawHtml: string | undefined;
 
-    await page.waitForSelector("#app");
     snapshot += `# Loading\n\n`;
-    const html = await getHTML();
-    prevRawHtml = await getRawHTML();
-    snapshot += htmlSnapshot(html, prevHtml);
-    prevHtml = html;
+    const initialHtml = getHTML();
+    prevRawHtml = getRawHTML();
+    snapshot += htmlSnapshot(initialHtml, prevHtml);
+    prevHtml = initialHtml;
 
-    // Run initial interaction steps if provided at top-level.
-    const initialSteps: Step[] = config.steps
-      ? Array.isArray(config.steps)
-        ? config.steps
-        : [config.steps]
-      : [];
-
-    for (const [i, step] of initialSteps.entries()) {
+    for (const [i, step] of toSteps(config.steps).entries()) {
       snapshot += `# Step ${i}\n${getStepString(step)}\n\n`;
       await step();
-      const stepHtml = await getHTML();
+      await browser.drain();
+      const stepHtml = getHTML();
       if (stepHtml === prevHtml) continue;
       snapshot += htmlSnapshot(stepHtml, prevHtml);
       prevHtml = stepHtml;
-      prevRawHtml = await getRawHTML();
+      prevRawHtml = getRawHTML();
     }
 
-    page.on("framenavigated", trackReloads);
+    let prevReloadCount = browser.reloadCount;
 
-    // Run HMR steps.
     for (const [hmrIdx, hmrStep] of hmrSteps.entries()) {
-      // Apply file changes.
       for (const [file, find, replace] of hmrStep.changes) {
         const filePath = path.join(dir, file);
         if (!originalFiles.has(filePath)) {
@@ -408,28 +277,32 @@ async function testHMR(dir: string, config: FixtureConfig) {
         fs.writeFileSync(filePath, newContent);
       }
 
-      // // Wait for HMR update to propagate to the browser.
-      // // We listen for Vite HMR events and watch for DOM changes on #app as a signal that HMR has taken effect.
-
       await Promise.any([
-        page.evaluate(() => (window as any).__nextHmr),
-        page
-          .waitForFunction(
-            (prev) => {
-              const app = document.getElementById("app");
-              return app && app.innerHTML !== prev;
-            },
-            prevRawHtml,
-            { timeout: 5000 },
-          )
-          .catch(() => {
-            /* Timeout */
-          }),
+        // If the client entry hasn't installed __nextHmr, never settle so the
+        // waitFor below is the only signal (Promise.any would otherwise treat
+        // undefined as an immediately fulfilled value).
+        browser.window.__nextHmr ?? new Promise<never>(() => {}),
+        waitFor(
+          () =>
+            getRawHTML() !== prevRawHtml ||
+            browser.reloadCount !== prevReloadCount,
+        ),
       ]);
 
-      await page.waitForTimeout(100);
+      // Vite debounces full-page reloads by 20ms after vite:afterUpdate.
+      // Sleep longer than the debounce before reading reloadCount.
+      await sleep(50);
+      await browser.drain();
 
-      const hmrHtml = await getHTML();
+      const hmrReloads = browser.reloadCount - prevReloadCount;
+      if (hmrReloads) {
+        // JSDOM can't navigate, so simulate the reload by re-opening the page
+        // to capture the freshly server-rendered result.
+        await openPage(port);
+      }
+      prevReloadCount = browser.reloadCount;
+
+      const hmrHtml = getHTML();
       const changesDesc = hmrStep.changes
         .map(
           ([file, find, replace]) =>
@@ -441,7 +314,6 @@ async function testHMR(dir: string, config: FixtureConfig) {
 
       if (hmrReloads) {
         snapshot += ` (Reload${hmrReloads > 1 ? ` x${hmrReloads}` : ""})`;
-        hmrReloads = 0;
       } else {
         snapshot += ` (No Reload)`;
       }
@@ -451,93 +323,101 @@ async function testHMR(dir: string, config: FixtureConfig) {
       if (hmrHtml !== prevHtml) {
         snapshot += htmlSnapshot(hmrHtml, prevHtml);
         prevHtml = hmrHtml;
-        prevRawHtml = await getRawHTML();
+        prevRawHtml = getRawHTML();
       } else {
         snapshot += `(no change)\n\n`;
       }
 
-      // Run any post-HMR interaction steps.
-      const postSteps: Step[] = hmrStep.steps
-        ? Array.isArray(hmrStep.steps)
-          ? hmrStep.steps
-          : [hmrStep.steps]
-        : [];
-
-      for (const [i, step] of postSteps.entries()) {
+      for (const [i, step] of toSteps(hmrStep.steps).entries()) {
         snapshot += `# HMR ${hmrIdx} Step ${i}\n${getStepString(step)}\n\n`;
         await step();
-        const stepHtml = await getHTML();
+        await browser.drain();
+        const stepHtml = getHTML();
         if (stepHtml === prevHtml) continue;
         snapshot += htmlSnapshot(stepHtml, prevHtml);
         prevHtml = stepHtml;
-        prevRawHtml = await getRawHTML();
+        prevRawHtml = getRawHTML();
       }
     }
 
     await snap(snapshot, { ext: ".md", dir });
   } finally {
-    // Restore all mutated files.
+    // Close the page before the server so the Vite client's reconnect
+    // polling (which assumes a restarting dev server) can't keep running
+    // against the closed port.
+    globalThis.browser?.window.close();
     for (const [filePath, content] of originalFiles) {
       fs.writeFileSync(filePath, content);
     }
-    page.off("framenavigated", trackReloads);
-
     await devServer.close();
   }
 }
 
 async function testPage(dir: string, steps: Step[], port: number) {
-  await page.goto(`http://localhost:${port}`);
+  try {
+    await openPage(port);
 
-  const title = await page.title();
-  if (title === "Error") {
+    let snapshot = "";
+    let prevHtml: string | undefined;
+
+    snapshot += `# Loading\n\n`;
+    const initialHtml = getHTML();
+    snapshot += htmlSnapshot(initialHtml, prevHtml);
+    prevHtml = initialHtml;
+
+    for (const [i, step] of steps.entries()) {
+      snapshot += `# Step ${i}\n${getStepString(step)}\n\n`;
+      await step();
+      await browser.drain();
+      const html = getHTML();
+      if (html === prevHtml) continue;
+      snapshot += htmlSnapshot(html, prevHtml);
+      prevHtml = html;
+    }
+
+    await snap(snapshot, { ext: ".md", dir });
+  } finally {
+    // Close the page before the caller closes its server, so the Vite
+    // client's reconnect polling can't keep running against the closed port.
+    globalThis.browser?.window.close();
+  }
+}
+
+async function openPage(port: number): Promise<void> {
+  globalThis.browser?.window.close();
+  browser = globalThis.browser = await fromURL(`http://localhost:${port}`);
+  while (browser.flush()) {
+    // Apply every server flush; tests that assert intermediate streamed
+    // states can instead step through flushes one at a time.
+  }
+  await browser.settle();
+  await browser.drain();
+
+  const { document } = browser.window;
+  if (document.title === "Error") {
+    const pre = document.querySelector("pre");
     const error = new Error("Error in response");
-    const html = await page.locator("pre").innerHTML();
-    if (html) {
-      error.stack = JSDOM.fragment(html.replace(/<br>/g, "\n")).textContent!;
+    if (pre) {
+      error.stack = JSDOM.fragment(
+        pre.innerHTML.replace(/<br>/g, "\n"),
+      ).textContent!;
     }
     throw error;
   }
-
-  let snapshot = "";
-  let prevHtml: string | undefined;
-
-  await page.waitForSelector("#app");
-  snapshot += `# Loading\n\n`;
-  const html = await getHTML();
-  snapshot += htmlSnapshot(html, prevHtml);
-  prevHtml = html;
-
-  for (const [i, step] of steps.entries()) {
-    snapshot += `# Step ${i}\n${getStepString(step)}\n\n`;
-    await step();
-    const html = await getHTML();
-    if (html === prevHtml) continue;
-    snapshot += htmlSnapshot(html, prevHtml);
-    prevHtml = html;
+  if (!document.getElementById("app")) {
+    throw new Error("No #app element found");
   }
-
-  await snap(snapshot, { ext: ".md", dir });
 }
 
-async function getHTML() {
+function toSteps(steps?: Step | Step[]): Step[] {
+  return steps == null ? [] : Array.isArray(steps) ? steps : [steps];
+}
+
+function getHTML() {
   return defaultSerializer(
     defaultNormalizer(
       JSDOM.fragment(
-        await page.evaluate(async () => {
-          do {
-            await __loading__;
-            await new Promise((r) => {
-              requestAnimationFrame(() => {
-                const { port1, port2 } = new MessageChannel();
-                port1.onmessage = r;
-                port2.postMessage(0);
-              });
-            });
-          } while (__loading__);
-
-          return document.getElementById("app")?.innerHTML || "";
-        }),
+        browser.window.document.getElementById("app")?.innerHTML || "",
       ),
     ),
   )
@@ -546,17 +426,27 @@ async function getHTML() {
     .replace(/[?&][tv]=[\d.]+/, "");
 }
 
-async function getRawHTML() {
-  return page.evaluate(() => document.getElementById("app")?.innerHTML || "");
+function getRawHTML() {
+  return browser.window.document.getElementById("app")?.innerHTML || "";
 }
 
-async function getAvailablePort() {
-  return new Promise<number>((resolve) => {
-    const server = net.createServer().listen(0, () => {
-      const { port } = server.address() as net.AddressInfo;
-      server.close(() => resolve(port));
-    });
-  });
+function getPort(server: Pick<net.Server, "address">) {
+  // Servers are always started on port 0 — the kernel assigns a free port
+  // atomically, unlike probing for one (which races against other sockets,
+  // including this process's own outgoing connections).
+  return (server.address() as net.AddressInfo).port;
+}
+
+async function waitFor(fn: () => boolean, timeout = 5000): Promise<void> {
+  const deadline = Date.now() + timeout;
+  while (Date.now() < deadline) {
+    if (fn()) return;
+    await sleep(50);
+  }
+}
+
+function sleep(ms: number) {
+  return new Promise<void>((r) => setTimeout(r, ms));
 }
 
 function getStepString(step: Step) {

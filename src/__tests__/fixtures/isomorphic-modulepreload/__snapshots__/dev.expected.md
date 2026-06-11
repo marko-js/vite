@@ -13,7 +13,7 @@
 ```
 
 # Step 0
-await page.click("#clickable")
+browser.window.document.querySelector("#clickable").click()
 
 ```diff
 -    Mounted: true Clicks: 0 LOGO_PATH: /src/components/logo.svg ENV: /
