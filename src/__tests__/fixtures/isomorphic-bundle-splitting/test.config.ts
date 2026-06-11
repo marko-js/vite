@@ -1,6 +1,8 @@
 export const ssr = true;
-export async function steps() {
-  for (const el of await page.$$(".clickable")) {
-    await el.click();
+export function steps() {
+  for (const el of browser.window.document.querySelectorAll<HTMLElement>(
+    ".clickable",
+  )) {
+    el.click();
   }
 }

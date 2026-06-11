@@ -9,7 +9,7 @@ class {
   }
 
   updateColor() {
-    this.state.color = document.querySelector("#clickable").computedStyleMap().get("color");
+    this.state.color = getComputedStyle(document.querySelector("#clickable")).color;
   }
 }
 

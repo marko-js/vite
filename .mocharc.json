@@ -1,6 +1,8 @@
 {
   "exit": true,
   "timeout": 20000,
+  "no-warnings": true,
+  "experimental-vm-modules": true,
   "extension": ["js", "ts", "marko"],
   "watchFiles": ["src/**/*.ts", "src/**/*.marko"],
   "require": ["tsx", "mocha-snap"]
