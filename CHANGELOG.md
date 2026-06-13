@@ -1,5 +1,13 @@
 # Changelog
 
+## 6.1.0
+
+### Minor Changes
+
+- [#277](https://github.com/marko-js/vite/pull/277) [`94f5609`](https://github.com/marko-js/vite/commit/94f5609ed4457c924fa532e9e321f550794fc0d1) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Add support for the Marko compiler's built-in asset orchestration. When the installed compiler and translator support it, the plugin lets the compiler generate server entry wrappers and flush assets, including assets for lazily loaded (`import ... with { load }`) templates.
+
+  The `getMarkoAssetCodeForEntry` plugin api is now deprecated. It targets the legacy asset handling, so any plugin providing it opts the build out of the compiler's built-in asset orchestration.
+
 ## 6.0.6
 
 ### Patch Changes
