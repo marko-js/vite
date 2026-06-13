@@ -1,7 +1,7 @@
 import { ElementType } from "domelementtype";
 import type { Comment, Element, Node, Text } from "domhandler";
 
-enum InjectType {
+export enum InjectType {
   AssetAttrs = 0,
   PublicPath = 1,
   Dedupe = 2,

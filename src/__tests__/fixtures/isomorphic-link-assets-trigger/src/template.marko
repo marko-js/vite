@@ -1,0 +1,12 @@
+import Lazy from "./tags/lazy.marko" with { load: "on-click#load-lazy" }
+
+<style>
+  div { color: green }
+</style>
+
+<layout>
+  <div#app>
+    <button#load-lazy>Load lazy</button>
+    <Lazy/>
+  </div>
+</layout>

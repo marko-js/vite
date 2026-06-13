@@ -1,6 +1,11 @@
 # Loading
 
 ```html
+<script
+  async=""
+  src="/src/components/class-[hash].client-[hash].marko"
+  type="module"
+/>
 <div
   class="clickable"
 >
