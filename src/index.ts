@@ -14,9 +14,18 @@ import cjsInteropTranslate, {
 import transformCjsToEsm from "./cjs-to-esm";
 import globImportTransformer from "./glob-import-transform";
 import {
+  getDevLoadAssetsManifest,
+  getLinkAssetsRuntime,
+  getRegisterAssetsCode,
+  linkAssetsRuntimeId,
+  supportsLinkAssets,
+} from "./link-assets";
+import {
   type DocManifest,
   generateDocManifest,
   generateInputDoc,
+  generateLinkAssetsManifest,
+  type LinkAssetsDocManifest,
 } from "./manifest-generator";
 import { normalizePath, POSIX_SEP, WINDOWS_SEP } from "./normalize-path";
 import { ReadOncePersistedStore } from "./read-once-persisted-store";
@@ -32,6 +41,12 @@ import { clearScanCache } from "./scan";
 import getServerEntryTemplate from "./server-entry-template";
 
 export namespace API {
+  /**
+   * @deprecated This api targets the legacy asset orchestration and will be
+   * removed in a future release. Providing it opts the plugin out of the
+   * Marko compiler's built-in asset orchestration (the `linkAssets` compiler
+   * option).
+   */
   export type getMarkoAssetCodeForEntry = (id: string) => string | void;
 }
 
@@ -53,11 +68,12 @@ export interface Options {
 enum InternalFileKind {
   clientEntry,
   serverEntry,
+  loadEntry,
   virtual,
 }
 
 interface ClientManifest {
-  [id: string]: DocManifest;
+  [id: string]: DocManifest | LinkAssetsDocManifest;
 }
 
 interface ServerManifest {
@@ -65,6 +81,9 @@ interface ServerManifest {
     [entryId: string]: string;
   };
   entrySources: {
+    [entryId: string]: string;
+  };
+  loadEntries?: {
     [entryId: string]: string;
   };
   chunksNeedingAssets: string[];
@@ -87,6 +106,7 @@ const virtualFiles = new Map<
   VirtualFile | DeferredPromise<VirtualFile>
 >();
 const virtualFilesForTemplate = new Map<string, Set<string>>();
+const virtualFilesResetForTemplate = new Map<string, number>();
 const ssrTransformCache = new Map<string, string>();
 const importTagReg = /^<([^>]+)>$/;
 const optionalWatchFileReg =
@@ -96,6 +116,7 @@ const markoExt = ".marko";
 const htmlExt = ".html";
 const clientEntryExt = ".client-entry.marko";
 const serverEntryExt = ".server-entry.marko";
+const loadEntryExt = ".load-entry.marko";
 const virtualFileInfix = "-virtual";
 const virtualFileReg = /^(.*\.marko)-virtual((?:\.[^\\/?]+)+)$/;
 const resolveOpts = { skipSelf: true };
@@ -124,23 +145,32 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
   let baseConfig: compiler.Config;
   let clientConfig: compiler.Config;
   let clientEntryConfig: compiler.Config;
+  let clientLoadEntryConfig: compiler.Config;
   let serverConfig: compiler.Config;
   let serverCJSConfig: compiler.Config;
   let serverEntryConfig: compiler.Config;
+  let serverEntryLinkConfig: compiler.Config;
+  let useLinkAssets = false;
   let virtualFileCacheDirPromise: Promise<unknown> | undefined;
 
   const resolveVirtualDependency: compiler.Config["resolveVirtualDependency"] =
     (from, dep) => {
       const { virtualPath } = dep;
       const normalizedFrom = normalizePath(from);
-      const sourceBaseName = path.basename(from);
-      const virtualBaseName = path.basename(virtualPath);
-      const virtualExt =
-        virtualFileInfix +
-        (virtualBaseName.startsWith(sourceBaseName)
-          ? virtualBaseName.slice(sourceBaseName.length)
-          : `.${virtualBaseName.replace(/[^a-z0-9_.-]+/gi, "_")}`);
-      const id = normalizedFrom + virtualExt;
+      const nativeFrom = path.join(from);
+      const resolvedVirtualPath = path.join(nativeFrom, "..", virtualPath);
+      const virtualBaseName = path.basename(resolvedVirtualPath);
+      const markoBaseName = /^.*?\.marko(?=\.)/.exec(virtualBaseName)?.[0];
+      const virtualFileName = markoBaseName
+        ? path.join(
+            resolvedVirtualPath,
+            "..",
+            markoBaseName +
+              virtualFileInfix +
+              virtualBaseName.slice(markoBaseName.length),
+          )
+        : `${nativeFrom}${virtualFileInfix}.${virtualBaseName.replace(/[^a-z0-9_.-]+/gi, "_")}`;
+      const id = normalizePath(virtualFileName);
       const virtualFile = {
         code: dep.code,
         map: stripSourceRoot(dep.map),
@@ -160,7 +190,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
       }
 
       virtualFiles.set(id, virtualFile);
-      return `./${sourceBaseName + virtualExt}`;
+      return relativeImportPath(nativeFrom, virtualFileName);
     };
 
   let root: string;
@@ -169,6 +199,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
   let devEntryFile: string;
   let devEntryFilePosix: string;
   let renderAssetsRuntimeCode: string;
+  let linkAssetsRuntimeCode: string;
   let isTest = false;
   let isBuild = false;
   let hasBuildApp = false;
@@ -180,6 +211,8 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
   let checkIsEntry: NonNullable<Options["isEntry"]> = () => true;
 
   const entryIds = new Set<string>();
+  const pageAssetIds = new Map<string, string>();
+  const loadAssetIds = new Map<string, string>();
   const cachedSources = new Map<string, string>();
   const transformWatchFiles = new Map<string, string[]>();
   const transformAnalyzedTags = new Map<string, Set<string>>();
@@ -252,6 +285,38 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           (baseConfig as any).markoViteLinked = linked;
         }
 
+        useLinkAssets = linked && supportsLinkAssets(opts.translator);
+
+        if (useLinkAssets) {
+          baseConfig.linkAssets = {
+            runtime: linkAssetsRuntimeId,
+            onAsset(kind, filename, assetId) {
+              const file = normalizePath(filename);
+              if (kind === "page") {
+                pageAssetIds.set(file, assetId);
+              } else if (isBuild) {
+                if (serverManifest) {
+                  (serverManifest.loadEntries ??= {})[assetId] = normalizePath(
+                    path.relative(root, file),
+                  );
+                }
+              } else if (devServer && !loadAssetIds.has(file)) {
+                loadAssetIds.set(file, assetId);
+                // The template may have already been transformed before it
+                // was known to be lazily loaded. Re-transform it so its
+                // compiled output includes the dev asset registration.
+                const { moduleGraph } = devServer.environments.ssr;
+                const mods = moduleGraph.getModulesByFile(file);
+                if (mods) {
+                  for (const mod of mods) {
+                    moduleGraph.invalidateModule(mod);
+                  }
+                }
+              }
+            },
+          };
+        }
+
         const cjsInteropMarkoVite = {
           filter:
             isBuild || isTest ? undefined : (path: string) => !/^\./.test(path),
@@ -278,11 +343,26 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           ...serverConfig,
           sourceMaps: false,
         };
+        serverEntryLinkConfig = {
+          ...serverConfig,
+          entry: "page",
+          sourceMaps: false,
+        };
+        clientLoadEntryConfig = {
+          ...clientConfig,
+          entry: "load",
+          sourceMaps: false,
+        };
 
         compiler.configure(baseConfig);
         devEntryFile = path.join(root, "index.html");
         devEntryFilePosix = normalizePath(devEntryFile);
         renderAssetsRuntimeCode = getRenderAssetsRuntime({
+          isBuild,
+          basePathVar,
+          runtimeId,
+        });
+        linkAssetsRuntimeCode = getLinkAssetsRuntime({
           isBuild,
           basePathVar,
           runtimeId,
@@ -457,10 +537,36 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
             }
           }
         }
+
+        if (getMarkoAssetFns && useLinkAssets) {
+          // TODO: remove once the deprecated `getMarkoAssetCodeForEntry` api
+          // is dropped. Its entries target the legacy asset runtime, so any
+          // plugin providing it opts the build out of the compiler's
+          // built-in asset orchestration.
+          useLinkAssets = false;
+          for (const compileConfig of [
+            baseConfig,
+            clientConfig,
+            clientEntryConfig,
+            clientLoadEntryConfig,
+            serverConfig,
+            serverCJSConfig,
+            serverEntryConfig,
+            serverEntryLinkConfig,
+          ]) {
+            delete compileConfig.linkAssets;
+          }
+
+          compiler.configure(baseConfig);
+        }
       },
       configureServer(_server) {
         if (!isTest) {
-          clientConfig.hot = serverConfig.hot = serverEntryConfig.hot = true;
+          clientConfig.hot =
+            serverConfig.hot =
+            serverEntryConfig.hot =
+            serverEntryLinkConfig.hot =
+              true;
         }
 
         devServer = _server;
@@ -523,8 +629,19 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         // in the HMR update so the browser receives the new content.
         const virtualFileIds = virtualFilesForTemplate.get(fileName);
         if (virtualFileIds) {
+          // This hook runs once per environment for the same file change. A
+          // compile triggered by one environment can resolve the pending
+          // virtual files before another environment's hook runs, so the
+          // pending state is only reset once per change — resetting again
+          // would leave a promise nothing recompiles to resolve.
+          const shouldReset =
+            virtualFilesResetForTemplate.get(fileName) !== ctx.timestamp;
+          if (shouldReset) {
+            virtualFilesResetForTemplate.set(fileName, ctx.timestamp);
+          }
+
           for (const id of virtualFileIds) {
-            if (!isDeferredPromise(virtualFiles.get(id))) {
+            if (shouldReset && !isDeferredPromise(virtualFiles.get(id))) {
               virtualFiles.set(id, createDeferredPromise());
             }
             const mods = this.environment.moduleGraph.getModulesByFile(id);
@@ -587,13 +704,19 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
             }
 
             if (serverManifest) {
-              if (isEmpty(serverManifest.entries)) {
+              const htmlInputs = toHTMLEntries(root, serverManifest.entries);
+              if (serverManifest.loadEntries) {
+                for (const entryId in serverManifest.loadEntries) {
+                  htmlInputs.push(
+                    toLoadHTMLEntry(root, serverManifest.loadEntries[entryId]),
+                  );
+                }
+              }
+
+              if (htmlInputs.length === 0) {
                 inputOptions.input = noClientAssetsRuntimeId;
               } else {
-                inputOptions.input = toHTMLEntries(
-                  root,
-                  serverManifest.entries,
-                );
+                inputOptions.input = htmlInputs;
                 for (const entry in serverManifest.entrySources) {
                   const id = normalizePath(path.resolve(root, entry));
                   entryIds.add(id);
@@ -612,6 +735,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         switch (importee) {
           case cjsInteropHelpersId:
           case renderAssetsRuntimeId:
+          case linkAssetsRuntimeId:
           case noClientAssetsRuntimeId:
             return importee;
         }
@@ -725,6 +849,8 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
             return cjsInteropHelpersCode;
           case renderAssetsRuntimeId:
             return renderAssetsRuntimeCode;
+          case linkAssetsRuntimeId:
+            return linkAssetsRuntimeCode;
           case noClientAssetsRuntimeId:
             return "NO_CLIENT_ASSETS";
         }
@@ -742,7 +868,8 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
                 null
               );
             }
-            case InternalFileKind.clientEntry: {
+            case InternalFileKind.clientEntry:
+            case InternalFileKind.loadEntry: {
               // The goal below is to cached source content when in linked mode
               // to avoid loading from disk for both server and browser builds.
               // This is to support virtual Marko entry files.
@@ -783,8 +910,11 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         const isSSR = this.environment.name === "ssr";
         const isClientEntry = info?.kind === InternalFileKind.clientEntry;
         const isServerEntry = info?.kind === InternalFileKind.serverEntry;
+        const isLoadEntry = info?.kind === InternalFileKind.loadEntry;
 
-        if (isServerEntry) {
+        if (isServerEntry && !useLinkAssets) {
+          // TODO: remove this branch once the legacy (pre `linkAssets`
+          // compiler option) asset orchestration is dropped.
           const fileName = info.sourceId;
           let mainEntryData: string;
           cachedSources.set(fileName, source);
@@ -865,10 +995,13 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           return null;
         }
 
-        const fileName = isClientEntry ? info.sourceId : id;
+        const fileName =
+          isClientEntry || isLoadEntry || (isServerEntry && useLinkAssets)
+            ? info.sourceId
+            : id;
 
-        if (devServer) {
-          virtualFilesForTemplate.delete(normalizePath(fileName));
+        if (isServerEntry && useLinkAssets) {
+          cachedSources.set(fileName, source);
         }
 
         if (isSSR) {
@@ -900,15 +1033,74 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
             ? isCJSModule(id, rootResolveFile)
               ? serverCJSConfig
               : isServerEntry
-                ? serverEntryConfig
+                ? useLinkAssets
+                  ? serverEntryLinkConfig
+                  : serverEntryConfig
                 : serverConfig
             : isClientEntry
               ? clientEntryConfig
-              : clientConfig,
+              : isLoadEntry
+                ? clientLoadEntryConfig
+                : clientConfig,
         );
 
         const { meta } = compiled;
         let { code } = compiled;
+
+        if (isServerEntry && useLinkAssets) {
+          // With the compiler's built-in asset orchestration the compiler
+          // generates the server entry wrapper itself and reports the page
+          // asset id through `linkAssets.onAsset` during the compile above.
+          const assetId = pageAssetIds.get(normalizePath(fileName));
+
+          if (!assetId) {
+            return this.error(
+              `@marko/vite: the Marko compiler did not report an asset id for ${fileName}.`,
+            );
+          }
+
+          if (isBuild) {
+            const relativeFileName = normalizePath(
+              path.relative(root, fileName),
+            );
+            serverManifest!.entries[assetId] = relativeFileName;
+            serverManifest!.entrySources[relativeFileName] = source;
+          } else {
+            code += getRegisterAssetsCode(
+              assetId,
+              JSON.stringify(
+                await generateLinkAssetsManifest(
+                  basePath,
+                  await devServer.transformIndexHtml(
+                    "/",
+                    generateInputDoc(
+                      fileNameToURL(toClientEntryId(fileName), root),
+                    ),
+                  ),
+                  assetId,
+                ),
+              ),
+            );
+          }
+        }
+
+        if (isSSR && devServer && useLinkAssets && !info) {
+          // In dev, a lazily loaded (`import ... with { load }`) template
+          // registers its asset manifest as part of its own compiled output.
+          // The importing page always imports it on the server before
+          // rendering, so the registration runs before assets can flush.
+          const loadAssetId = loadAssetIds.get(normalizePath(fileName));
+          if (loadAssetId) {
+            code += getRegisterAssetsCode(
+              loadAssetId,
+              JSON.stringify(
+                getDevLoadAssetsManifest(
+                  fileNameToURL(toLoadEntryId(fileName), root).slice(1),
+                ),
+              ),
+            );
+          }
+        }
 
         if (serverManifest && isClientEntry) {
           for (const assetId of serverManifest.ssrAssetIds) {
@@ -930,7 +1122,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           if (meta.analyzedTags) {
             const files = new Set<string>();
             transformAnalyzedTags.set(id, files);
-            if (isClientEntry) {
+            if (isClientEntry || (isServerEntry && useLinkAssets)) {
               files.add(normalizePath(info.sourceId));
             }
             for (const file of meta.analyzedTags) {
@@ -987,10 +1179,31 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
             const chunk = bundle[fileName];
 
             if (chunk.type === "chunk") {
-              if (chunk.moduleIds.includes(renderAssetsRuntimeId)) {
+              if (
+                chunk.moduleIds.includes(
+                  useLinkAssets ? linkAssetsRuntimeId : renderAssetsRuntimeId,
+                )
+              ) {
                 serverManifest.chunksNeedingAssets.push(
                   path.resolve(dir, fileName),
                 );
+              }
+            }
+          }
+
+          if (serverManifest.loadEntries) {
+            // Cache lazily loaded entry sources so the browser build can
+            // compile them without reading from disk (supporting virtual
+            // Marko files).
+            for (const entryId in serverManifest.loadEntries) {
+              const relativeFileName = serverManifest.loadEntries[entryId];
+              if (!serverManifest.entrySources[relativeFileName]) {
+                const source = cachedSources.get(
+                  normalizePath(path.join(root, relativeFileName)),
+                );
+                if (source) {
+                  serverManifest.entrySources[relativeFileName] = source;
+                }
               }
             }
           }
@@ -1013,7 +1226,10 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         } else {
           const clientManifest: ClientManifest = {};
 
-          if (isEmpty(serverManifest.entries)) {
+          if (
+            isEmpty(serverManifest.entries) &&
+            isEmpty(serverManifest.loadEntries)
+          ) {
             for (const chunkId in bundle) {
               const chunk = bundle[chunkId];
               if (
@@ -1031,19 +1247,67 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
               const chunk = bundle[chunkId];
 
               if (chunk?.type === "asset") {
-                clientManifest[entryId] = {
-                  ...(await generateDocManifest(
-                    basePath,
-                    chunk.source.toString(),
-                  )),
-                  preload: undefined, // clear out preload for prod builds.
-                } as any;
+                clientManifest[entryId] = useLinkAssets
+                  ? await generateLinkAssetsManifest(
+                      basePath,
+                      chunk.source.toString(),
+                    )
+                  : ({
+                      ...(await generateDocManifest(
+                        basePath,
+                        chunk.source.toString(),
+                      )),
+                      preload: undefined, // clear out preload for prod builds.
+                    } as any);
 
                 delete bundle[chunkId];
               } else {
                 this.error(
                   `Marko template had unexpected output from vite, ${fileName}`,
                 );
+              }
+            }
+
+            if (serverManifest.loadEntries) {
+              for (const entryId in serverManifest.loadEntries) {
+                const fileName = serverManifest.loadEntries[entryId];
+                const chunkId =
+                  fileName.slice(0, -markoExt.length) + loadEntryExt + htmlExt;
+                const chunk = bundle[chunkId];
+
+                if (chunk?.type === "asset") {
+                  // Vite only writes stylesheet links into the html document
+                  // for statically imported css, but a load entry's component
+                  // code sits behind a dynamic import and hydrates html that
+                  // was already server rendered. Any css reachable from the
+                  // load entry must flush with that html to avoid FOUC, so
+                  // it's injected into the document before partitioning
+                  // (making it part of the render blocking group).
+                  let html = chunk.source.toString();
+                  let cssLinks = "";
+                  for (const cssFileName of collectCssFiles(
+                    bundle,
+                    normalizePath(path.join(root, chunkId)),
+                  )) {
+                    cssLinks += `<link rel="stylesheet" href=${JSON.stringify(
+                      basePath + cssFileName,
+                    )}>`;
+                  }
+                  if (cssLinks) {
+                    html = html.replace("</head>", `${cssLinks}</head>`);
+                  }
+
+                  clientManifest[entryId] = await generateLinkAssetsManifest(
+                    basePath,
+                    html,
+                  );
+
+                  delete bundle[chunkId];
+                } else {
+                  this.error(
+                    `Marko template had unexpected output from vite, ${fileName}`,
+                  );
+                }
               }
             }
 
@@ -1065,6 +1329,42 @@ function isMarkoFile(id: string) {
   return id.endsWith(markoExt);
 }
 
+/**
+ * Collects the css output files reachable from the chunk for the given
+ * module id, following both static and dynamic imports.
+ */
+function collectCssFiles(
+  bundle: vite.Rollup.OutputBundle,
+  facadeModuleId: string,
+) {
+  const css = new Set<string>();
+
+  for (const fileName in bundle) {
+    const chunk = bundle[fileName];
+    if (chunk.type === "chunk" && chunk.facadeModuleId === facadeModuleId) {
+      const seen = new Set<string>();
+      const visit = (chunkFileName: string) => {
+        if (seen.has(chunkFileName)) return;
+        seen.add(chunkFileName);
+        const chunk = bundle[chunkFileName];
+        if (chunk?.type === "chunk") {
+          if (chunk.viteMetadata) {
+            for (const cssFileName of chunk.viteMetadata.importedCss) {
+              css.add(cssFileName);
+            }
+          }
+          for (const imported of chunk.imports) visit(imported);
+          for (const imported of chunk.dynamicImports) visit(imported);
+        }
+      };
+      visit(chunk.fileName);
+      break;
+    }
+  }
+
+  return css;
+}
+
 function toHTMLEntries(root: string, serverEntries: ServerManifest["entries"]) {
   const result: string[] = [];
 
@@ -1080,6 +1380,17 @@ function toHTMLEntries(root: string, serverEntries: ServerManifest["entries"]) {
   return result;
 }
 
+function toLoadHTMLEntry(root: string, relativeFileName: string) {
+  const loadFile = toLoadEntryId(
+    normalizePath(path.join(root, relativeFileName)),
+  );
+  const htmlFile = loadFile + htmlExt;
+  virtualFiles.set(htmlFile, {
+    code: generateInputDoc(loadFile),
+  });
+  return htmlFile;
+}
+
 function getMarkoFileInfo(id: string) {
   if (id.endsWith(serverEntryExt)) {
     return {
@@ -1092,6 +1403,13 @@ function getMarkoFileInfo(id: string) {
     return {
       kind: InternalFileKind.clientEntry,
       sourceId: `${id.slice(0, -clientEntryExt.length)}${markoExt}`,
+    } as const;
+  }
+
+  if (id.endsWith(loadEntryExt)) {
+    return {
+      kind: InternalFileKind.loadEntry,
+      sourceId: `${id.slice(0, -loadEntryExt.length)}${markoExt}`,
     } as const;
   }
 
@@ -1114,6 +1432,8 @@ function toMarkoFileId(
       return toServerEntryId(id);
     case InternalFileKind.clientEntry:
       return toClientEntryId(id);
+    case InternalFileKind.loadEntry:
+      return toLoadEntryId(id);
     case InternalFileKind.virtual:
       return `${id}${virtualFileInfix}${info.virtualSuffix}`;
   }
@@ -1125,6 +1445,10 @@ function toServerEntryId(id: string) {
 
 function toClientEntryId(id: string) {
   return id.slice(0, -markoExt.length) + clientEntryExt;
+}
+
+function toLoadEntryId(id: string) {
+  return id.slice(0, -markoExt.length) + loadEntryExt;
 }
 
 function toEntryId(id: string) {

@@ -52,6 +52,17 @@ export async function fromURL(url: string): Promise<Browser> {
   let reloadCount = 0;
   let pendingFetches = 0;
   let completedFetches = 0;
+  let rafBatch: Map<number, FrameRequestCallback> | undefined;
+  let rafId = 0;
+
+  function flushFrame() {
+    const batch = rafBatch;
+    if (!batch?.size) return false;
+    rafBatch = undefined;
+    const now = window.performance.now();
+    for (const cb of batch.values()) cb(now);
+    return true;
+  }
 
   const virtualConsole = new VirtualConsole();
   virtualConsole.forwardTo(quietConsole, {
@@ -81,18 +92,33 @@ export async function fromURL(url: string): Promise<Browser> {
     beforeParse(window) {
       (window as any).__name = (v: any) => v; // needed for esbuild.
       window.setImmediate = setImmediate;
-      window.MessageChannel = globalThis.MessageChannel;
+      // Node's MessageChannel delivers on its own task source, which can
+      // land between drain() ticks and hide a scheduled update from its
+      // quiet check. Like the marko test runner, deliver via setImmediate →
+      // queueMicrotask so messages always run before the next tick's check.
+      window.MessageChannel = class MessageChannel {
+        port1: any = { onmessage() {} };
+        port2: any = {
+          postMessage: () => {
+            setImmediate(() => {
+              window.queueMicrotask(() => this.port1.onmessage());
+            });
+          },
+        };
+      } as any;
       window.WebSocket = globalThis.WebSocket;
       // JSDOM paces requestAnimationFrame on a real ~16ms frame timer; tests
-      // only need the scheduling semantics, so deliver frames on the next
-      // macrotask instead. (window timers, so window.close() cancels them.)
-      window.requestAnimationFrame = ((cb: FrameRequestCallback) =>
-        window.setTimeout(
-          () => cb(window.performance.now()),
-          0,
-        )) as typeof requestAnimationFrame;
+      // only need the scheduling semantics, so frames are collected into a
+      // batch that drain() delivers explicitly (callbacks scheduled during a
+      // flush land in the next batch, like real frames). Owning the queue
+      // lets drain() settle by queue emptiness instead of guessing whether
+      // scheduled work is still pending.
+      window.requestAnimationFrame = ((cb: FrameRequestCallback) => {
+        (rafBatch ??= new Map()).set(++rafId, cb);
+        return rafId;
+      }) as typeof requestAnimationFrame;
       window.cancelAnimationFrame = ((handle: number) =>
-        window.clearTimeout(handle)) as typeof cancelAnimationFrame;
+        rafBatch?.delete(handle)) as typeof cancelAnimationFrame;
       // Node's fetch rejects relative URLs; resolve them against the page.
       // Requests are also tracked so drain() doesn't report a stable DOM
       // while a response (and any update it causes) is still in flight.
@@ -156,11 +182,41 @@ export async function fromURL(url: string): Promise<Browser> {
   const moduleCache = new Map<string, Promise<vm.Module>>();
   const pendingModules: Promise<vm.Module>[] = [];
   const pendingResources: Promise<unknown>[] = [];
+  const handledScripts = new WeakSet<HTMLScriptElement>();
   let inlineModuleCount = 0;
+
+  // Module scripts can also enter the DOM after streaming (e.g. a lazy
+  // load trigger inserting its assets when its event fires). JSDOM won't
+  // evaluate them, so drain() scans for unhandled ones and runs them like
+  // the marko test runner re-scans `document.scripts`.
+  async function evalNewScripts() {
+    let ran = false;
+    for (const script of [...document.scripts]) {
+      if (
+        script.type === "module" &&
+        script.src &&
+        !handledScripts.has(script)
+      ) {
+        handledScripts.add(script);
+        ran = true;
+        const mod = await loadModule(script.src);
+        await mod.evaluate();
+      }
+    }
+    return ran;
+  }
 
   function loadModule(moduleUrl: string): Promise<vm.Module> {
     let mod = moduleCache.get(moduleUrl);
     if (!mod) {
+      // Counted with page requests so drain() doesn't report a stable DOM
+      // while a module (e.g. a lazy load entry's fire-and-forget import of
+      // its template) is still being fetched and linked.
+      const done = () => {
+        pendingFetches--;
+        completedFetches++;
+      };
+      pendingFetches++;
       moduleCache.set(
         moduleUrl,
         (mod = fetchRetry(moduleUrl)
@@ -174,6 +230,7 @@ export async function fromURL(url: string): Promise<Browser> {
           })
           .then((source) => createModule(source, moduleUrl))),
       );
+      mod.then(done, done);
     }
     return mod;
   }
@@ -231,6 +288,7 @@ export async function fromURL(url: string): Promise<Browser> {
                   ),
             );
             clone = document.importNode(node, true);
+            handledScripts.add(clone as HTMLScriptElement);
           } else {
             // Unlike imported nodes, fresh script elements execute on
             // insertion via JSDOM's _attach() → _eval().
@@ -266,31 +324,55 @@ export async function fromURL(url: string): Promise<Browser> {
     },
     async settle() {
       await Promise.all(pendingResources.splice(0));
-      for (const mod of await Promise.all(pendingModules.splice(0))) {
-        await mod.evaluate();
+      // Like the marko test runner, scheduled effects (hydration renders)
+      // are deferred while module scripts evaluate and applied together
+      // after, so the page reaches the same state no matter how evaluation
+      // interleaves with the runtime's scheduling.
+      const qmt = window.queueMicrotask;
+      const deferred: Array<() => void> = [];
+      window.queueMicrotask = (cb) => {
+        deferred.push(cb);
+      };
+      try {
+        for (const mod of await Promise.all(pendingModules.splice(0))) {
+          await mod.evaluate();
+        }
+      } finally {
+        window.queueMicrotask = qmt;
       }
+      for (const cb of deferred) qmt.call(window, cb);
     },
     async drain() {
-      // Marko schedules DOM updates via postMessage (class API) and
-      // queueMicrotask + requestAnimationFrame (tags API). Each tick waits a
-      // full frame plus a macrotask, looping until the DOM is quiet (up to
-      // 10×) to absorb cascading updates from component lifecycle chains.
-      for (let i = 0; i < 10; i++) {
+      // Marko schedules DOM updates via queueMicrotask, then a frame, then a
+      // message port macrotask (and the class API via postMessage). Each
+      // tick crosses a timer AND an immediate boundary — covering every
+      // event loop phase work can be scheduled into, including the message
+      // deliveries stubbed onto setImmediate above — and then delivers a
+      // frame from the owned rAF queue. The loop only settles after two
+      // consecutive ticks ran no frame callbacks, saw no DOM mutations, and
+      // had no request in flight: work can be parked (e.g. in JSDOM's own
+      // event loop) where a single quiet tick can't observe it.
+      for (let i = 0, quietTicks = 0; i < 50; i++) {
         const fetches = completedFetches;
         mutated = false;
-        await new Promise((resolve) =>
-          window.requestAnimationFrame(() => setTimeout(resolve)),
-        );
+        await new Promise((resolve) => setTimeout(resolve));
+        await new Promise((resolve) => setImmediate(resolve));
+        const ranFrame = flushFrame();
+        const ranScript = await evalNewScripts();
         if (errors.length) throw errors.splice(0, errors.length)[0];
         // A request that's in flight (or finished mid-tick) may still cause
         // an update; only an unmutated DOM across a quiet tick is stable.
         if (
+          !ranFrame &&
+          !ranScript &&
           !mutated &&
           !mutationObserver.takeRecords().length &&
           !pendingFetches &&
           fetches === completedFetches
         ) {
-          return;
+          if (++quietTicks === 2) return;
+        } else {
+          quietTicks = 0;
         }
       }
     },

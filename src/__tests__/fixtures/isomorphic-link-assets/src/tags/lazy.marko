@@ -1,0 +1,10 @@
+<let/lazyClickCount=0>
+<let/lazyMounted=false>
+<script>lazyMounted = true</script>
+<style>
+  button { color: blue }
+</style>
+<button#lazy-clickable onClick() { lazyClickCount++ }>
+  Lazy mounted: ${lazyMounted}
+  Lazy clicks: ${lazyClickCount}
+</button>
