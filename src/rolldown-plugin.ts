@@ -1,6 +1,6 @@
 import * as compiler from "@marko/compiler";
 import path from "path";
-import type { ModuleType, Plugin } from "rolldown";
+import type { Rolldown } from "rolldown";
 
 import { normalizePath } from "./normalize-path";
 import { scan } from "./scan";
@@ -12,7 +12,7 @@ export default function rolldownPlugin(
   config: compiler.Config,
   virtualFiles: Map<string, { code: string } | Promise<{ code: string }>>,
   cacheVirtualFile: (path: string) => Promise<undefined | string>,
-): Plugin[] {
+): Rolldown.Plugin[] {
   const baseConfig: compiler.Config = {
     ...config,
     hot: false,
@@ -47,7 +47,7 @@ export default function rolldownPlugin(
           return (
             file && {
               code: (await file).code,
-              moduleType: path.extname(id).slice(1) as ModuleType,
+              moduleType: path.extname(id).slice(1) as Rolldown.ModuleType,
             }
           );
         },
