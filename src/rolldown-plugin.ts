@@ -1,6 +1,6 @@
 import * as compiler from "@marko/compiler";
 import path from "path";
-import type { Rolldown } from "rolldown";
+import type { Rolldown } from "vite";
 
 import { normalizePath } from "./normalize-path";
 import { scan } from "./scan";
