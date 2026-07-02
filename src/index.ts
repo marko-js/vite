@@ -63,6 +63,9 @@ export interface Options {
   babelConfig?: compiler.Config["babelConfig"];
   // Filter marko files used as entries
   isEntry?: (importee: string, importer: string) => boolean;
+  // Compiles output capable of persisted (single-page server-first update) rendering.
+  // Requires a translator/runtime that understands the `persisted` compiler option.
+  persisted?: boolean;
 }
 
 enum InternalFileKind {
@@ -280,6 +283,10 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
             ? getKnownTemplates(root)
             : undefined,
         };
+
+        if (opts.persisted) {
+          (baseConfig as any).persisted = true;
+        }
 
         if (linked) {
           (baseConfig as any).markoViteLinked = linked;
