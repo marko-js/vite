@@ -75,6 +75,7 @@ enum InternalFileKind {
   serverEntry,
   loadEntry,
   updateEntry,
+  registerEntry,
   virtual,
 }
 
@@ -127,6 +128,15 @@ const loadEntryExt = ".load-entry.marko";
 // template's generated update entry (compiled with `persisted: "update"`).
 const updateEntryExt = ".update-entry.marko";
 const updateQuery = "?update";
+// `x.marko?register` (imported by generated update entries) resolves to the
+// template's register entry (compiled with `persisted: "register"`): the
+// persisted dom module WITH the registry registrations updates resolve
+// signals, branch content, and renderers from -- deferred to the first
+// navigation so hydration bundles stay lean. Module-scope client state and
+// registered effect ids stay single-instance (the register compile imports
+// the former from the main module and never re-registers the latter).
+const registerEntryExt = ".register-entry.marko";
+const registerQuery = "?register";
 const virtualFileInfix = "-virtual";
 const virtualFileReg = /^(.*\.marko)-virtual((?:\.[^\\/?]+)+)$/;
 const resolveOpts = { skipSelf: true };
@@ -157,6 +167,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
   let clientEntryConfig: compiler.Config;
   let clientLoadEntryConfig: compiler.Config;
   let updateEntryConfig: compiler.Config;
+  let registerEntryConfig: compiler.Config;
   let serverConfig: compiler.Config;
   let serverCJSConfig: compiler.Config;
   let serverEntryConfig: compiler.Config;
@@ -378,6 +389,14 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           // ids stay consistent because \`optimizeKnownTemplates\` (the id
           // cache key) is shared too.
           persisted: "update",
+          sourceMaps: false,
+        } as compiler.Config;
+        registerEntryConfig = {
+          ...clientConfig,
+          // Compiles the template's persisted register entry (the dom module
+          // with registry registrations; imported by the update entry).
+          // Shares the build's compiler cache like the update entries.
+          persisted: "register",
           sourceMaps: false,
         } as compiler.Config;
 
@@ -800,6 +819,19 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           };
         }
 
+        if (!importeeInfo && importee.endsWith(markoExt + registerQuery)) {
+          if (!opts.persisted) {
+            throw new Error(
+              `@marko/vite: "${importee}" requires the \`persisted\` option.`,
+            );
+          }
+          importee = importee.slice(0, -registerQuery.length);
+          importeeInfo = {
+            kind: InternalFileKind.registerEntry,
+            sourceId: importee as `${string}.marko`,
+          };
+        }
+
         if (importeeInfo) {
           if (
             importee[0] !== "." &&
@@ -912,7 +944,8 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
             }
             case InternalFileKind.clientEntry:
             case InternalFileKind.loadEntry:
-            case InternalFileKind.updateEntry: {
+            case InternalFileKind.updateEntry:
+            case InternalFileKind.registerEntry: {
               // The goal below is to cached source content when in linked mode
               // to avoid loading from disk for both server and browser builds.
               // This is to support virtual Marko entry files.
@@ -955,6 +988,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         const isServerEntry = info?.kind === InternalFileKind.serverEntry;
         const isLoadEntry = info?.kind === InternalFileKind.loadEntry;
         const isUpdateEntry = info?.kind === InternalFileKind.updateEntry;
+        const isRegisterEntry = info?.kind === InternalFileKind.registerEntry;
 
         if (isServerEntry && !useLinkAssets) {
           // TODO: remove this branch once the legacy (pre `linkAssets`
@@ -1043,6 +1077,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           isClientEntry ||
           isLoadEntry ||
           isUpdateEntry ||
+          isRegisterEntry ||
           (isServerEntry && useLinkAssets)
             ? info.sourceId
             : id;
@@ -1090,7 +1125,9 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
                 ? clientLoadEntryConfig
                 : isUpdateEntry
                   ? updateEntryConfig
-                  : clientConfig,
+                  : isRegisterEntry
+                    ? registerEntryConfig
+                    : clientConfig,
         );
 
         const { meta } = compiled;
@@ -1490,6 +1527,13 @@ function getMarkoFileInfo(id: string) {
     } as const;
   }
 
+  if (id.endsWith(registerEntryExt)) {
+    return {
+      kind: InternalFileKind.registerEntry,
+      sourceId: `${id.slice(0, -registerEntryExt.length)}${markoExt}`,
+    } as const;
+  }
+
   const virtualMatch = virtualFileReg.exec(id);
   if (virtualMatch) {
     return {
@@ -1513,6 +1557,8 @@ function toMarkoFileId(
       return toLoadEntryId(id);
     case InternalFileKind.updateEntry:
       return toUpdateEntryId(id);
+    case InternalFileKind.registerEntry:
+      return toRegisterEntryId(id);
     case InternalFileKind.virtual:
       return `${id}${virtualFileInfix}${info.virtualSuffix}`;
   }
@@ -1532,6 +1578,10 @@ function toLoadEntryId(id: string) {
 
 function toUpdateEntryId(id: string) {
   return id.slice(0, -markoExt.length) + updateEntryExt;
+}
+
+function toRegisterEntryId(id: string) {
+  return id.slice(0, -markoExt.length) + registerEntryExt;
 }
 
 function toEntryId(id: string) {
