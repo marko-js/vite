@@ -14,9 +14,11 @@ import cjsInteropTranslate, {
 import transformCjsToEsm from "./cjs-to-esm";
 import globImportTransformer from "./glob-import-transform";
 import {
+  buildHashAssetId,
   getDevLoadAssetsManifest,
   getLinkAssetsRuntime,
   getRegisterAssetsCode,
+  linkAssetsPublicId,
   linkAssetsRuntimeId,
   supportsLinkAssets,
 } from "./link-assets";
@@ -762,6 +764,8 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           case linkAssetsRuntimeId:
           case noClientAssetsRuntimeId:
             return importee;
+          case linkAssetsPublicId:
+            return linkAssetsRuntimeId;
         }
 
         if (virtualFiles.has(importee)) {
@@ -1354,6 +1358,27 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
                 }
               }
             }
+
+            // A single digest over the shipped client files gives the build
+            // an identity, exposed through the linkAssets runtime's
+            // `buildId()` (which reads it off the manifest at call time).
+            const buildHash = crypto.createHash("shake256", {
+              outputLength: 8,
+            });
+            for (const fileName of Object.keys(bundle).sort()) {
+              const chunk = bundle[fileName];
+              buildHash.update(fileName);
+              buildHash.update(
+                chunk.type === "chunk"
+                  ? chunk.code
+                  : typeof chunk.source === "string"
+                    ? chunk.source
+                    : new Uint8Array(chunk.source),
+              );
+            }
+            clientManifest[buildHashAssetId] = buildHash.digest(
+              "base64url",
+            ) as any;
 
             const manifestStr = `\n;var __MARKO_MANIFEST__=${JSON.stringify(
               clientManifest,
