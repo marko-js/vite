@@ -371,12 +371,13 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         updateEntryConfig = {
           ...clientConfig,
           // Compiles the template's persisted update entry (merge functions).
-          // A fresh compiler cache: the same file also compiles as the
-          // regular dom module in this build. Template/register ids stay
-          // consistent because \`optimizeKnownTemplates\` (the id cache key)
-          // is shared with the other configs.
+          // Shares the whole build's compiler cache: the cache stores the
+          // parse/migrate/analyze result (each compile translates a clone),
+          // and analysis is identical across the persisted modes --
+          // \`"update"\` only changes the translate phase. Template/register
+          // ids stay consistent because \`optimizeKnownTemplates\` (the id
+          // cache key) is shared too.
           persisted: "update",
-          cache: new Map(),
           sourceMaps: false,
         } as compiler.Config;
 
