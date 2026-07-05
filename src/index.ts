@@ -238,6 +238,12 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
   const cachedSources = new Map<string, string>();
   const transformWatchFiles = new Map<string, string[]>();
   const transformAnalyzedTags = new Map<string, Set<string>>();
+  // Client-build side-effect policy: an entry per compiled marko module
+  // (keyed by the id rolldown passes back as `importer`) holding the
+  // template's explicit side-effect-only import sources. Populated only for
+  // production client builds -- dev never tree-shakes, so the resolveId
+  // policy hook below exits on a single Map miss everywhere else.
+  const sideEffectImportsByImporter = new Map<string, Set<string>>();
   const store = new ReadOncePersistedStore<ServerManifest>(
     `vite-marko${runtimeId ? `-${runtimeId}` : ""}`,
   );
@@ -780,142 +786,182 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         }
       },
       async resolveId(importee, importer, importOpts, ssr = importOpts.ssr) {
-        switch (importee) {
-          case cjsInteropHelpersId:
-          case renderAssetsRuntimeId:
-          case linkAssetsRuntimeId:
-          case noClientAssetsRuntimeId:
-            return importee;
-          case linkAssetsPublicId:
-            return linkAssetsRuntimeId;
-        }
-
-        if (virtualFiles.has(importee)) {
-          return importee;
-        }
-
-        if (importer) {
-          const tagName = importTagReg.exec(importee)?.[1];
-          importer = stripViteQueries(importer);
-
-          if (tagName) {
-            const tagDef = compiler.taglib
-              .buildLookup(path.dirname(importer))
-              .getTag(tagName);
-            return tagDef && (tagDef.template || tagDef.renderer);
+        // Side-effect policy (production client builds): imports from
+        // templates are pure unless explicitly side-effect-only, so library
+        // authors never need a `sideEffects` declaration for their packages
+        // to tree-shake well from Marko apps. Captured before the base
+        // resolution below (which may reassign `importer`); non-template
+        // importers miss the map and the policy costs a single lookup.
+        const bareImports =
+          isBuild && !ssr && importer
+            ? sideEffectImportsByImporter.get(importer)
+            : undefined;
+        const base = await (async () => {
+          switch (importee) {
+            case cjsInteropHelpersId:
+            case renderAssetsRuntimeId:
+            case linkAssetsRuntimeId:
+            case noClientAssetsRuntimeId:
+              return importee;
+            case linkAssetsPublicId:
+              return linkAssetsRuntimeId;
           }
-        }
 
-        let importeeInfo = getMarkoFileInfo(importee);
-
-        if (!importeeInfo && importee.endsWith(markoExt + updateQuery)) {
-          if (!opts.persisted) {
-            throw new Error(
-              `@marko/vite: "${importee}" requires the \`persisted\` option.`,
-            );
-          }
-          importee = importee.slice(0, -updateQuery.length);
-          importeeInfo = {
-            kind: InternalFileKind.updateEntry,
-            sourceId: importee as `${string}.marko`,
-          };
-        }
-
-        if (!importeeInfo && importee.endsWith(markoExt + persistedQuery)) {
-          if (!opts.persisted) {
-            throw new Error(
-              `@marko/vite: "${importee}" requires the \`persisted\` option.`,
-            );
-          }
-          importee = importee.slice(0, -persistedQuery.length);
-          importeeInfo = {
-            kind: InternalFileKind.persistedEntry,
-            sourceId: importee as `${string}.marko`,
-          };
-        }
-
-        if (importeeInfo) {
-          if (
-            importee[0] !== "." &&
-            importee[0] !== "\0" &&
-            importeeInfo.kind === InternalFileKind.virtual
-          ) {
+          if (virtualFiles.has(importee)) {
             return importee;
           }
-          importee = importeeInfo.sourceId;
-        } else if (!(importOpts as any).scan) {
-          if (
-            ssr &&
-            linked &&
-            importer &&
-            importer[0] !== "\0" &&
-            (importer !== devEntryFile ||
-              normalizePath(importer) !== devEntryFilePosix) && // Vite tries to resolve against an `index.html` in some cases, we ignore it here.
-            isMarkoFile(importee) &&
-            !getMarkoFileInfo(importer) &&
-            !isMarkoFile(importer) &&
-            checkIsEntry(
-              normalizePath(path.resolve(importer, "..", importee)),
-              importer,
-            )
-          ) {
-            importeeInfo = {
-              kind: InternalFileKind.serverEntry,
-              sourceId: importee as `${string}.marko`,
-            };
-          } else if (
-            !ssr &&
-            isBuild &&
-            importer &&
-            isMarkoFile(importee) &&
-            this.getModuleInfo(importer)?.isEntry
-          ) {
-            importeeInfo = {
-              kind: InternalFileKind.clientEntry,
-              sourceId: importee as `${string}.marko`,
-            };
-          }
-        }
 
-        if (importeeInfo) {
-          const resolved =
-            importee[0] === "."
-              ? {
-                  id: normalizePath(
-                    importer
-                      ? path.resolve(importer, "..", importee)
-                      : path.resolve(root, importee),
-                  ),
-                }
-              : await this.resolve(importee, importer, resolveOpts);
+          if (importer) {
+            const tagName = importTagReg.exec(importee)?.[1];
+            importer = stripViteQueries(importer);
 
-          if (resolved) {
-            resolved.id = toMarkoFileId(
-              stripViteQueries(resolved.id),
-              importeeInfo,
-            );
+            if (tagName) {
+              const tagDef = compiler.taglib
+                .buildLookup(path.dirname(importer))
+                .getTag(tagName);
+              return tagDef && (tagDef.template || tagDef.renderer);
+            }
           }
 
-          return resolved;
-        }
+          let importeeInfo = getMarkoFileInfo(importee);
 
-        if (importer) {
-          const importerInfo = getMarkoFileInfo(importer);
-          if (importerInfo) {
-            importer = importerInfo.sourceId;
-
-            if (importee[0] === ".") {
-              const resolved = normalizePath(
-                path.resolve(importer, "..", importee),
+          if (!importeeInfo && importee.endsWith(markoExt + updateQuery)) {
+            if (!opts.persisted) {
+              throw new Error(
+                `@marko/vite: "${importee}" requires the \`persisted\` option.`,
               );
-              if (resolved === normalizePath(importer)) return resolved;
+            }
+            importee = importee.slice(0, -updateQuery.length);
+            importeeInfo = {
+              kind: InternalFileKind.updateEntry,
+              sourceId: importee as `${string}.marko`,
+            };
+          }
+
+          if (!importeeInfo && importee.endsWith(markoExt + persistedQuery)) {
+            if (!opts.persisted) {
+              throw new Error(
+                `@marko/vite: "${importee}" requires the \`persisted\` option.`,
+              );
+            }
+            importee = importee.slice(0, -persistedQuery.length);
+            importeeInfo = {
+              kind: InternalFileKind.persistedEntry,
+              sourceId: importee as `${string}.marko`,
+            };
+          }
+
+          if (importeeInfo) {
+            if (
+              importee[0] !== "." &&
+              importee[0] !== "\0" &&
+              importeeInfo.kind === InternalFileKind.virtual
+            ) {
+              return importee;
+            }
+            importee = importeeInfo.sourceId;
+          } else if (!(importOpts as any).scan) {
+            if (
+              ssr &&
+              linked &&
+              importer &&
+              importer[0] !== "\0" &&
+              (importer !== devEntryFile ||
+                normalizePath(importer) !== devEntryFilePosix) && // Vite tries to resolve against an `index.html` in some cases, we ignore it here.
+              isMarkoFile(importee) &&
+              !getMarkoFileInfo(importer) &&
+              !isMarkoFile(importer) &&
+              checkIsEntry(
+                normalizePath(path.resolve(importer, "..", importee)),
+                importer,
+              )
+            ) {
+              importeeInfo = {
+                kind: InternalFileKind.serverEntry,
+                sourceId: importee as `${string}.marko`,
+              };
+            } else if (
+              !ssr &&
+              isBuild &&
+              importer &&
+              isMarkoFile(importee) &&
+              this.getModuleInfo(importer)?.isEntry
+            ) {
+              importeeInfo = {
+                kind: InternalFileKind.clientEntry,
+                sourceId: importee as `${string}.marko`,
+              };
+            }
+          }
+
+          if (importeeInfo) {
+            const resolved =
+              importee[0] === "."
+                ? {
+                    id: normalizePath(
+                      importer
+                        ? path.resolve(importer, "..", importee)
+                        : path.resolve(root, importee),
+                    ),
+                  }
+                : await this.resolve(importee, importer, resolveOpts);
+
+            if (resolved) {
+              resolved.id = toMarkoFileId(
+                stripViteQueries(resolved.id),
+                importeeInfo,
+              );
             }
 
-            return this.resolve(importee, importer, resolveOpts);
+            return resolved;
           }
-        }
 
-        return null;
+          if (importer) {
+            const importerInfo = getMarkoFileInfo(importer);
+            if (importerInfo) {
+              importer = importerInfo.sourceId;
+
+              if (importee[0] === ".") {
+                const resolved = normalizePath(
+                  path.resolve(importer, "..", importee),
+                );
+                if (resolved === normalizePath(importer)) return resolved;
+              }
+
+              return this.resolve(importee, importer, resolveOpts);
+            }
+          }
+
+          return null;
+        })();
+        if (!bareImports) return base;
+
+        // A bare import (`client import "./client-init"`) is author intent
+        // and stays side-effectful even over a package's own pure
+        // declaration; `.marko` targets keep their defaults (registration
+        // side effects), as do non-JS assets (css rides its bare import
+        // anyway); every other JS import from a template defaults pure.
+        const resolved =
+          base == null
+            ? await this.resolve(importee, importer, importOpts)
+            : base;
+        if (
+          !resolved ||
+          (typeof resolved === "object" &&
+            (resolved as { external?: boolean | string }).external)
+        ) {
+          return base ?? resolved;
+        }
+        const resolvedId =
+          typeof resolved === "string" ? resolved : resolved.id;
+        if (bareImports.has(importee)) {
+          return { id: resolvedId, moduleSideEffects: true };
+        }
+        const resolvedFile = stripViteQueries(resolvedId);
+        if (isMarkoFile(resolvedFile) || !jsFileReg.test(resolvedFile)) {
+          return base ?? resolved;
+        }
+        return { id: resolvedId, moduleSideEffects: false };
       },
       async load(rawId) {
         const id = stripViteQueries(rawId);
@@ -1223,6 +1269,13 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           }
         }
 
+        if (isBuild && !isSSR) {
+          // The compiled output is babel-generated, so side-effect-only
+          // imports match a fixed shape; a false positive (eg inside a
+          // string) only marks a module side-effectful -- pessimistic-safe.
+          sideEffectImportsByImporter.set(rawId, collectBareImports(code));
+        }
+
         return {
           code,
           map: stripSourceRoot(compiled.map),
@@ -1436,6 +1489,16 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
 
 function isMarkoFile(id: string) {
   return id.endsWith(markoExt);
+}
+
+const jsFileReg = /\.[cm]?[jt]sx?$/;
+const bareImportReg = /(?<![.\w$])import\s*(["'])((?:[^"'\\]|\\.)*)\1/g;
+function collectBareImports(code: string) {
+  const sources = new Set<string>();
+  for (const match of code.matchAll(bareImportReg)) {
+    sources.add(match[2]);
+  }
+  return sources;
 }
 
 /**

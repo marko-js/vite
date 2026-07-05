@@ -1,0 +1,8 @@
+// Side-effect policy fixture: in production client builds, imports from
+// templates are pure unless side-effect-only. The bare import must run
+// (build and dev), while the named-import module's init side effect drops
+// in build (dev never tree-shakes, so its snapshot shows lib:true).
+import "./bare-init";
+import { used } from "./lib";
+
+<div id="flags">bare:${!!globalThis.__bareRan} lib:${!!globalThis.__libInitRan} used:${used}</div>
