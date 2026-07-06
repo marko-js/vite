@@ -67,7 +67,11 @@ export interface Options {
   isEntry?: (importee: string, importer: string) => boolean;
   // Compiles output capable of persisted (single-page server-first update) rendering.
   // Requires a translator/runtime that understands the `persisted` compiler option.
-  persisted?: boolean;
+  // `"fragments"` commits the build to fragment-delivered divergence (the
+  // @marko/run persisted router's contract): persisted entries stop shipping
+  // the fills-path construction material for content a live page has never
+  // rendered.
+  persisted?: boolean | "fragments";
 }
 
 enum InternalFileKind {
@@ -310,7 +314,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         };
 
         if (opts.persisted) {
-          (baseConfig as any).persisted = true;
+          (baseConfig as any).persisted = opts.persisted;
         }
 
         if (linked) {
