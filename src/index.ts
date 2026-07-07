@@ -109,6 +109,9 @@ const virtualFilesForTemplate = new Map<string, Set<string>>();
 const virtualFilesResetForTemplate = new Map<string, number>();
 const ssrTransformCache = new Map<string, string>();
 const importTagReg = /^<([^>]+)>$/;
+// Styles Vite's `assetsInclude` skips (it handles css/preprocessors itself).
+const styleImportReg =
+  /\.(?:css|less|s[ac]ss|styl(?:us)?|pcss|postcss)(?:\?|$)/i;
 const optionalWatchFileReg =
   /[\\/](?:([^\\/]+)\.)?(?:marko-tag.json|(?:style|component|component-browser)\.\w+)$/;
 const noClientAssetsRuntimeId = "\0no_client_bundles.mjs";
@@ -200,6 +203,9 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
   let devEntryFilePosix: string;
   let renderAssetsRuntimeCode: string;
   let linkAssetsRuntimeCode: string;
+  // Vite's asset matcher (set in `configResolved`); excludes css, so
+  // `isSideEffectFile` adds styles + `.marko`.
+  let viteAssetsInclude: (file: string) => boolean = () => false;
   let isTest = false;
   let isBuild = false;
   let hasBuildApp = false;
@@ -216,10 +222,16 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
   const cachedSources = new Map<string, string>();
   const transformWatchFiles = new Map<string, string[]>();
   const transformAnalyzedTags = new Map<string, Set<string>>();
+  // Resolved ids of a template's explicit bare `import "x"` imports (filled in
+  // `transform`); the treeshake hook keeps these, everything else is shakeable.
+  const markoSideEffectImportIds = new Set<string>();
   const store = new ReadOncePersistedStore<ServerManifest>(
     `vite-marko${runtimeId ? `-${runtimeId}` : ""}`,
   );
   const isTagsApi = (api: undefined | string) => api === "tags";
+  // Kept purely by path: a `.marko` file, a style, or a Vite asset.
+  const isSideEffectFile = (file: string) =>
+    isMarkoFile(file) || styleImportReg.test(file) || viteAssetsInclude(file);
 
   return [
     {
@@ -325,11 +337,17 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         clientConfig = {
           ...baseConfig,
           output: "dom",
+          // In build, keep the compiled AST so `transform` can read a template's
+          // side effect imports for tree-shaking without re-parsing (see below).
+          ast: isBuild,
         };
         clientEntryConfig = {
           ...baseConfig,
           output: "hydrate",
           sourceMaps: false,
+          // Also keep the AST here so the page entry's own side effect imports
+          // (eg the assets a server only page links in) are captured too.
+          ast: isBuild,
         };
         serverConfig = {
           ...baseConfig,
@@ -456,8 +474,8 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
 
         if (isBuild) {
           config.build ??= {};
-          if (!config.build.rolldownOptions?.output) {
-            config.build.rolldownOptions ??= {};
+          config.build.rolldownOptions ??= {};
+          if (!config.build.rolldownOptions.output) {
             config.build.rolldownOptions.output = {
               // By default use `_[hash]` instead of `[name]-[hash]` because for chunk names the `[name]` is
               // not deterministic (it's based on chunk.moduleIds order).
@@ -468,6 +486,37 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
                 ? "_[hash].js"
                 : `${config.build?.assetsDir?.replace(/[/\\]$/, "") ?? "assets"}/_[hash].js`,
             };
+          }
+
+          if (!isSSR) {
+            // Marko is the only source of side effects: default every module to
+            // side effect free (kept: `.marko`, assets, and bare imports).
+            const treeshake = config.build.rolldownOptions.treeshake;
+            const userModuleSideEffects =
+              treeshake && typeof treeshake === "object"
+                ? treeshake.moduleSideEffects
+                : undefined;
+            // Only compose when we can defer to the user's value (a function or
+            // nothing); leave an explicit array/string/"no-external" untouched.
+            if (
+              treeshake !== false &&
+              (userModuleSideEffects == null ||
+                typeof userModuleSideEffects === "function")
+            ) {
+              config.build.rolldownOptions.treeshake = {
+                ...(typeof treeshake === "object" ? treeshake : undefined),
+                moduleSideEffects: (id, external) => {
+                  const userValue = userModuleSideEffects?.(id, external);
+                  if (userValue != null) return userValue;
+                  // Let vite handle externals as it normally would.
+                  if (external) return undefined;
+                  return markoSideEffectImportIds.has(id) ||
+                    isSideEffectFile(stripViteQueries(id))
+                    ? undefined
+                    : false;
+                },
+              };
+            }
           }
         } else {
           const optimizeDeps = (config.optimizeDeps ??= {});
@@ -524,6 +573,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
       configResolved(config) {
         basePath = config.base;
         cacheDir = config.cacheDir && normalizePath(config.cacheDir);
+        viteAssetsInclude = config.assetsInclude;
         getMarkoAssetFns = undefined;
         for (const plugin of config.plugins) {
           const fn = plugin.api?.getMarkoAssetCodeForEntry as
@@ -690,6 +740,11 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
       },
 
       async options(inputOptions) {
+        if (isBuild && this.environment.name !== "ssr") {
+          // Reset the per-build tree-shaking set (eg for `vite build --watch`).
+          markoSideEffectImportIds.clear();
+        }
+
         if (linked && isBuild) {
           if (this.environment.name === "ssr") {
             serverManifest = {
@@ -1046,6 +1101,31 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
 
         const { meta } = compiled;
         let { code } = compiled;
+
+        if (isBuild && !isSSR && compiled.ast) {
+          // Record every bare `import "x"` the template compiles to so the
+          // treeshake hook keeps it (externals are left for vite to handle).
+          let resolvingSideEffectImports: Promise<unknown>[] | undefined;
+          for (const node of compiled.ast.program.body) {
+            if (
+              node.type === "ImportDeclaration" &&
+              node.specifiers.length === 0
+            ) {
+              (resolvingSideEffectImports ??= []).push(
+                this.resolve(node.source.value, fileName, resolveOpts).then(
+                  (resolved) => {
+                    if (resolved && !resolved.external) {
+                      markoSideEffectImportIds.add(resolved.id);
+                    }
+                  },
+                ),
+              );
+            }
+          }
+          if (resolvingSideEffectImports) {
+            await Promise.all(resolvingSideEffectImports);
+          }
+        }
 
         if (isServerEntry && useLinkAssets) {
           // With the compiler's built-in asset orchestration the compiler

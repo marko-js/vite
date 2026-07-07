@@ -1,0 +1,18 @@
+import { onlyServer } from "./server-only.js";
+import { impureServerOnly } from "impure-lib";
+import { shared } from "./shared.js";
+import { loaded } from "./tracker.js";
+import "./explicit-side-effect.js";
+import "./styles.css";
+
+// `onlyServer`/`impureServerOnly` are used only in a server block, so they (and
+// `impure-lib`, which has no `sideEffects` field) tree-shake out of the client.
+server {
+  onlyServer();
+  impureServerOnly();
+}
+
+<div.marko-side-effects>
+  <div id="shared">shared: ${shared}</div>
+  <div id="loaded">loaded: ${loaded.slice().sort().join(", ")}</div>
+</div>

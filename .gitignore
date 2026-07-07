@@ -11,6 +11,7 @@
 !**/__tests__/**/node_modules/test-package2
 !**/__tests__/**/node_modules/dep
 !**/__tests__/**/node_modules/transient-dep
+!**/__tests__/**/node_modules/impure-lib
 npm-debug.log
 
 # Build
