@@ -5,6 +5,7 @@ import glob from "fast-glob";
 import fs from "fs";
 import path from "path";
 import { relativeImportPath } from "relative-import-path";
+import { resolveSync } from "resolve-sync";
 import type * as vite from "vite";
 
 import cjsInteropTranslate, {
@@ -141,6 +142,17 @@ let registeredTagLib = false;
 
 function noop(): undefined {}
 
+// Env markers set by terminal coding agents (Claude Code, Cursor, Gemini CLI,
+// Codex, and the generic AI_AGENT convention).
+const isCodingAgent =
+  process.env.CLAUDECODE ||
+  process.env.CLAUDE_CODE ||
+  process.env.CURSOR_AGENT ||
+  process.env.GEMINI_CLI ||
+  process.env.CODEX_SANDBOX ||
+  process.env.CODEX_THREAD_ID ||
+  process.env.AI_AGENT;
+
 export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
   let { linked = true } = opts;
   let runtimeId: string | undefined;
@@ -199,6 +211,70 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
   let root: string;
   let cacheDir: string | undefined;
   let rootResolveFile: string;
+  // Appended to compile errors when a coding agent is driving the terminal
+  // and the installed marko package ships an LLM syntax reference
+  // (cheatsheet.md); humans never see it. false = checked and absent.
+  let markoFixGuide: string | false | undefined;
+
+  function getMarkoFixGuide(): string | false {
+    if (markoFixGuide === undefined) {
+      markoFixGuide = false;
+      if (isCodingAgent) {
+        const cheatsheet = resolveSync("marko/cheatsheet.md", {
+          from: rootResolveFile,
+          silent: true,
+        });
+        if (cheatsheet) {
+          markoFixGuide = `\n\nFix guide: READ ${path.relative(root, cheatsheet)} before writing a fix.`;
+        }
+      }
+    }
+    return markoFixGuide;
+  }
+
+  // Warning diagnostics print once per file+source version (the html and dom
+  // compiles of the same source share one print; edits reprint).
+  const printedWarnings = new Map<
+    string,
+    { source: string; labels: Set<string> }
+  >();
+
+  async function compileWithFixGuide(
+    source: string,
+    filename: string,
+    config: compiler.Config,
+  ) {
+    try {
+      const result = await compiler.compile(source, filename, config);
+      let printed = printedWarnings.get(filename);
+      if (printed?.source !== source) {
+        printedWarnings.set(
+          filename,
+          (printed = { source, labels: new Set() }),
+        );
+      }
+      for (const diag of result.meta.diagnostics) {
+        if (diag.type === "warning" && !printed.labels.has(diag.label)) {
+          printed.labels.add(diag.label);
+          const loc = diag.loc ? `:${diag.loc.start.line}` : "";
+          console.warn(
+            `[marko] warning: ${path.relative(root, filename)}${loc} ${diag.label}`,
+          );
+        }
+      }
+      return result;
+    } catch (err) {
+      const fixGuide = getMarkoFixGuide();
+      if (
+        fixGuide &&
+        err instanceof Error &&
+        !err.message.includes("cheatsheet.md")
+      ) {
+        err.message += fixGuide;
+      }
+      throw err;
+    }
+  }
   let devEntryFile: string;
   let devEntryFilePosix: string;
   let renderAssetsRuntimeCode: string;
@@ -1066,7 +1142,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
 
           if (!info && isCJSModule(id, rootResolveFile)) {
             if (isBuild) {
-              const { code, map, meta } = await compiler.compile(
+              const { code, map, meta } = await compileWithFixGuide(
                 source,
                 id,
                 serverCJSConfig,
@@ -1081,7 +1157,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           }
         }
 
-        const compiled = await compiler.compile(
+        const compiled = await compileWithFixGuide(
           source,
           fileName,
           isSSR
