@@ -217,13 +217,37 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
     return markoFixGuide;
   }
 
+  // Warning diagnostics print once per file+source version (the html and dom
+  // compiles of the same source share one print; edits reprint).
+  const printedWarnings = new Map<
+    string,
+    { source: string; labels: Set<string> }
+  >();
+
   async function compileWithFixGuide(
     source: string,
     filename: string,
     config: compiler.Config,
   ) {
     try {
-      return await compiler.compile(source, filename, config);
+      const result = await compiler.compile(source, filename, config);
+      let printed = printedWarnings.get(filename);
+      if (printed?.source !== source) {
+        printedWarnings.set(
+          filename,
+          (printed = { source, labels: new Set() }),
+        );
+      }
+      for (const diag of result.meta.diagnostics) {
+        if (diag.type === "warning" && !printed.labels.has(diag.label)) {
+          printed.labels.add(diag.label);
+          const loc = diag.loc ? `:${diag.loc.start.line}` : "";
+          console.warn(
+            `[marko] warning: ${path.relative(root, filename)}${loc} ${diag.label}`,
+          );
+        }
+      }
+      return result;
     } catch (err) {
       const fixGuide = getMarkoFixGuide();
       if (
