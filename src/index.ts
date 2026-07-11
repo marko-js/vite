@@ -5,6 +5,7 @@ import glob from "fast-glob";
 import fs from "fs";
 import path from "path";
 import { relativeImportPath } from "relative-import-path";
+import Resolve from "resolve";
 import type * as vite from "vite";
 
 import cjsInteropTranslate, {
@@ -199,6 +200,42 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
   let root: string;
   let cacheDir: string | undefined;
   let rootResolveFile: string;
+  // Appended to compile errors when the installed runtime ships an LLM syntax
+  // reference (marko@6 publishes llms.md); measurably steers coding agents to
+  // read it before retrying. false = checked and absent.
+  let markoFixGuide: string | false | undefined;
+
+  function getMarkoFixGuide(): string | false {
+    if (markoFixGuide === undefined) {
+      try {
+        const resolved = Resolve.sync("marko/llms.md", { basedir: root });
+        markoFixGuide = `\n\nFix guide: READ ${path.relative(root, resolved)} (Marko 6 syntax) before writing a fix.`;
+      } catch {
+        markoFixGuide = false;
+      }
+    }
+    return markoFixGuide;
+  }
+
+  async function compileWithFixGuide(
+    source: string,
+    filename: string,
+    config: compiler.Config,
+  ) {
+    try {
+      return await compiler.compile(source, filename, config);
+    } catch (err) {
+      const fixGuide = getMarkoFixGuide();
+      if (
+        fixGuide &&
+        err instanceof Error &&
+        !err.message.includes("llms.md")
+      ) {
+        err.message += fixGuide;
+      }
+      throw err;
+    }
+  }
   let devEntryFile: string;
   let devEntryFilePosix: string;
   let renderAssetsRuntimeCode: string;
@@ -1066,7 +1103,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
 
           if (!info && isCJSModule(id, rootResolveFile)) {
             if (isBuild) {
-              const { code, map, meta } = await compiler.compile(
+              const { code, map, meta } = await compileWithFixGuide(
                 source,
                 id,
                 serverCJSConfig,
@@ -1081,7 +1118,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           }
         }
 
-        const compiled = await compiler.compile(
+        const compiled = await compileWithFixGuide(
           source,
           fileName,
           isSSR
