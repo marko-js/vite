@@ -1,6 +1,6 @@
 import fs from "fs";
 import path from "path";
-import Resolve, { type Opts as ResolveOpts } from "resolve";
+import { resolveSync } from "resolve-sync";
 
 const moduleNameReg = /^(?:@[^/\\]+[/\\])?[^/\\]+/;
 const modulePathReg =
@@ -21,31 +21,49 @@ export function isCJSModule(id: string, fromFile: string): boolean {
   let isCJS = cjsModuleLookup.get(moduleId);
 
   if (isCJS === undefined) {
-    try {
-      if (isAbsolute) {
+    if (isAbsolute) {
+      try {
         const pkgPath = path.join(modulePathReg.exec(id)![0], "package.json");
-        const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8"));
-        isCJS = pkg.type !== "module" && !pkg.exports;
-      } else {
-        Resolve.sync(moduleId + "/package.json", {
-          basedir: path.dirname(fromFile),
-          filename: fromFile,
-          pathFilter(
-            pkg: Record<string, unknown>,
-            _pkgFile: string,
-            relativePath: string,
-          ) {
-            isCJS = pkg.type !== "module" && !pkg.exports;
-            return relativePath;
-          },
-        } as ResolveOpts);
-        isCJS ??= false;
+        isCJS = isCJSPkg(JSON.parse(fs.readFileSync(pkgPath, "utf8")));
+      } catch {
+        // ignore
       }
-    } catch {
-      isCJS = false;
+    } else {
+      // The resolved entry point is unused; the fs hook captures the
+      // package.json of the package the resolver picks, which works even
+      // when its exports map does not expose an entry to resolve.
+      resolveSync(moduleId, {
+        from: fromFile,
+        silent: true,
+        fs: {
+          isFile(file) {
+            try {
+              return fs.statSync(file).isFile();
+            } catch {
+              return false;
+            }
+          },
+          readPkg(file) {
+            try {
+              const pkg = JSON.parse(fs.readFileSync(file, "utf8"));
+              if (pkg && typeof pkg === "object") {
+                isCJS ??= isCJSPkg(pkg);
+              }
+              return pkg;
+            } catch {
+              // ignore
+            }
+          },
+        },
+      });
     }
-    cjsModuleLookup.set(moduleId, isCJS);
+
+    cjsModuleLookup.set(moduleId, (isCJS ??= false));
   }
 
   return isCJS;
+}
+
+function isCJSPkg(pkg: { type?: unknown; exports?: unknown }): boolean {
+  return pkg.type !== "module" && !pkg.exports;
 }
