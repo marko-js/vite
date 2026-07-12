@@ -1,5 +1,15 @@
 # Changelog
 
+## 6.1.2
+
+### Patch Changes
+
+- [#283](https://github.com/marko-js/vite/pull/283) [`db7ee41`](https://github.com/marko-js/vite/commit/db7ee411b8c1eef43762e50d35a9f960c4eb7db6) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - When a coding agent is driving the terminal (detected via the env markers agents set, e.g. `CLAUDECODE`, `CURSOR_AGENT`, `GEMINI_CLI`, `AI_AGENT`) and the installed marko package ships an LLM syntax reference, compile errors now end with a fix-guide pointer: "Fix guide: READ node_modules/marko/cheatsheet.md before writing a fix." Projects whose marko version does not ship `cheatsheet.md` — and all human-driven terminals — are unaffected.
+
+- [#283](https://github.com/marko-js/vite/pull/283) [`3794f06`](https://github.com/marko-js/vite/commit/3794f064da4a84d63c8949577f44d5f57cdd787c) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - CommonJS module detection (`isCJSModule`) now resolves through `resolve-sync` instead of the legacy `resolve` package, removing `@marko/vite`'s last direct dependency on `resolve`. Behavior is unchanged: the resolved package's `package.json` is inspected the same way, including packages whose exports map exposes no resolvable entry.
+
+- [#283](https://github.com/marko-js/vite/pull/283) [`db7ee41`](https://github.com/marko-js/vite/commit/db7ee411b8c1eef43762e50d35a9f960c4eb7db6) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Marko compile warnings are now printed to the dev/build terminal as `[marko] warning: <file>:<line> <message>`, once per file and source version. Previously warning diagnostics were only visible to editors via the language server.
+
 ## 6.1.1
 
 ### Patch Changes
