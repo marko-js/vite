@@ -12,7 +12,7 @@
   <div
     id="loaded"
   >
-    loaded: explicit-side-effect
+    loaded: explicit-side-effect, nested-side-effect, side-effect-lib/register
   </div>
 </div>
 ```

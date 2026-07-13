@@ -863,6 +863,33 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         }
       },
       async resolveId(importee, importer, importOpts, ssr = importOpts.ssr) {
+        // An explicit bare `import "x"` only says *x* has side effects, but x's
+        // own side effects usually live in the modules it imports (eg terser
+        // installs `AST_Toplevel#resolve_defines` from a bare
+        // `import "./global-defs.js"`). Carry the marking downstream so the
+        // whole subgraph a template opted into keeps its side effects. This
+        // stops at `.marko`/style/asset ids, which are never added to the set,
+        // so a template's own imports stay shakeable.
+        if (
+          isBuild &&
+          !ssr &&
+          importer &&
+          markoSideEffectImportIds.has(importer)
+        ) {
+          const resolved = await this.resolve(importee, importer, {
+            ...importOpts,
+            skipSelf: true,
+          });
+
+          if (
+            resolved &&
+            !resolved.external &&
+            !isSideEffectFile(stripViteQueries(resolved.id))
+          ) {
+            markoSideEffectImportIds.add(resolved.id);
+          }
+        }
+
         switch (importee) {
           case cjsInteropHelpersId:
           case renderAssetsRuntimeId:
@@ -1181,6 +1208,9 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         if (isBuild && !isSSR && compiled.ast) {
           // Record every bare `import "x"` the template compiles to so the
           // treeshake hook keeps it (externals are left for vite to handle).
+          // Files `isSideEffectFile` already keeps (`.marko`, styles, assets)
+          // are skipped: adding them would seed the propagation below with, eg,
+          // every page template, which would mark the entire client graph.
           let resolvingSideEffectImports: Promise<unknown>[] | undefined;
           for (const node of compiled.ast.program.body) {
             if (
@@ -1190,7 +1220,11 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
               (resolvingSideEffectImports ??= []).push(
                 this.resolve(node.source.value, fileName, resolveOpts).then(
                   (resolved) => {
-                    if (resolved && !resolved.external) {
+                    if (
+                      resolved &&
+                      !resolved.external &&
+                      !isSideEffectFile(stripViteQueries(resolved.id))
+                    ) {
                       markoSideEffectImportIds.add(resolved.id);
                     }
                   },
