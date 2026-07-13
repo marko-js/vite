@@ -68,10 +68,10 @@ export interface Options {
   isEntry?: (importee: string, importer: string) => boolean;
   // Compiles output capable of persisted (single-page server-first update) rendering.
   // Requires a translator/runtime that understands the `persisted` compiler option.
-  // `"fragments"` (the @marko/run persisted router's contract) makes persisted
-  // entries drop the fills-path construction material for content a live page
-  // has never rendered.
-  persisted?: boolean | "fragments";
+  // Divergent content is delivered as resumable HTML fragments, so persisted
+  // entries do not retain client-side construction material for server-only
+  // components.
+  persisted?: boolean;
 }
 
 enum InternalFileKind {
@@ -652,9 +652,22 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
               "dom",
               opts.translator,
             );
+            if (opts.persisted) {
+              // Both facades must enter one optimizer graph. Discovering the
+              // lazy persisted facade after the page runtime was optimized would
+              // create a second resume registry and force the first navigation
+              // to reload in development.
+              domDeps.push(
+                ...compiler.getRuntimeEntryFiles(
+                  "dom-persisted",
+                  opts.translator,
+                ),
+              );
+            }
+            const uniqueDomDeps = [...new Set(domDeps)];
             optimizeDeps.include = optimizeDeps.include
-              ? [...optimizeDeps.include, ...domDeps]
-              : domDeps;
+              ? [...optimizeDeps.include, ...uniqueDomDeps]
+              : uniqueDomDeps;
           }
 
           if (!isTest) {
@@ -1590,25 +1603,28 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
               }
             }
 
-            // A single digest over the shipped client files gives the build an
-            // identity, exposed through the linkAssets runtime's `buildId()`.
-            const buildHash = crypto.createHash("shake256", {
-              outputLength: 8,
-            });
-            for (const fileName of Object.keys(bundle).sort()) {
-              const chunk = bundle[fileName];
-              buildHash.update(fileName);
-              buildHash.update(
-                chunk.type === "chunk"
-                  ? chunk.code
-                  : typeof chunk.source === "string"
-                    ? chunk.source
-                    : new Uint8Array(chunk.source),
-              );
+            if (opts.persisted) {
+              // A single digest over the shipped client files gives persisted
+              // update requests a deployment identity. Non-persisted builds
+              // keep their manifest and build work byte-for-byte unchanged.
+              const buildHash = crypto.createHash("shake256", {
+                outputLength: 8,
+              });
+              for (const fileName of Object.keys(bundle).sort()) {
+                const chunk = bundle[fileName];
+                buildHash.update(fileName);
+                buildHash.update(
+                  chunk.type === "chunk"
+                    ? chunk.code
+                    : typeof chunk.source === "string"
+                      ? chunk.source
+                      : new Uint8Array(chunk.source),
+                );
+              }
+              clientManifest[buildHashAssetId] = buildHash.digest(
+                "base64url",
+              ) as any;
             }
-            clientManifest[buildHashAssetId] = buildHash.digest(
-              "base64url",
-            ) as any;
 
             const manifestStr = `\n;var __MARKO_MANIFEST__=${JSON.stringify(
               clientManifest,
