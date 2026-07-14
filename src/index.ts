@@ -14,9 +14,11 @@ import cjsInteropTranslate, {
 import transformCjsToEsm from "./cjs-to-esm";
 import globImportTransformer from "./glob-import-transform";
 import {
+  buildHashAssetId,
   getDevLoadAssetsManifest,
   getLinkAssetsRuntime,
   getRegisterAssetsCode,
+  linkAssetsPublicId,
   linkAssetsRuntimeId,
   supportsLinkAssets,
 } from "./link-assets";
@@ -63,12 +65,20 @@ export interface Options {
   babelConfig?: compiler.Config["babelConfig"];
   // Filter marko files used as entries
   isEntry?: (importee: string, importer: string) => boolean;
+  // Compiles output capable of persisted (single-page server-first update) rendering.
+  // Requires a translator/runtime that understands the `persisted` compiler option.
+  // Divergent content is delivered as resumable HTML fragments, so persisted
+  // entries do not retain client-side construction material for server-only
+  // components.
+  persisted?: boolean;
 }
 
 enum InternalFileKind {
   clientEntry,
   serverEntry,
   loadEntry,
+  updateEntry,
+  persistedEntry,
   virtual,
 }
 
@@ -120,6 +130,18 @@ const htmlExt = ".html";
 const clientEntryExt = ".client-entry.marko";
 const serverEntryExt = ".server-entry.marko";
 const loadEntryExt = ".load-entry.marko";
+// `x.marko?update` imports resolve to the template's generated update entry
+// (compiled with `entry: "update"`).
+const updateEntryExt = ".update-entry.marko";
+const updateQuery = "?update";
+// `x.marko?persisted` (imported by generated update entries) resolves to the
+// template's persisted entry (compiled with `entry: "persisted"`): the render
+// graph plus registry registrations that updates resolve from, deferred to
+// first navigation so hydration bundles stay lean. Module-scope client state
+// and registered effect ids stay single-instance -- the persisted compile
+// imports the former from the main module and never re-registers the latter.
+const persistedEntryExt = ".persisted-entry.marko";
+const persistedQuery = "?persisted";
 const virtualFileInfix = "-virtual";
 const virtualFileReg = /^(.*\.marko)-virtual((?:\.[^\\/?]+)+)$/;
 const resolveOpts = { skipSelf: true };
@@ -149,6 +171,8 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
   let clientConfig: compiler.Config;
   let clientEntryConfig: compiler.Config;
   let clientLoadEntryConfig: compiler.Config;
+  let updateEntryConfig: compiler.Config;
+  let persistedEntryConfig: compiler.Config;
   let serverConfig: compiler.Config;
   let serverCJSConfig: compiler.Config;
   let serverEntryConfig: compiler.Config;
@@ -324,6 +348,10 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
             : undefined,
         };
 
+        if (opts.persisted) {
+          (baseConfig as any).persisted = opts.persisted;
+        }
+
         if (linked) {
           (baseConfig as any).markoViteLinked = linked;
         }
@@ -403,6 +431,27 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           ...clientConfig,
           entry: "load",
         };
+        updateEntryConfig = {
+          ...clientConfig,
+          // Compiles the template's persisted update entry (merge functions).
+          // Shares the build's compiler cache: analysis (parse/migrate/analyze;
+          // each compile translates a clone) is identical across entry kinds --
+          // `entry: "update"` only changes translate. Template/register ids stay
+          // consistent because `optimizeKnownTemplates` (the id cache key) is
+          // shared too.
+          entry: "update",
+          sourceMaps: false,
+          // The update/persisted entry kinds ship with the paired marko
+          // release; the installed compiler types may predate them.
+        } as unknown as compiler.Config;
+        persistedEntryConfig = {
+          ...clientConfig,
+          // Compiles the template's persisted entry (the render graph with
+          // registry registrations; imported by the update entry). Shares
+          // the build's compiler cache like the update entries.
+          entry: "persisted",
+          sourceMaps: false,
+        } as unknown as compiler.Config;
 
         compiler.configure(baseConfig);
         devEntryFile = path.join(root, "index.html");
@@ -559,9 +608,22 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
               "dom",
               opts.translator,
             );
+            if (opts.persisted) {
+              // Both facades must enter one optimizer graph. Discovering the
+              // lazy persisted facade after the page runtime was optimized would
+              // create a second resume registry and force the first navigation
+              // to reload in development.
+              domDeps.push(
+                ...compiler.getRuntimeEntryFiles(
+                  "dom-persisted",
+                  opts.translator,
+                ),
+              );
+            }
+            const uniqueDomDeps = [...new Set(domDeps)];
             optimizeDeps.include = optimizeDeps.include
-              ? [...optimizeDeps.include, ...domDeps]
-              : domDeps;
+              ? [...optimizeDeps.include, ...uniqueDomDeps]
+              : uniqueDomDeps;
           }
 
           if (!isTest) {
@@ -852,6 +914,8 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           case linkAssetsRuntimeId:
           case noClientAssetsRuntimeId:
             return importee;
+          case linkAssetsPublicId:
+            return linkAssetsRuntimeId;
         }
 
         if (virtualFiles.has(importee)) {
@@ -871,6 +935,26 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         }
 
         let importeeInfo = getMarkoFileInfo(importee);
+
+        if (!importeeInfo) {
+          const persistedKind = importee.endsWith(markoExt + updateQuery)
+            ? InternalFileKind.updateEntry
+            : importee.endsWith(markoExt + persistedQuery)
+              ? InternalFileKind.persistedEntry
+              : undefined;
+          if (persistedKind) {
+            if (!opts.persisted) {
+              throw new Error(
+                `@marko/vite: "${importee}" requires the \`persisted\` option.`,
+              );
+            }
+            importee = importee.slice(0, importee.lastIndexOf("?"));
+            importeeInfo = {
+              kind: persistedKind,
+              sourceId: importee as `${string}.marko`,
+            };
+          }
+        }
 
         if (importeeInfo) {
           if (
@@ -983,7 +1067,9 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
               );
             }
             case InternalFileKind.clientEntry:
-            case InternalFileKind.loadEntry: {
+            case InternalFileKind.loadEntry:
+            case InternalFileKind.updateEntry:
+            case InternalFileKind.persistedEntry: {
               // The goal below is to cached source content when in linked mode
               // to avoid loading from disk for both server and browser builds.
               // This is to support virtual Marko entry files.
@@ -1025,6 +1111,8 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         const isClientEntry = info?.kind === InternalFileKind.clientEntry;
         const isServerEntry = info?.kind === InternalFileKind.serverEntry;
         const isLoadEntry = info?.kind === InternalFileKind.loadEntry;
+        const isUpdateEntry = info?.kind === InternalFileKind.updateEntry;
+        const isPersistedEntry = info?.kind === InternalFileKind.persistedEntry;
 
         if (isServerEntry && !useLinkAssets) {
           // TODO: remove this branch once the legacy (pre `linkAssets`
@@ -1110,7 +1198,11 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         }
 
         const fileName =
-          isClientEntry || isLoadEntry || (isServerEntry && useLinkAssets)
+          isClientEntry ||
+          isLoadEntry ||
+          isUpdateEntry ||
+          isPersistedEntry ||
+          (isServerEntry && useLinkAssets)
             ? info.sourceId
             : id;
 
@@ -1155,7 +1247,11 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
               ? clientEntryConfig
               : isLoadEntry
                 ? clientLoadEntryConfig
-                : clientConfig,
+                : isUpdateEntry
+                  ? updateEntryConfig
+                  : isPersistedEntry
+                    ? persistedEntryConfig
+                    : clientConfig,
         );
 
         const { meta } = compiled;
@@ -1457,6 +1553,29 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
               }
             }
 
+            if (opts.persisted) {
+              // A single digest over the shipped client files gives persisted
+              // update requests a deployment identity. Non-persisted builds
+              // keep their manifest and build work byte-for-byte unchanged.
+              const buildHash = crypto.createHash("shake256", {
+                outputLength: 8,
+              });
+              for (const fileName of Object.keys(bundle).sort()) {
+                const chunk = bundle[fileName];
+                buildHash.update(fileName);
+                buildHash.update(
+                  chunk.type === "chunk"
+                    ? chunk.code
+                    : typeof chunk.source === "string"
+                      ? chunk.source
+                      : new Uint8Array(chunk.source),
+                );
+              }
+              clientManifest[buildHashAssetId] = buildHash.digest(
+                "base64url",
+              ) as any;
+            }
+
             const manifestStr = `\n;var __MARKO_MANIFEST__=${JSON.stringify(
               clientManifest,
             )};\n`;
@@ -1559,6 +1678,20 @@ function getMarkoFileInfo(id: string) {
     } as const;
   }
 
+  if (id.endsWith(updateEntryExt)) {
+    return {
+      kind: InternalFileKind.updateEntry,
+      sourceId: `${id.slice(0, -updateEntryExt.length)}${markoExt}`,
+    } as const;
+  }
+
+  if (id.endsWith(persistedEntryExt)) {
+    return {
+      kind: InternalFileKind.persistedEntry,
+      sourceId: `${id.slice(0, -persistedEntryExt.length)}${markoExt}`,
+    } as const;
+  }
+
   const virtualMatch = virtualFileReg.exec(id);
   if (virtualMatch) {
     return {
@@ -1580,6 +1713,10 @@ function toMarkoFileId(
       return toClientEntryId(id);
     case InternalFileKind.loadEntry:
       return toLoadEntryId(id);
+    case InternalFileKind.updateEntry:
+      return toUpdateEntryId(id);
+    case InternalFileKind.persistedEntry:
+      return toPersistedEntryId(id);
     case InternalFileKind.virtual:
       return `${id}${virtualFileInfix}${info.virtualSuffix}`;
   }
@@ -1595,6 +1732,14 @@ function toClientEntryId(id: string) {
 
 function toLoadEntryId(id: string) {
   return id.slice(0, -markoExt.length) + loadEntryExt;
+}
+
+function toUpdateEntryId(id: string) {
+  return id.slice(0, -markoExt.length) + updateEntryExt;
+}
+
+function toPersistedEntryId(id: string) {
+  return id.slice(0, -markoExt.length) + persistedEntryExt;
 }
 
 function toEntryId(id: string) {
