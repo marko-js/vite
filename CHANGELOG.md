@@ -1,5 +1,11 @@
 # Changelog
 
+## 6.1.4
+
+### Patch Changes
+
+- [#289](https://github.com/marko-js/vite/pull/289) [`cdc39e6`](https://github.com/marko-js/vite/commit/cdc39e6b72437e45535cbdb215d85192110fd026) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Move the coding-agent cheat-sheet fix-guide into `@marko/compiler`.
+
 ## 6.1.3
 
 ### Patch Changes
