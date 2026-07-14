@@ -375,7 +375,8 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         clientEntryConfig = {
           ...baseConfig,
           output: "hydrate",
-          sourceMaps: false,
+          // `sourceMaps` stays on so extracted `<style>` maps survive; the
+          // compiler skips the entry wrapper's own (meaningless) map.
           // Also keep the AST here so the page entry's own side effect imports
           // (eg the assets a server only page links in) are captured too.
           ast: isBuild,
@@ -390,17 +391,17 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         } as any;
         serverEntryConfig = {
           ...serverConfig,
+          // Legacy server entry: a plain `html` wrapper the compiler can't
+          // distinguish from a real template, so suppress its map here.
           sourceMaps: false,
         };
         serverEntryLinkConfig = {
           ...serverConfig,
           entry: "page",
-          sourceMaps: false,
         };
         clientLoadEntryConfig = {
           ...clientConfig,
           entry: "load",
-          sourceMaps: false,
         };
 
         compiler.configure(baseConfig);
