@@ -1,5 +1,11 @@
 # Changelog
 
+## 6.1.5
+
+### Patch Changes
+
+- [#291](https://github.com/marko-js/vite/pull/291) [`dc6d57b`](https://github.com/marko-js/vite/commit/dc6d57b076a662c3573536d29d36089a70464dd9) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Fix a spurious `Sourcemap for "<template>.marko-virtual.scss" points to missing source files` warning in dev when a `.marko` template has a `<style>` block. The dep optimizer compiled templates with `sourceMaps: "inline"`, which drops the extracted style block's separate sourcemap; the shared compiler cache then left the dev server serving the virtual CSS with no map to trace back to its template, so the style preprocessor emitted a self-referential map to the (non-existent) virtual file. The optimizer now uses `sourceMaps: "both"` so the separate map is retained, and the entry compile configs no longer force `sourceMaps: false` (the compiler now skips the entry wrapper's own map on its side), so CSS sourcemaps survive.
+
 ## 6.1.4
 
 ### Patch Changes
