@@ -16,7 +16,9 @@ export default function rolldownPlugin(
   const baseConfig: compiler.Config = {
     ...config,
     hot: false,
-    sourceMaps: "inline",
+    // `both`, not `inline`: virtual files (eg `<style>` blocks) reach the dev
+    // server via shared `virtualFiles`, which needs the map `inline` drops.
+    sourceMaps: "both",
   };
   return [
     {
