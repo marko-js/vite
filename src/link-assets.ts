@@ -20,15 +20,10 @@ import { getPreventFOUCParts } from "./manifest-generator";
  * the seams are easy to find.
  */
 
-// The translator (runtime) versions that first support the `linkAssets` and
-// `entry` compiler options (including applying the `runtimeId` option through
-// the generated `withPageAssets` server entry wrapper): marko@5.39.5 for the
-// class runtime (5.39.3 shipped the feature, but its translator only reports
-// a version from 5.39.4 and its page/load wrappers recurse under hot reload
-// before 5.39.5) and marko@6.1.4 (runtime-tags) for the tags runtime. Any
-// later major is assumed to support it.
+// Minimum runtime versions with reliable `linkAssets`/`entry` support. The class
+// runtime's `withPageAssets` applies a configured `runtimeId` only from 5.39.14.
 const minRuntimeVersions: Record<number, readonly [number, number, number]> = {
-  5: [5, 39, 5],
+  5: [5, 39, 14],
   6: [6, 1, 4],
 };
 

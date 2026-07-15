@@ -1,0 +1,9 @@
+class {
+  onCreate() { this.state = { mounted: false, clickCount: 0 }; }
+  onMount() { this.state.mounted = true; }
+  increment() { this.state.clickCount++; }
+}
+<div#clickable onClick("increment")>
+  Mounted: ${state.mounted}
+  Clicks: ${state.clickCount}
+</div>
