@@ -1,5 +1,11 @@
 # Changelog
 
+## 6.1.6
+
+### Patch Changes
+
+- [#293](https://github.com/marko-js/vite/pull/293) [`b44290d`](https://github.com/marko-js/vite/commit/b44290da65bf72cc35653cb13284860cea2b083d) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Require marko@5.39.14 for the class runtime's `linkAssets`/`entry` support. Older versions' generated `withPageAssets` page entry ignored a configured `runtimeId`, so the server serialized hydration data under the default `$MC` key while the client entry read `$<runtimeId>_C` and never hydrated (for example, `onMount` never firing). Older class runtimes now fall back to the legacy asset orchestration, which honors the `runtimeId`.
+
 ## 6.1.5
 
 ### Patch Changes
