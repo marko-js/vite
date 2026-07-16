@@ -14,7 +14,6 @@ import cjsInteropTranslate, {
 import transformCjsToEsm from "./cjs-to-esm";
 import globImportTransformer from "./glob-import-transform";
 import {
-  buildHashAssetId,
   getDevLoadAssetsManifest,
   getLinkAssetsRuntime,
   getRegisterAssetsCode,
@@ -77,7 +76,6 @@ enum InternalFileKind {
   clientEntry,
   serverEntry,
   loadEntry,
-  updateEntry,
   persistedEntry,
   virtual,
 }
@@ -87,6 +85,8 @@ interface ClientManifest {
 }
 
 interface ServerManifest {
+  // The SSR build mints this token and hands it to the client build here.
+  buildId: string;
   entries: {
     [entryId: string]: string;
   };
@@ -130,16 +130,7 @@ const htmlExt = ".html";
 const clientEntryExt = ".client-entry.marko";
 const serverEntryExt = ".server-entry.marko";
 const loadEntryExt = ".load-entry.marko";
-// `x.marko?update` imports resolve to the template's generated update entry
-// (compiled with `entry: "update"`).
-const updateEntryExt = ".update-entry.marko";
-const updateQuery = "?update";
-// `x.marko?persisted` (imported by generated update entries) resolves to the
-// template's persisted entry (compiled with `entry: "persisted"`): the render
-// graph plus registry registrations that updates resolve from, deferred to
-// first navigation so hydration bundles stay lean. Module-scope client state
-// and registered effect ids stay single-instance -- the persisted compile
-// imports the former from the main module and never re-registers the latter.
+// `x.marko?persisted` resolves to its deferred render graph and patch API.
 const persistedEntryExt = ".persisted-entry.marko";
 const persistedQuery = "?persisted";
 const virtualFileInfix = "-virtual";
@@ -164,6 +155,7 @@ let registeredTagLib = false;
 function noop(): undefined {}
 
 export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
+  let persistedBuildId = crypto.randomBytes(8).toString("base64url");
   let { linked = true } = opts;
   let runtimeId: string | undefined;
   let basePathVar: string | undefined;
@@ -171,7 +163,6 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
   let clientConfig: compiler.Config;
   let clientEntryConfig: compiler.Config;
   let clientLoadEntryConfig: compiler.Config;
-  let updateEntryConfig: compiler.Config;
   let persistedEntryConfig: compiler.Config;
   let serverConfig: compiler.Config;
   let serverCJSConfig: compiler.Config;
@@ -431,24 +422,8 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           ...clientConfig,
           entry: "load",
         };
-        updateEntryConfig = {
-          ...clientConfig,
-          // Compiles the template's persisted update entry (merge functions).
-          // Shares the build's compiler cache: analysis (parse/migrate/analyze;
-          // each compile translates a clone) is identical across entry kinds --
-          // `entry: "update"` only changes translate. Template/register ids stay
-          // consistent because `optimizeKnownTemplates` (the id cache key) is
-          // shared too.
-          entry: "update",
-          sourceMaps: false,
-          // The update/persisted entry kinds ship with the paired marko
-          // release; the installed compiler types may predate them.
-        } as unknown as compiler.Config;
         persistedEntryConfig = {
           ...clientConfig,
-          // Compiles the template's persisted entry (the render graph with
-          // registry registrations; imported by the update entry). Shares
-          // the build's compiler cache like the update entries.
           entry: "persisted",
           sourceMaps: false,
         } as unknown as compiler.Config;
@@ -462,6 +437,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           runtimeId,
         });
         linkAssetsRuntimeCode = getLinkAssetsRuntime({
+          buildId: persistedBuildId,
           isBuild,
           basePathVar,
           runtimeId,
@@ -842,6 +818,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         if (linked && isBuild) {
           if (this.environment.name === "ssr") {
             serverManifest = {
+              buildId: persistedBuildId,
               entries: {},
               entrySources: {},
               chunksNeedingAssets: [],
@@ -853,6 +830,13 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
             }
 
             if (serverManifest) {
+              persistedBuildId = serverManifest.buildId;
+              linkAssetsRuntimeCode = getLinkAssetsRuntime({
+                buildId: persistedBuildId,
+                isBuild,
+                basePathVar,
+                runtimeId,
+              });
               const htmlInputs = toHTMLEntries(root, serverManifest.entries);
               if (serverManifest.loadEntries) {
                 for (const entryId in serverManifest.loadEntries) {
@@ -937,11 +921,9 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         let importeeInfo = getMarkoFileInfo(importee);
 
         if (!importeeInfo) {
-          const persistedKind = importee.endsWith(markoExt + updateQuery)
-            ? InternalFileKind.updateEntry
-            : importee.endsWith(markoExt + persistedQuery)
-              ? InternalFileKind.persistedEntry
-              : undefined;
+          const persistedKind = importee.endsWith(markoExt + persistedQuery)
+            ? InternalFileKind.persistedEntry
+            : undefined;
           if (persistedKind) {
             if (!opts.persisted) {
               throw new Error(
@@ -1068,7 +1050,6 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
             }
             case InternalFileKind.clientEntry:
             case InternalFileKind.loadEntry:
-            case InternalFileKind.updateEntry:
             case InternalFileKind.persistedEntry: {
               // The goal below is to cached source content when in linked mode
               // to avoid loading from disk for both server and browser builds.
@@ -1111,7 +1092,6 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         const isClientEntry = info?.kind === InternalFileKind.clientEntry;
         const isServerEntry = info?.kind === InternalFileKind.serverEntry;
         const isLoadEntry = info?.kind === InternalFileKind.loadEntry;
-        const isUpdateEntry = info?.kind === InternalFileKind.updateEntry;
         const isPersistedEntry = info?.kind === InternalFileKind.persistedEntry;
 
         if (isServerEntry && !useLinkAssets) {
@@ -1200,7 +1180,6 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         const fileName =
           isClientEntry ||
           isLoadEntry ||
-          isUpdateEntry ||
           isPersistedEntry ||
           (isServerEntry && useLinkAssets)
             ? info.sourceId
@@ -1247,11 +1226,9 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
               ? clientEntryConfig
               : isLoadEntry
                 ? clientLoadEntryConfig
-                : isUpdateEntry
-                  ? updateEntryConfig
-                  : isPersistedEntry
-                    ? persistedEntryConfig
-                    : clientConfig,
+                : isPersistedEntry
+                  ? persistedEntryConfig
+                  : clientConfig,
         );
 
         const { meta } = compiled;
@@ -1553,29 +1530,6 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
               }
             }
 
-            if (opts.persisted) {
-              // A single digest over the shipped client files gives persisted
-              // update requests a deployment identity. Non-persisted builds
-              // keep their manifest and build work byte-for-byte unchanged.
-              const buildHash = crypto.createHash("shake256", {
-                outputLength: 8,
-              });
-              for (const fileName of Object.keys(bundle).sort()) {
-                const chunk = bundle[fileName];
-                buildHash.update(fileName);
-                buildHash.update(
-                  chunk.type === "chunk"
-                    ? chunk.code
-                    : typeof chunk.source === "string"
-                      ? chunk.source
-                      : new Uint8Array(chunk.source),
-                );
-              }
-              clientManifest[buildHashAssetId] = buildHash.digest(
-                "base64url",
-              ) as any;
-            }
-
             const manifestStr = `\n;var __MARKO_MANIFEST__=${JSON.stringify(
               clientManifest,
             )};\n`;
@@ -1678,13 +1632,6 @@ function getMarkoFileInfo(id: string) {
     } as const;
   }
 
-  if (id.endsWith(updateEntryExt)) {
-    return {
-      kind: InternalFileKind.updateEntry,
-      sourceId: `${id.slice(0, -updateEntryExt.length)}${markoExt}`,
-    } as const;
-  }
-
   if (id.endsWith(persistedEntryExt)) {
     return {
       kind: InternalFileKind.persistedEntry,
@@ -1713,8 +1660,6 @@ function toMarkoFileId(
       return toClientEntryId(id);
     case InternalFileKind.loadEntry:
       return toLoadEntryId(id);
-    case InternalFileKind.updateEntry:
-      return toUpdateEntryId(id);
     case InternalFileKind.persistedEntry:
       return toPersistedEntryId(id);
     case InternalFileKind.virtual:
@@ -1732,10 +1677,6 @@ function toClientEntryId(id: string) {
 
 function toLoadEntryId(id: string) {
   return id.slice(0, -markoExt.length) + loadEntryExt;
-}
-
-function toUpdateEntryId(id: string) {
-  return id.slice(0, -markoExt.length) + updateEntryExt;
 }
 
 function toPersistedEntryId(id: string) {

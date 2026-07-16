@@ -41,12 +41,6 @@ export const linkAssetsRuntimeId = "\0marko-link-assets.mjs";
  */
 export const linkAssetsPublicId = "virtual:marko-vite/link-assets";
 
-/**
- * Reserved `__MARKO_MANIFEST__` key carrying the client build's digest.
- * Cannot collide with real asset ids (`name_hash` from `getTemplateId`).
- */
-export const buildHashAssetId = "#build";
-
 export function supportsLinkAssets(translator?: string): boolean {
   // Both exports were added in the same release as the `linkAssets` option
   // (@marko/compiler@5.39.64), so their absence at runtime means the
@@ -90,6 +84,7 @@ export function getDevLoadAssetsManifest(url: string) {
 }
 
 export function getLinkAssetsRuntime(opts: {
+  buildId: string;
   isBuild: boolean;
   runtimeId?: string;
   basePathVar?: string;
@@ -107,19 +102,9 @@ export function register(assetId, entry) {
   registered[assetId] = entry;
 }
 
-// The client build's digest (deployment identity): compiled accessors and
-// register ids are stable only within one build, so consumers (e.g.
-// @marko/run's persisted-pages) compare it to reject cross-build update
-// payloads. Read at call time -- the manifest var is appended to the chunk
-// after this module's body runs. Undefined in dev.
+// Identifies the client bundle so servers can reject incompatible updates.
 export function buildId() {
-  return ${
-    opts.isBuild
-      ? `typeof __MARKO_MANIFEST__ === "undefined"
-    ? undefined
-    : __MARKO_MANIFEST__[${JSON.stringify(buildHashAssetId)}]`
-      : "undefined"
-  };
+  return ${JSON.stringify(opts.buildId)};
 }
 
 export function flush(g, type, assetId) {

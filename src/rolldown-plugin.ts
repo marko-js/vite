@@ -75,9 +75,9 @@ export default function rolldownPlugin(
       load: {
         filter: { id: /\.marko$/ },
         async handler(id) {
-          // Entry-suffixed ids (e.g. `x.update-entry.marko` from `x.marko?update`
+          // Entry-suffixed ids (e.g. `x.persisted-entry.marko`
           // imports) have no file on disk -- scan the source template they wrap.
-          const entryMatch = /\.(?:update|persisted)-entry(\.marko)$/.exec(id);
+          const entryMatch = /\.persisted-entry(\.marko)$/.exec(id);
           if (entryMatch) {
             id = id.slice(0, -entryMatch[0].length) + entryMatch[1];
           }
