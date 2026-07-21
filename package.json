@@ -27,18 +27,18 @@
   "scripts": {
     "build": "tsc -b && tsx build.mts",
     "change": "changeset add",
-    "ci:test": "nyc npm test -- --forbid-only",
-    "format": "npm run lint:eslint -- --fix && npm run lint:prettier -- --write",
-    "lint": "tsc -b && npm run lint:eslint && npm run lint:prettier -- -l",
+    "ci:test": "nyc pnpm test --forbid-only",
+    "format": "pnpm run lint:eslint --fix && pnpm run lint:prettier --write",
+    "lint": "tsc -b && pnpm run lint:eslint && pnpm run lint:prettier -l",
     "lint:eslint": "eslint -f unix .",
     "lint:prettier": "prettier \"./**/*{.ts,.js,.json,.md,.yml,rc}\"",
     "prepare": "husky",
-    "release": "npm run build && changeset publish --tag ${NPM_CONFIG_TAG:-latest}",
+    "release": "pnpm run build && changeset publish --tag ${NPM_CONFIG_TAG:-latest}",
     "report": "open ./coverage/lcov-report/index.html",
     "test": "cross-env NODE_ENV=test mocha \"./src/**/__tests__/*.test.ts\"",
-    "test:inspect": "npm test -- --inspect",
-    "test:update": "npm test -- --update",
-    "version": "changeset version && npm i --package-lock-only"
+    "test:inspect": "pnpm test --inspect",
+    "test:update": "pnpm test --update",
+    "version": "changeset version && pnpm install --lockfile-only"
   },
   "dependencies": {
     "@chialab/estransform": "^0.19.1",
@@ -91,5 +91,6 @@
   "peerDependencies": {
     "@marko/compiler": "^5",
     "vite": "^8"
-  }
+  },
+  "packageManager": "pnpm@11.15.1"
 }
