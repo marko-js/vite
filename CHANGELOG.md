@@ -1,5 +1,11 @@
 # Changelog
 
+## 6.1.7
+
+### Patch Changes
+
+- [#297](https://github.com/marko-js/vite/pull/297) [`b73226a`](https://github.com/marko-js/vite/commit/b73226a9d4a968d8123842e4dbd15c723c16a0ad) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Stop following symlinks when discovering known templates for optimized builds: pnpm layouts link node_modules as cyclic symlink graphs, so the walk previously never terminated and exhausted the heap.
+
 ## 6.1.6
 
 ### Patch Changes
