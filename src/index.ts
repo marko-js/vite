@@ -1681,6 +1681,10 @@ function getKnownTemplates(cwd: string) {
         {
           cwd,
           absolute: true,
+          // The node_modules pattern forces the walk into package trees, and
+          // pnpm layouts link those as cyclic symlink graphs — following the
+          // links walks forever and OOMs the build.
+          followSymbolicLinks: false,
           ignore: [
             "**/*.d.marko",
             "**/*build*/**",
