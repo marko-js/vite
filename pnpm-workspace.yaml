@@ -1,4 +1,8 @@
 allowBuilds:
   esbuild: true
+
+# This repo depends on same-day marko releases; disable pnpm's release-age gate.
+minimumReleaseAge: 0
+
 publicHoistPattern:
   - "@marko/runtime-tags"
