@@ -1,5 +1,11 @@
 # Changelog
 
+## 6.1.8
+
+### Patch Changes
+
+- [#299](https://github.com/marko-js/vite/pull/299) [`6228f86`](https://github.com/marko-js/vite/commit/6228f866d7d873a0ac3db97509ddbab49c08bd6a) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Compile `.marko` modules whose id carries an unrecognized query, such as the marker `@vitest/coverage-*` appends when it pulls in files no test imported, which previously reached the coverage instrumenter as uncompiled Marko source. Queries that change what the module is (`?raw`, `?url`, `?inline`, ...) are still left for vite to serve.
+
 ## 6.1.7
 
 ### Patch Changes
