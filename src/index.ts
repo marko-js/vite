@@ -28,6 +28,7 @@ import {
   type LinkAssetsDocManifest,
 } from "./manifest-generator";
 import { normalizePath, POSIX_SEP, WINDOWS_SEP } from "./normalize-path";
+import { cleanUrl, hasOpaqueQuery } from "./query";
 import { ReadOncePersistedStore } from "./read-once-persisted-store";
 import relativeAssetsTransform from "./relative-assets-transform";
 import {
@@ -543,7 +544,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
                   // Let vite handle externals as it normally would.
                   if (external) return undefined;
                   return markoSideEffectImportIds.has(id) ||
-                    isSideEffectFile(stripViteQueries(id))
+                    isSideEffectFile(cleanUrl(id))
                     ? undefined
                     : false;
                 },
@@ -840,7 +841,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           if (
             resolved &&
             !resolved.external &&
-            !isSideEffectFile(stripViteQueries(resolved.id))
+            !isSideEffectFile(cleanUrl(resolved.id))
           ) {
             markoSideEffectImportIds.add(resolved.id);
           }
@@ -860,7 +861,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
 
         if (importer) {
           const tagName = importTagReg.exec(importee)?.[1];
-          importer = stripViteQueries(importer);
+          importer = cleanUrl(importer);
 
           if (tagName) {
             const tagDef = compiler.taglib
@@ -928,10 +929,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
               : await this.resolve(importee, importer, resolveOpts);
 
           if (resolved) {
-            resolved.id = toMarkoFileId(
-              stripViteQueries(resolved.id),
-              importeeInfo,
-            );
+            resolved.id = toMarkoFileId(cleanUrl(resolved.id), importeeInfo);
           }
 
           return resolved;
@@ -956,7 +954,11 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         return null;
       },
       async load(rawId) {
-        const id = stripViteQueries(rawId);
+        // `?raw`, `?url`, ... are vite's to serve: it must see the file as it
+        // is on disk, so the marko file behind the query is left alone.
+        if (hasOpaqueQuery(rawId)) return null;
+
+        const id = cleanUrl(rawId);
 
         switch (id) {
           case cjsInteropHelpersId:
@@ -1019,7 +1021,9 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         return virtualFiles.get(id) || cachedSources.get(id) || null;
       },
       async transform(source, rawId) {
-        const id = stripViteQueries(rawId);
+        if (hasOpaqueQuery(rawId)) return null;
+
+        const id = cleanUrl(rawId);
         const info = getMarkoFileInfo(id);
         const isSSR = this.environment.name === "ssr";
         const isClientEntry = info?.kind === InternalFileKind.clientEntry;
@@ -1179,7 +1183,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
                     if (
                       resolved &&
                       !resolved.external &&
-                      !isSideEffectFile(stripViteQueries(resolved.id))
+                      !isSideEffectFile(cleanUrl(resolved.id))
                     ) {
                       markoSideEffectImportIds.add(resolved.id);
                     }
@@ -1658,17 +1662,6 @@ function isEmpty(obj: unknown) {
   }
 
   return true;
-}
-
-function stripViteQueries(id: string) {
-  const queryStart = id.indexOf("?");
-  if (queryStart === -1) return id;
-  const url = id.slice(0, queryStart);
-  const query = id
-    .slice(queryStart + 1)
-    .replace(/(?:^|[&])(?:cache|[vt])=[^&]+/g, "");
-  if (query) return `${url}?${query}`;
-  return url;
 }
 
 function getKnownTemplates(cwd: string) {
