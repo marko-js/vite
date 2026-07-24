@@ -86,26 +86,32 @@ describe("templates with a query", () => {
     await server?.close();
   });
 
-  // The hmr client keys the module by the requested url; a transparent query
-  // must leave everything else identical to the plain request.
   const transform = async (id: string) =>
-    (await server.environments.client.transformRequest(id))?.code.replaceAll(
-      JSON.stringify(id),
-      JSON.stringify(TEMPLATE),
-    );
+    (await server.environments.client.transformRequest(id))?.code;
+
+  // Vite prepends a cjs interop preamble whose consts are ordered
+  // nondeterministically, so a transparent query is checked against the
+  // compiled template that follows it.
+  const compiledTemplate = (code: string | undefined) => {
+    const start = code?.indexOf("const _marko_componentType") ?? -1;
+    assert.notEqual(start, -1, `expected a compiled template, got:\n${code}`);
+    return code!.slice(start);
+  };
 
   it("compiles a template requested with an unknown marker query", async () => {
     // `@vitest/coverage-*` re-requests uncovered files with a marker like this.
     assert.equal(
-      await transform(`${TEMPLATE}?cache=123&vitest-uncovered-coverage=true`),
-      await transform(TEMPLATE),
+      compiledTemplate(
+        await transform(`${TEMPLATE}?cache=123&vitest-uncovered-coverage=true`),
+      ),
+      compiledTemplate(await transform(TEMPLATE)),
     );
   });
 
   it("compiles a template requested with a cache busting query", async () => {
     assert.equal(
-      await transform(`${TEMPLATE}?v=abc`),
-      await transform(TEMPLATE),
+      compiledTemplate(await transform(`${TEMPLATE}?v=abc`)),
+      compiledTemplate(await transform(TEMPLATE)),
     );
   });
 
