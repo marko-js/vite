@@ -284,9 +284,11 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         hasBuildApp = !!config.builder?.buildApp;
 
         if (isTest) {
+          // vitest resolves a plain vite config too, which carries no `test`
+          // section, so this cannot assume one is present.
           const { test } = config as any;
           linked = false;
-          if ((test.environment as string | undefined)?.includes("dom")) {
+          if ((test?.environment as string | undefined)?.includes("dom")) {
             config.resolve ??= {};
             config.resolve.conditions ??= [];
             config.resolve.conditions.push("browser");
