@@ -1,5 +1,11 @@
 # Changelog
 
+## 6.1.9
+
+### Patch Changes
+
+- [#302](https://github.com/marko-js/vite/pull/302) [`0a401ca`](https://github.com/marko-js/vite/commit/0a401ca844f75aac9c5015d1562565853dad1b14) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Fix a crash when vitest resolves a vite config that has no `test` section. The plugin read `config.test.environment` unguarded in test mode, so simply having `@marko/vite` installed made `vitest run` fail before any test loaded.
+
 ## 6.1.8
 
 ### Patch Changes
