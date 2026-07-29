@@ -75,6 +75,12 @@ export default function rolldownPlugin(
       load: {
         filter: { id: /\.marko$/ },
         async handler(id) {
+          // Entry-suffixed ids (e.g. `x.persisted-entry.marko`
+          // imports) have no file on disk -- scan the source template they wrap.
+          const entryMatch = /\.persisted-entry(\.marko)$/.exec(id);
+          if (entryMatch) {
+            id = id.slice(0, -entryMatch[0].length) + entryMatch[1];
+          }
           const code = await this.fs.readFile(id, { encoding: "utf8" });
           const compiled = await compiler.compile(code, id, baseConfig);
           return {

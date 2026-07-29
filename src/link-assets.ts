@@ -29,6 +29,13 @@ const minRuntimeVersions: Record<number, readonly [number, number, number]> = {
 
 export const linkAssetsRuntimeId = "\0marko-link-assets.mjs";
 
+/**
+ * Stable importable alias for the runtime module above, for tooling built on
+ * this plugin (e.g. @marko/run's persisted-pages imports `buildId` from it).
+ * Resolved by the plugin in dev and build.
+ */
+export const linkAssetsPublicId = "virtual:marko-vite/link-assets";
+
 export function supportsLinkAssets(translator?: string): boolean {
   // Both exports were added in the same release as the `linkAssets` option
   // (@marko/compiler@5.39.64), so their absence at runtime means the
@@ -72,6 +79,7 @@ export function getDevLoadAssetsManifest(url: string) {
 }
 
 export function getLinkAssetsRuntime(opts: {
+  buildId: string;
   isBuild: boolean;
   runtimeId?: string;
   basePathVar?: string;
@@ -87,6 +95,11 @@ const registered = {};
 
 export function register(assetId, entry) {
   registered[assetId] = entry;
+}
+
+// Identifies the client bundle so servers can reject incompatible updates.
+export function buildId() {
+  return ${JSON.stringify(opts.buildId)};
 }
 
 export function flush(g, type, assetId) {

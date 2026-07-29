@@ -17,6 +17,7 @@ import {
   getDevLoadAssetsManifest,
   getLinkAssetsRuntime,
   getRegisterAssetsCode,
+  linkAssetsPublicId,
   linkAssetsRuntimeId,
   supportsLinkAssets,
 } from "./link-assets";
@@ -28,6 +29,10 @@ import {
   type LinkAssetsDocManifest,
 } from "./manifest-generator";
 import { normalizePath, POSIX_SEP, WINDOWS_SEP } from "./normalize-path";
+import {
+  planOnlyMergeSideEffect,
+  rewriteLoadEntryPersistedImports,
+} from "./persisted-print-skip";
 import { cleanUrl, hasOpaqueQuery } from "./query";
 import { ReadOncePersistedStore } from "./read-once-persisted-store";
 import relativeAssetsTransform from "./relative-assets-transform";
@@ -64,12 +69,84 @@ export interface Options {
   babelConfig?: compiler.Config["babelConfig"];
   // Filter marko files used as entries
   isEntry?: (importee: string, importer: string) => boolean;
+  // Compiles output capable of persisted (single-page server-first update) rendering.
+  // Requires a translator/runtime that understands the `persisted` compiler option.
+  // Divergent content is delivered as resumable HTML fragments, so persisted
+  // entries do not retain client-side construction material for server-only
+  // components.
+  persisted?: boolean;
+  /**
+   * Constructed only by `@marko/run` (not app config). Replaces the former
+   * loose `persistedPlanHost` / `persistedPlanEntries` / `persistedPrintSkip`
+   * fields with one host object.
+   */
+  persistedBuild?: PersistedBuild;
+}
+
+/** @marko/run → @marko/vite peer contract for persisted builds. Not app Options. */
+export interface PersistedBuild {
+  planHost: PersistedPlanHost;
+  /** Framework page entries to harvest before the client route table finalizes. */
+  planEntries?: string[];
+  /**
+   * When true on a production client build, dual-entry bodies are not product
+   * JS (plan-only compile + merge rewrites/stubs). Dev ignores this (print-on
+   * for incomplete-seal dual-entry). False when emission is off (dual A/B).
+   */
+  cutoverClientGraph: boolean;
+}
+
+/**
+ * Must match `@marko/compiler` `plan-only-persisted-entry.js`. Set only on the
+ * persisted-entry compile config when cutoverClientGraph && isBuild — not a
+ * public Config field (avoids piggybacking bare Babel `code: false`).
+ */
+const PLAN_ONLY_PERSISTED_ENTRY = "__markoPlanOnlyPersistedEntry";
+
+// Structural mirror of @marko/run's coordinator host API (kept narrow on
+// purpose; no run import from this package).
+export interface PersistedPlanHost {
+  registerVirtualSource(id: string, source: string): void;
+  ensureFinalized(intake: {
+    id: string;
+    env: "ssr" | "client";
+    carrier: unknown;
+    resolve(
+      specifier: string,
+      importer: string,
+    ): Promise<{ id: string } | null>;
+    getVirtualContent(id: string): string | undefined;
+  }): Promise<{
+    plans: {
+      requestedModules: { kind: string; canonical: string }[];
+      loaders: {
+        targetKind: string;
+        targets: { canonical: string }[];
+      }[];
+    }[];
+  } | null>;
+  onCompilerCacheWipe(): void;
+  /**
+   * When plan-only dual-entry bodies are suppressed, return the
+   * artifact/facade virtual id whose side-effect import still runs
+   * merge registration (load-entry imports x?persisted).
+   */
+  resolveCutoverMerge?(sourceFile: string): string | undefined;
+}
+
+interface PersistedPlanPluginContext {
+  resolve(
+    source: string,
+    importer?: string,
+    options?: { skipSelf?: boolean },
+  ): Promise<{ id: string } | null>;
 }
 
 enum InternalFileKind {
   clientEntry,
   serverEntry,
   loadEntry,
+  persistedEntry,
   virtual,
 }
 
@@ -78,6 +155,8 @@ interface ClientManifest {
 }
 
 interface ServerManifest {
+  // The SSR build mints this token and hands it to the client build here.
+  buildId: string;
   entries: {
     [entryId: string]: string;
   };
@@ -121,6 +200,9 @@ const htmlExt = ".html";
 const clientEntryExt = ".client-entry.marko";
 const serverEntryExt = ".server-entry.marko";
 const loadEntryExt = ".load-entry.marko";
+// `x.marko?persisted` resolves to its deferred render graph and patch API.
+const persistedEntryExt = ".persisted-entry.marko";
+const persistedQuery = "?persisted";
 const virtualFileInfix = "-virtual";
 const virtualFileReg = /^(.*\.marko)-virtual((?:\.[^\\/?]+)+)$/;
 const resolveOpts = { skipSelf: true };
@@ -143,6 +225,7 @@ let registeredTagLib = false;
 function noop(): undefined {}
 
 export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
+  let persistedBuildId = crypto.randomBytes(8).toString("base64url");
   let { linked = true } = opts;
   let runtimeId: string | undefined;
   let basePathVar: string | undefined;
@@ -150,6 +233,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
   let clientConfig: compiler.Config;
   let clientEntryConfig: compiler.Config;
   let clientLoadEntryConfig: compiler.Config;
+  let persistedEntryConfig: compiler.Config;
   let serverConfig: compiler.Config;
   let serverCJSConfig: compiler.Config;
   let serverEntryConfig: compiler.Config;
@@ -194,6 +278,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
       }
 
       virtualFiles.set(id, virtualFile);
+      opts.persistedBuild?.planHost.registerVirtualSource(id, dep.code);
       return relativeImportPath(nativeFrom, virtualFileName);
     };
 
@@ -230,6 +315,95 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
       }
     }
     return result;
+  }
+
+  function publishPersistedPlan(
+    context: PersistedPlanPluginContext,
+    fileName: string,
+    carrier: unknown,
+    env: "ssr" | "client",
+  ) {
+    return opts.persistedBuild?.planHost.ensureFinalized({
+      id: fileName,
+      env,
+      carrier,
+      resolve: (specifier, importer) => {
+        let from = importer.split("?")[0];
+        if (from[0] === ".") from = path.join(fileName, "..", from);
+        return context.resolve(specifier, from, { skipSelf: false });
+      },
+      getVirtualContent: (virtualId) => {
+        const virtual = virtualFiles.get(virtualId);
+        return virtual && "code" in virtual
+          ? (virtual as VirtualFile).code
+          : undefined;
+      },
+    });
+  }
+
+  async function preHarvestPersistedPlans(context: PersistedPlanPluginContext) {
+    const queue = [...(opts.persistedBuild?.planEntries ?? [])];
+    const harvested = new Set<string>();
+    while (queue.length) {
+      const requested = queue.shift()!;
+      const requestedInfo = getMarkoFileInfo(cleanUrl(requested));
+      const resolved = await context.resolve(
+        requested.includes("?") ||
+          requestedInfo?.kind === InternalFileKind.persistedEntry
+          ? requested
+          : `${requested}?persisted`,
+        undefined,
+        { skipSelf: false },
+      );
+      if (!resolved) {
+        throw new Error(
+          `persisted plan pre-bundle harvest could not resolve ${requested}`,
+        );
+      }
+      const info = getMarkoFileInfo(cleanUrl(resolved.id));
+      if (info?.kind !== InternalFileKind.persistedEntry) {
+        throw new Error(
+          `persisted plan pre-bundle harvest expected a persisted entry for ${requested}`,
+        );
+      }
+      const fileName = info.sourceId;
+      if (harvested.has(fileName)) continue;
+      harvested.add(fileName);
+      const source = await fs.promises.readFile(fileName, "utf8");
+      const compiled = await compileAndReportWarnings(
+        source,
+        fileName,
+        persistedEntryConfig,
+      );
+      const set = await publishPersistedPlan(
+        context,
+        fileName,
+        (compiled.meta as { updatePlan?: unknown }).updatePlan,
+        "client",
+      );
+      for (const plan of set?.plans ?? []) {
+        for (const request of plan.requestedModules) {
+          if (
+            request.kind === "internalized-child" ||
+            request.kind === "load-edge-child"
+          ) {
+            const child = getMarkoFileInfo(cleanUrl(request.canonical));
+            if (child?.kind === InternalFileKind.persistedEntry) {
+              queue.push(request.canonical);
+            }
+          }
+        }
+        for (const loader of plan.loaders) {
+          if (loader.targetKind === "scheduled-load-ready") continue;
+          for (const target of loader.targets) {
+            const child = getMarkoFileInfo(cleanUrl(target.canonical));
+            if (child?.kind === InternalFileKind.persistedEntry) {
+              queue.push(target.canonical);
+            }
+          }
+        }
+      }
+    }
   }
   let devEntryFile: string;
   let devEntryFilePosix: string;
@@ -284,11 +458,9 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         hasBuildApp = !!config.builder?.buildApp;
 
         if (isTest) {
-          // vitest resolves a plain vite config too, which carries no `test`
-          // section, so this cannot assume one is present.
           const { test } = config as any;
           linked = false;
-          if ((test?.environment as string | undefined)?.includes("dom")) {
+          if ((test.environment as string | undefined)?.includes("dom")) {
             config.resolve ??= {};
             config.resolve.conditions ??= [];
             config.resolve.conditions.push("browser");
@@ -318,7 +490,9 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           cache,
           optimize,
           runtimeId,
-          babelConfig,
+          babelConfig: opts.babelConfig
+            ? { ...babelConfig, ...opts.babelConfig }
+            : babelConfig,
           sourceMaps: true,
           writeVersionComment: false,
           resolveVirtualDependency,
@@ -326,6 +500,10 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
             ? getKnownTemplates(root)
             : undefined,
         };
+
+        if (opts.persisted) {
+          (baseConfig as any).persisted = opts.persisted;
+        }
 
         if (linked) {
           (baseConfig as any).markoViteLinked = linked;
@@ -406,6 +584,19 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           ...clientConfig,
           entry: "load",
         };
+        const planOnlyCutover =
+          !!opts.persistedBuild?.cutoverClientGraph && isBuild;
+        // Production client + cutover graph: plan-only (host-tagged flag,
+        // not bare Babel code:false). Dev stays print-ON for fail-closed
+        // dual-entry when seal is incomplete.
+        persistedEntryConfig = {
+          ...clientConfig,
+          entry: "persisted",
+          sourceMaps: false,
+          ...(planOnlyCutover
+            ? { [PLAN_ONLY_PERSISTED_ENTRY]: true as const }
+            : null),
+        } as unknown as compiler.Config;
 
         compiler.configure(baseConfig);
         devEntryFile = path.join(root, "index.html");
@@ -416,6 +607,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           runtimeId,
         });
         linkAssetsRuntimeCode = getLinkAssetsRuntime({
+          buildId: persistedBuildId,
           isBuild,
           basePathVar,
           runtimeId,
@@ -562,9 +754,22 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
               "dom",
               opts.translator,
             );
+            if (opts.persisted) {
+              // Both facades must enter one optimizer graph. Discovering the
+              // lazy persisted facade after the page runtime was optimized would
+              // create a second resume registry and force the first navigation
+              // to reload in development.
+              domDeps.push(
+                ...compiler.getRuntimeEntryFiles(
+                  "dom-persisted",
+                  opts.translator,
+                ),
+              );
+            }
+            const uniqueDomDeps = [...new Set(domDeps)];
             optimizeDeps.include = optimizeDeps.include
-              ? [...optimizeDeps.include, ...domDeps]
-              : domDeps;
+              ? [...optimizeDeps.include, ...uniqueDomDeps]
+              : uniqueDomDeps;
           }
 
           if (!isTest) {
@@ -687,13 +892,39 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         });
       },
 
-      async hotUpdate(ctx) {
-        compiler.taglib.clearCaches();
-        baseConfig.cache!.clear();
-        clearScanCache();
+      async buildStart() {
+        if (
+          isBuild &&
+          this.environment.name !== "ssr" &&
+          opts.persistedBuild?.planHost &&
+          opts.persistedBuild.planEntries?.length
+        ) {
+          await preHarvestPersistedPlans(this);
+        }
+      },
 
+      async hotUpdate(ctx) {
         const modules = new Set(ctx.modules);
         const fileName = normalizePath(ctx.file);
+        const compilerRelevant =
+          isMarkoFile(fileName) ||
+          optionalWatchFileReg.test(fileName) ||
+          [...transformWatchFiles.values()].some((files) =>
+            anyMatch(files, fileName),
+          ) ||
+          [...transformAnalyzedTags.values()].some((files) =>
+            files.has(fileName),
+          );
+
+        if (compilerRelevant) {
+          compiler.taglib.clearCaches();
+          baseConfig.cache!.clear();
+          clearScanCache();
+          // A REAL global compiler-cache wipe shares a generation boundary
+          // with the persisted plan cache (class W4). Unrelated handler /
+          // middleware fan-out is W3 and never wipes either cache.
+          opts.persistedBuild?.planHost.onCompilerCacheWipe();
+        }
 
         // When a child tag template changes, parent templates that analyzed
         // it may need recompilation (e.g., input destructuring changes in
@@ -783,6 +1014,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         if (linked && isBuild) {
           if (this.environment.name === "ssr") {
             serverManifest = {
+              buildId: persistedBuildId,
               entries: {},
               entrySources: {},
               chunksNeedingAssets: [],
@@ -794,6 +1026,13 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
             }
 
             if (serverManifest) {
+              persistedBuildId = serverManifest.buildId;
+              linkAssetsRuntimeCode = getLinkAssetsRuntime({
+                buildId: persistedBuildId,
+                isBuild,
+                basePathVar,
+                runtimeId,
+              });
               const htmlInputs = toHTMLEntries(root, serverManifest.entries);
               if (serverManifest.loadEntries) {
                 for (const entryId in serverManifest.loadEntries) {
@@ -855,6 +1094,8 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           case linkAssetsRuntimeId:
           case noClientAssetsRuntimeId:
             return importee;
+          case linkAssetsPublicId:
+            return linkAssetsRuntimeId;
         }
 
         if (virtualFiles.has(importee)) {
@@ -874,6 +1115,24 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         }
 
         let importeeInfo = getMarkoFileInfo(importee);
+
+        if (!importeeInfo) {
+          const persistedKind = importee.endsWith(markoExt + persistedQuery)
+            ? InternalFileKind.persistedEntry
+            : undefined;
+          if (persistedKind) {
+            if (!opts.persisted) {
+              throw new Error(
+                `@marko/vite: "${importee}" requires the \`persisted\` option.`,
+              );
+            }
+            importee = importee.slice(0, importee.lastIndexOf("?"));
+            importeeInfo = {
+              kind: persistedKind,
+              sourceId: importee as `${string}.marko`,
+            };
+          }
+        }
 
         if (importeeInfo) {
           if (
@@ -987,7 +1246,8 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
               );
             }
             case InternalFileKind.clientEntry:
-            case InternalFileKind.loadEntry: {
+            case InternalFileKind.loadEntry:
+            case InternalFileKind.persistedEntry: {
               // The goal below is to cached source content when in linked mode
               // to avoid loading from disk for both server and browser builds.
               // This is to support virtual Marko entry files.
@@ -1031,6 +1291,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         const isClientEntry = info?.kind === InternalFileKind.clientEntry;
         const isServerEntry = info?.kind === InternalFileKind.serverEntry;
         const isLoadEntry = info?.kind === InternalFileKind.loadEntry;
+        const isPersistedEntry = info?.kind === InternalFileKind.persistedEntry;
 
         if (isServerEntry && !useLinkAssets) {
           // TODO: remove this branch once the legacy (pre `linkAssets`
@@ -1116,7 +1377,10 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         }
 
         const fileName =
-          isClientEntry || isLoadEntry || (isServerEntry && useLinkAssets)
+          isClientEntry ||
+          isLoadEntry ||
+          isPersistedEntry ||
+          (isServerEntry && useLinkAssets)
             ? info.sourceId
             : id;
 
@@ -1161,11 +1425,68 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
               ? clientEntryConfig
               : isLoadEntry
                 ? clientLoadEntryConfig
-                : clientConfig,
+                : isPersistedEntry
+                  ? persistedEntryConfig
+                  : clientConfig,
         );
 
         const { meta } = compiled;
         let { code } = compiled;
+
+        const cutoverClient =
+          !!opts.persistedBuild?.cutoverClientGraph && isBuild && !isSSR;
+
+        // Load-entry is Promise.all([dom, x?persisted]). With plan-only
+        // dual-entry bodies suppressed, rewrite every ?persisted import to
+        // the merge artifact. Missing map or incomplete rewrite = hard fail.
+        if (
+          isLoadEntry &&
+          cutoverClient &&
+          typeof code === "string" &&
+          code.includes("?persisted")
+        ) {
+          try {
+            code = rewriteLoadEntryPersistedImports(
+              code,
+              fileName,
+              opts.persistedBuild?.planHost.resolveCutoverMerge?.(fileName),
+            );
+          } catch (err) {
+            this.error((err as Error).message);
+          }
+        }
+
+        if (isPersistedEntry && opts.persistedBuild?.planHost) {
+          // Plan intake side channel: the carrier (or its absence, under
+          // suppression) goes to the coordinator; the served bytes are the
+          // printed module either way.
+          try {
+            await publishPersistedPlan(
+              this,
+              fileName,
+              (meta as { updatePlan?: unknown }).updatePlan,
+              isSSR ? "ssr" : "client",
+            );
+          } catch (err) {
+            if ((err as Error)?.name !== "CancelledError") throw err;
+            // A cancelled generation re-finalizes on the next request; the
+            // printed module is unaffected.
+          }
+        }
+
+        // Plan-only cutover yields no module body. Side-effect-import the
+        // merge artifact so ready/load still registers. Missing merge
+        // mapping is a build error — never a silent empty stub.
+        if (isPersistedEntry && cutoverClient && (code == null || code === "")) {
+          try {
+            code = planOnlyMergeSideEffect(
+              fileName,
+              opts.persistedBuild?.planHost.resolveCutoverMerge?.(fileName),
+            );
+          } catch (err) {
+            this.error((err as Error).message);
+          }
+        }
 
         if (isBuild && !isSSR && compiled.ast) {
           // Record every bare `import "x"` the template compiles to so the
@@ -1565,6 +1886,13 @@ function getMarkoFileInfo(id: string) {
     } as const;
   }
 
+  if (id.endsWith(persistedEntryExt)) {
+    return {
+      kind: InternalFileKind.persistedEntry,
+      sourceId: `${id.slice(0, -persistedEntryExt.length)}${markoExt}`,
+    } as const;
+  }
+
   const virtualMatch = virtualFileReg.exec(id);
   if (virtualMatch) {
     return {
@@ -1586,6 +1914,8 @@ function toMarkoFileId(
       return toClientEntryId(id);
     case InternalFileKind.loadEntry:
       return toLoadEntryId(id);
+    case InternalFileKind.persistedEntry:
+      return toPersistedEntryId(id);
     case InternalFileKind.virtual:
       return `${id}${virtualFileInfix}${info.virtualSuffix}`;
   }
@@ -1601,6 +1931,10 @@ function toClientEntryId(id: string) {
 
 function toLoadEntryId(id: string) {
   return id.slice(0, -markoExt.length) + loadEntryExt;
+}
+
+function toPersistedEntryId(id: string) {
+  return id.slice(0, -markoExt.length) + persistedEntryExt;
 }
 
 function toEntryId(id: string) {

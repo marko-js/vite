@@ -117,6 +117,10 @@ app.listen(3000);
 
 You can manually override Marko's Babel configuration by passing a `babelConfig` object to the `@marko/vite` plugin. If no babel configuration is specified, babel related config files will not be considered.
 
+The object is shallow-merged over the plugin defaults. Nested values use
+replace semantics: for example, `plugins` replaces any default `plugins`
+array rather than appending to it.
+
 ```javascript
 marko({
   babelConfig: {
