@@ -110,13 +110,12 @@ const virtualFilesForTemplate = new Map<string, Set<string>>();
 const virtualFilesResetForTemplate = new Map<string, number>();
 const ssrTransformCache = new Map<string, string>();
 const importTagReg = /^<([^>]+)>$/;
-// Styles Vite's `assetsInclude` skips (it handles css/preprocessors itself).
+// Styles Vite's `assetsInclude` skips (it handles css/preprocessors itself),
+// plus zero-runtime stylesheet modules (`*.css.ts`, vanilla-extract and
+// friends) -- those look pure, exporting only class name strings, but compiling
+// one is what emits its stylesheet.
 const styleImportReg =
-  /\.(?:css|less|s[ac]ss|styl(?:us)?|pcss|postcss)(?:\?|$)/i;
-// Zero-runtime CSS-in-JS stylesheets (vanilla-extract and friends). The module
-// looks pure -- it only exports class name strings -- but building it is what
-// emits the stylesheet, so it must not be treeshaken out of the client.
-const styleScriptImportReg = /\.css\.[cm]?[jt]s(?:\?|$)/i;
+  /\.(?:css(?:\.[cm]?[jt]s)?|less|s[ac]ss|styl(?:us)?|pcss|postcss)(?:\?|$)/i;
 const optionalWatchFileReg =
   /[\\/](?:([^\\/]+)\.)?(?:marko-tag.json|(?:style|component|component-browser)\.\w+)$/;
 const noClientAssetsRuntimeId = "\0no_client_bundles.mjs";
@@ -268,10 +267,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
   // Kept purely by path: a `.marko` file, a style (or stylesheet module), or a
   // Vite asset.
   const isSideEffectFile = (file: string) =>
-    isMarkoFile(file) ||
-    styleImportReg.test(file) ||
-    styleScriptImportReg.test(file) ||
-    viteAssetsInclude(file);
+    isMarkoFile(file) || styleImportReg.test(file) || viteAssetsInclude(file);
 
   return [
     {
