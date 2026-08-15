@@ -1,5 +1,11 @@
 # Changelog
 
+## 6.1.10
+
+### Patch Changes
+
+- [#305](https://github.com/marko-js/vite/pull/305) [`c1b1bfb`](https://github.com/marko-js/vite/commit/c1b1bfb18a8e340f6f7027ffcb4fa7ad7ffd6007) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Treat zero-runtime stylesheet modules (`*.css.ts`, `*.css.js`) as having side effects so their styles are still emitted when only server-rendered markup uses them.
+
 ## 6.1.9
 
 ### Patch Changes
