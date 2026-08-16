@@ -1,4 +1,4 @@
-// A bare import of its own.
+// A bare import of its own: the marking has to reach it too.
 import "./nested-side-effect.js";
 
 import { loaded } from "./tracker.js";

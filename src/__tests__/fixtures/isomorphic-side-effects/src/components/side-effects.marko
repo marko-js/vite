@@ -1,0 +1,34 @@
+import { onlyServer } from "./server-only.js";
+import { impureServerOnly } from "impure-lib";
+import { serverOnlyStyle } from "./server-styles.css.js";
+import { shared } from "./shared.js";
+import { loaded } from "./tracker.js";
+import "./explicit-side-effect.js";
+import "side-effect-lib";
+import "./styles.css";
+
+// `onlyServer`/`impureServerOnly` are used only in a server block, so they (and
+// `impure-lib`, which has no `sideEffects` field) tree-shake out of the client.
+// `serverOnlyStyle` is used the same way, but its `.css.js` module is a
+// stylesheet, so it is kept regardless.
+server {
+  onlyServer();
+  impureServerOnly();
+  serverOnlyStyle();
+}
+
+// Stateful so the page hydrates: by mount every import above has evaluated, so
+// the render reports which of them made it into the client bundle.
+class {
+  onCreate() {
+    this.state = { loaded: "" };
+  }
+  onMount() {
+    this.state.loaded = loaded.slice().sort().join(", ");
+  }
+}
+
+<div.marko-side-effects>
+  <div#shared>shared: ${shared}</div>
+  <div#loaded>loaded: ${state.loaded}</div>
+</div>
