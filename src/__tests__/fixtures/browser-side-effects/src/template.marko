@@ -7,10 +7,9 @@ import "./explicit-side-effect.js";
 import "side-effect-lib";
 import "./styles.css";
 
-// `onlyServer`/`impureServerOnly` are used only in a server block, so they (and
-// `impure-lib`, which has no `sideEffects` field) tree-shake out of the client.
-// `serverOnlyStyle` is used the same way, but its `.css.js` module is a
-// stylesheet, so it is kept regardless.
+// `onlyServer`/`impureServerOnly`/`serverOnlyStyle` are used only in a server
+// block, so nothing references them in the client build. Unlinked, that is not
+// enough to drop them: their modules still run for their side effects.
 server {
   onlyServer();
   impureServerOnly();

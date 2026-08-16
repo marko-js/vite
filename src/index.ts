@@ -375,9 +375,10 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         clientConfig = {
           ...baseConfig,
           output: "dom",
-          // In build, keep the compiled AST so `transform` can read a template's
-          // side effect imports for tree-shaking without re-parsing (see below).
-          ast: isBuild,
+          // In a linked build, keep the compiled AST so `transform` can read a
+          // template's side effect imports for tree-shaking without re-parsing
+          // (see below).
+          ast: isBuild && linked,
         };
         clientEntryConfig = {
           ...baseConfig,
@@ -386,7 +387,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           // compiler skips the entry wrapper's own (meaningless) map.
           // Also keep the AST here so the page entry's own side effect imports
           // (eg the assets a server only page links in) are captured too.
-          ast: isBuild,
+          ast: isBuild && linked,
         };
         serverConfig = {
           ...baseConfig,
@@ -527,9 +528,16 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
             };
           }
 
-          if (!isSSR) {
+          if (linked && !isSSR) {
             // Marko is the only source of side effects: default every module to
             // side effect free (kept: `.marko`, assets, and bare imports).
+            // That a side effect has to originate from a Marko file is the
+            // policy, not a gap: a bare `import "x"` counts when a `.marko`
+            // file writes it, and one written in a plain `.js` module does not.
+            // Only safe when linked, ie when this plugin owns the client build
+            // and its entries are Marko pages. Unlinked consumers (Storybook,
+            // vitest) hand Vite entries of their own whose modules run for
+            // their side effects, so there the default policy has to stand.
             const treeshake = config.build.rolldownOptions.treeshake;
             const userModuleSideEffects =
               treeshake && typeof treeshake === "object"
@@ -834,6 +842,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         // stops at `.marko`/style/asset ids, which are never added to the set,
         // so a template's own imports stay shakeable.
         if (
+          linked &&
           isBuild &&
           !ssr &&
           importer &&
@@ -1171,7 +1180,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         const { meta } = compiled;
         let { code } = compiled;
 
-        if (isBuild && !isSSR && compiled.ast) {
+        if (linked && isBuild && !isSSR && compiled.ast) {
           // Record every bare `import "x"` the template compiles to so the
           // treeshake hook keeps it (externals are left for vite to handle).
           // Files `isSideEffectFile` already keeps (`.marko`, styles, assets)
