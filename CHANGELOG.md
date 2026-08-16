@@ -1,5 +1,11 @@
 # Changelog
 
+## 6.1.11
+
+### Patch Changes
+
+- [#308](https://github.com/marko-js/vite/pull/308) [`b7b91e0`](https://github.com/marko-js/vite/commit/b7b91e054265f9e34e5f4af3a802356eb740f3c8) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Only apply the client build's side effect free default when linked. Unlinked consumers such as Storybook and vitest supply their own entries, whose modules run for their side effects, so tree-shaking them broke those setups (eg a static Storybook lost the addon channel setup and composed refs never finished loading).
+
 ## 6.1.10
 
 ### Patch Changes
