@@ -113,6 +113,11 @@ for (const fixture of fs.readdirSync(FIXTURES)) {
             minify: false,
             assetsInlineLimit: 0,
             emptyOutDir: false, // Avoid server / client deleting files from each other.
+            // Without the polyfill a page whose only client asset is a
+            // stylesheet ships no JS at all (the polyfill chunk would
+            // otherwise block vite's pure-css chunk removal), which the
+            // css module fixtures assert on.
+            modulePreload: { polyfill: false },
           },
         });
 
