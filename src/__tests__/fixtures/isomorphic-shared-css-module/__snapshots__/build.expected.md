@@ -2,7 +2,7 @@
 
 ```html
 <div
-  class="_thing_1n3is_1"
+  class="_thing_scoped"
 >
   first page
 </div>
@@ -13,6 +13,6 @@ const app=browser.window.document.getElementById("app");for(const el of browser.
 
 ```diff
 -</div>+</div>
-[link: /assets/styled-[hash].css][script: /assets/[hash].js]
+[link: /assets/styled-[hash].module-[hash].css]
 ```
 

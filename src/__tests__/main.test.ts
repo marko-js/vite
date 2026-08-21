@@ -113,6 +113,7 @@ for (const fixture of fs.readdirSync(FIXTURES)) {
             minify: false,
             assetsInlineLimit: 0,
             emptyOutDir: false, // Avoid server / client deleting files from each other.
+            modulePreload: { polyfill: false }, // Lets stylesheet-only pages ship no JS, which css module fixtures assert on.
           },
         });
 

@@ -2,7 +2,7 @@
 
 ```html
 <div
-  class="_thing_1n3is_1"
+  class="_thing_scoped"
 >
   first page
 </div>

@@ -16,6 +16,11 @@
   src="/assets/lazy.load-[hash].marko-[hash].js"
   type="module"
 />
+<link
+  crossorigin=""
+  href="/assets/[hash].js"
+  rel="modulepreload"
+/>
 <button
   id="lazy-clickable"
 >
