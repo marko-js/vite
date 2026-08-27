@@ -1349,6 +1349,13 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           meta: { markoAPI: meta.api },
         };
       },
+      generateBundle(_outputOptions, bundle) {
+        // Runs from the `pre` plugin so the html and manifest plugins that
+        // follow never see the chunks dropped here.
+        if (linked && this.environment.name !== "ssr") {
+          removeEmptyChunks(bundle);
+        }
+      },
     },
     {
       name: "marko-vite:post",
@@ -1524,6 +1531,106 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
 function isMarkoFile(id: string) {
   return id.endsWith(markoExt);
 }
+
+/**
+ * Drops chunks that carry nothing but a stylesheet.
+ *
+ * A css module's stylesheet is a side effect module, so a group of them that
+ * is shared by some pages but not others gets its own chunk. Once the css is
+ * extracted the chunk is left with the bare `import "./other.js"` lines that
+ * order it after its dependencies, which vite's own pure-css pass does not
+ * recognise (it requires an entirely empty chunk), so every page shipped a
+ * modulepreload for a script that does nothing. Those imports are already
+ * satisfied by anything that imports the chunk, so it is removed and its
+ * importers pick up its imports and stylesheet metadata directly.
+ */
+function removeEmptyChunks(bundle: vite.Rollup.OutputBundle) {
+  const chunks = Object.values(bundle).filter(
+    (chunk) => chunk.type === "chunk",
+  );
+  const dynamicallyImported = new Set<string>();
+  for (const chunk of chunks) {
+    for (const fileName of chunk.dynamicImports) {
+      dynamicallyImported.add(fileName);
+    }
+  }
+
+  const removed = new Set<string>();
+  for (const chunk of chunks) {
+    if (
+      !chunk.isEntry &&
+      !chunk.isDynamicEntry &&
+      !chunk.exports.length &&
+      !dynamicallyImported.has(chunk.fileName) &&
+      // A chunk with no code at all is vite's pure css chunk to remove.
+      chunk.code.trim() &&
+      Object.values(chunk.modules).every((mod) => !mod.renderedLength) &&
+      !chunk.code.replace(emptyChunkImportReg, "").trim()
+    ) {
+      removed.add(chunk.fileName);
+    }
+  }
+
+  if (!removed.size) return;
+
+  for (const chunk of chunks) {
+    if (removed.has(chunk.fileName)) continue;
+    const seen = new Set(chunk.imports);
+    const imports: string[] = [];
+    const visit = (fileName: string) => {
+      if (removed.has(fileName)) {
+        const empty = bundle[fileName] as vite.Rollup.OutputChunk;
+        for (const imported of empty.imports) visit(imported);
+        if (empty.viteMetadata && chunk.viteMetadata) {
+          for (const css of empty.viteMetadata.importedCss) {
+            chunk.viteMetadata.importedCss.add(css);
+          }
+          for (const asset of empty.viteMetadata.importedAssets) {
+            chunk.viteMetadata.importedAssets.add(asset);
+          }
+        }
+      } else {
+        imports.push(fileName);
+      }
+    };
+
+    if (!chunk.imports.some((fileName) => removed.has(fileName))) continue;
+    for (const fileName of chunk.imports) visit(fileName);
+    chunk.imports = [...new Set(imports)];
+
+    const dir = path.posix.dirname(chunk.fileName);
+    const toSpecifier = (fileName: string) => {
+      const rel = path.posix.relative(dir, fileName);
+      return rel[0] === "." ? rel : "./" + rel;
+    };
+    chunk.code = chunk.code.replace(emptyChunkImportReg, (match, spec) => {
+      const fileName = path.posix.join(dir, spec);
+      if (!removed.has(fileName)) return match;
+      // Splice the dropped chunk's own imports in its place so the relative
+      // order of side effects is kept for anything not already imported.
+      const hoisted: string[] = [];
+      const visit = (fileName: string) => {
+        const empty = bundle[fileName] as vite.Rollup.OutputChunk;
+        for (const imported of empty.imports) {
+          if (removed.has(imported)) visit(imported);
+          else if (!seen.has(imported)) {
+            seen.add(imported);
+            hoisted.push(`import ${JSON.stringify(toSpecifier(imported))};`);
+          }
+        }
+      };
+      visit(fileName);
+      return hoisted.join("\n");
+    });
+  }
+
+  for (const fileName of removed) {
+    delete bundle[fileName];
+    delete bundle[`${fileName}.map`];
+  }
+}
+
+const emptyChunkImportReg = /^\s*import\s*["']([^"']+)["'];?[ \t]*$/gm;
 
 /**
  * Collects the css output files reachable from the chunk for the given
