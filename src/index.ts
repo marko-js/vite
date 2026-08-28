@@ -1349,11 +1349,29 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           meta: { markoAPI: meta.api },
         };
       },
-      generateBundle(_outputOptions, bundle) {
-        // Runs from the `pre` plugin so the html and manifest plugins that
-        // follow never see the chunks dropped here.
-        if (linked && this.environment.name !== "ssr") {
-          removeEmptyChunks(bundle);
+      renderChunk(code, chunk, _opts, meta) {
+        // A css module's stylesheet is a side effect module, so a group of
+        // them shared by some pages but not others gets its own chunk. Once
+        // the css is extracted only the `import "./dep.js"` lines that order
+        // it after its dependencies are left, and every page preloads a script
+        // that does nothing. Vite's pure css pass drops such a chunk (folding
+        // its stylesheets into each importer) only when its code is entirely
+        // empty, so blank it when the imports are redundant: severing them is
+        // safe once every importer already imports the same chunks itself.
+        if (
+          linked &&
+          this.environment.name !== "ssr" &&
+          !chunk.isEntry &&
+          !chunk.isDynamicEntry &&
+          code.trim() &&
+          !code.replace(importStatementReg, "").trim() &&
+          Object.values(meta.chunks).every(
+            (importer) =>
+              !importer.imports.includes(chunk.fileName) ||
+              chunk.imports.every((dep) => importer.imports.includes(dep)),
+          )
+        ) {
+          return { code: "", map: null };
         }
       },
     },
@@ -1530,78 +1548,6 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
 
 function isMarkoFile(id: string) {
   return id.endsWith(markoExt);
-}
-
-/**
- * Drops chunks that carry nothing but a stylesheet.
- *
- * A css module's stylesheet is a side effect module, so a group of them that
- * is shared by some pages but not others gets its own chunk. Once the css is
- * extracted the chunk is left with the bare `import "./other.js"` lines that
- * order it after its dependencies, which vite's own pure-css pass does not
- * recognise (it requires an entirely empty chunk), so every page shipped a
- * modulepreload for a script that does nothing. Each importer takes over the
- * chunk's imports (in place, so side effect order holds) and its stylesheets.
- */
-function removeEmptyChunks(bundle: vite.Rollup.OutputBundle) {
-  const chunks = Object.values(bundle).filter(
-    (chunk) => chunk.type === "chunk",
-  );
-  const empty = new Map<string, vite.Rollup.OutputChunk>();
-  for (const chunk of chunks) {
-    if (
-      !chunk.isEntry &&
-      !chunk.isDynamicEntry &&
-      // Nothing but imports (a chunk with no code at all is left to vite).
-      chunk.code.trim() &&
-      !chunk.code.replace(importStatementReg, "").trim()
-    ) {
-      empty.set(chunk.fileName, chunk);
-    }
-  }
-
-  if (!empty.size) return;
-
-  for (const chunk of chunks) {
-    if (empty.has(chunk.fileName)) continue;
-    const dir = path.posix.dirname(chunk.fileName);
-    const seen = new Set(chunk.imports);
-    chunk.code = chunk.code.replace(importStatementReg, (match, spec) => {
-      const dropped = empty.get(path.posix.join(dir, spec));
-      if (!dropped) return match;
-      const hoisted: string[] = [];
-      const visit = (dropped: vite.Rollup.OutputChunk) => {
-        if (dropped.viteMetadata && chunk.viteMetadata) {
-          for (const css of dropped.viteMetadata.importedCss) {
-            chunk.viteMetadata.importedCss.add(css);
-          }
-          for (const asset of dropped.viteMetadata.importedAssets) {
-            chunk.viteMetadata.importedAssets.add(asset);
-          }
-        }
-        for (const fileName of dropped.imports) {
-          const nested = empty.get(fileName);
-          if (nested) visit(nested);
-          else if (!seen.has(fileName)) {
-            seen.add(fileName);
-            chunk.imports.push(fileName);
-            const rel = path.posix.relative(dir, fileName);
-            hoisted.push(
-              `import ${JSON.stringify(rel[0] === "." ? rel : "./" + rel)};`,
-            );
-          }
-        }
-      };
-      visit(dropped);
-      return hoisted.join("\n");
-    });
-    chunk.imports = chunk.imports.filter((fileName) => !empty.has(fileName));
-  }
-
-  for (const fileName of empty.keys()) {
-    delete bundle[fileName];
-    delete bundle[`${fileName}.map`];
-  }
 }
 
 const importStatementReg = /^\s*import\s*["']([^"']+)["'];?[ \t]*$/gm;
