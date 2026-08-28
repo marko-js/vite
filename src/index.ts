@@ -1349,7 +1349,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           meta: { markoAPI: meta.api },
         };
       },
-      renderChunk(code, chunk, _opts, meta) {
+      renderChunk(_code, chunk, _opts, meta) {
         // A css module's stylesheet is a side effect module, so a group of
         // them shared by some pages but not others gets its own chunk. Once
         // the css is extracted only the `import "./dep.js"` lines that order
@@ -1358,13 +1358,14 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         // its stylesheets into each importer) only when its code is entirely
         // empty, so blank it when the imports are redundant: severing them is
         // safe once every importer already imports the same chunks itself.
+        // (An entirely empty chunk has no imports to sever and is vite's.)
         if (
           linked &&
           this.environment.name !== "ssr" &&
           !chunk.isEntry &&
           !chunk.isDynamicEntry &&
-          code.trim() &&
-          !code.replace(importStatementReg, "").trim() &&
+          !chunk.exports.length &&
+          Object.values(chunk.modules).every((mod) => !mod.renderedLength) &&
           Object.values(meta.chunks).every(
             (importer) =>
               !importer.imports.includes(chunk.fileName) ||
@@ -1549,8 +1550,6 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
 function isMarkoFile(id: string) {
   return id.endsWith(markoExt);
 }
-
-const importStatementReg = /^\s*import\s*["']([^"']+)["'];?[ \t]*$/gm;
 
 /**
  * Collects the css output files reachable from the chunk for the given
