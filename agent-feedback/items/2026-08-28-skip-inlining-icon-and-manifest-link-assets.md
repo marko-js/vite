@@ -1,0 +1,12 @@
+---
+type: bug
+impact: low
+effort: low
+site: src/relative-assets-transform.ts › transform
+---
+
+# Skip inlining for relative `<link rel=icon|apple-touch-icon|manifest>` assets, as Vite's HTML pipeline does
+
+`transform` rewrites a static relative asset attribute into a plain Vite asset import without consulting the tag's `rel`, so `<link rel=icon href="./favicon.png">`, `rel=apple-touch-icon` and `rel=manifest` all fall through to Vite's size-only `shouldInline` (`build.assetsInlineLimit`, default 4096 bytes, with no rel and no SSR exception) and are base64-inlined into the SSR chunk. Vite's own HTML pipeline refuses to inline those rels on purpose, keeping `icon`, `apple-touch-icon`, `apple-touch-startup-image` and `manifest` in its `noInlineLinkRels` set, so the same 2.3 KB favicon that stays a hashed file in an `index.html` build becomes a 3.1 KB `data:` URI sitting in the head of every HTML response, uncacheable and charged to the first packet, and a `.webmanifest` is served as `data:application/manifest+json;base64,…`. Mirror Vite: when the tag is `link` and its static `rel` is one of those four, emit the generated import with `?no-inline`. That query is safe to add unconditionally, since `src/query.ts` already passes `no-inline` through and the package's peer range is `vite: ^8`. While fixing it, name the inline threshold and its two opt-outs (`?no-inline` on the reference, `build.assetsInlineLimit`) in README.md's `# Browser asset references`, which shows a hashed-file output as the result and says nothing about inlining.
+
+Check: in a linked-mode SSR app with `build.assetsInlineLimit` unset whose server-rendered layout has `<link rel=icon type=image/png sizes=32x32 href="./favicon.png">` (2310 bytes) and `<link rel=manifest href="./site.webmanifest">`, run `NODE_ENV=production vite build --app`; `grep -c 'data:image/png;base64' dist/index.js` prints 1, `ls dist/assets | grep -i favicon` prints nothing, and the served page carries `<link rel=icon … href=data:image/png;base64,…>` (3150 bytes, starting 575 bytes into the document; 3448 of its 8555 bytes are base64) plus `<link rel=manifest href=data:application/manifest+json;base64,…>`. Control: the same favicon.png in a plain `index.html` built by vite with default config stays `<link rel=icon … href="/assets/favicon-DH_FVca_.png">` while an `<img src="./favicon.png">` in that same document inlines. Writing `href="./favicon.png?no-inline"` in the layout yields 0 png data URIs and emits `dist/assets/favicon-DH_FVca_.png`.
