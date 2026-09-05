@@ -119,6 +119,10 @@ const styleImportReg =
 const optionalWatchFileReg =
   /[\\/](?:([^\\/]+)\.)?(?:marko-tag.json|(?:style|component|component-browser)\.\w+)$/;
 const noClientAssetsRuntimeId = "\0no_client_bundles.mjs";
+const cssModuleFacadePrefix = "\0marko-css-module:";
+const cssModuleStyleExt = ".marko-css-module.css";
+const cssModuleReg =
+  /\.module\.(?:css|less|s[ac]ss|styl(?:us)?|pcss|postcss)$/i;
 const markoExt = ".marko";
 const htmlExt = ".html";
 const clientEntryExt = ".client-entry.marko";
@@ -264,10 +268,13 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
     `vite-marko${runtimeId ? `-${runtimeId}` : ""}`,
   );
   const isTagsApi = (api: undefined | string) => api === "tags";
-  // Kept purely by path: a `.marko` file, a style (or stylesheet module), or a
-  // Vite asset.
+  // Kept purely by path: a `.marko` file, a style (or a css module's
+  // facade virtual), or a Vite asset.
   const isSideEffectFile = (file: string) =>
-    isMarkoFile(file) || styleImportReg.test(file) || viteAssetsInclude(file);
+    isMarkoFile(file) ||
+    styleImportReg.test(file) ||
+    file.startsWith(cssModuleFacadePrefix) ||
+    viteAssetsInclude(file);
 
   return [
     {
@@ -834,31 +841,32 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         }
       },
       async resolveId(importee, importer, importOpts, ssr = importOpts.ssr) {
-        // An explicit bare `import "x"` only says *x* has side effects, but x's
-        // own side effects usually live in the modules it imports (eg terser
-        // installs `AST_Toplevel#resolve_defines` from a bare
-        // `import "./global-defs.js"`). Carry the marking downstream so the
-        // whole subgraph a template opted into keeps its side effects. This
-        // stops at `.marko`/style/asset ids, which are never added to the set,
-        // so a template's own imports stay shakeable.
-        if (
-          linked &&
-          isBuild &&
-          !ssr &&
-          importer &&
-          markoSideEffectImportIds.has(importer)
-        ) {
-          const resolved = await this.resolve(importee, importer, {
-            ...importOpts,
-            skipSelf: true,
-          });
+        if (linked && isBuild && !ssr && importer) {
+          // An explicit bare `import "x"` only says *x* has side effects, but
+          // x's own side effects usually live in the modules it imports (eg
+          // terser installs `AST_Toplevel#resolve_defines` from a bare
+          // `import "./global-defs.js"`). Carry the marking downstream so the
+          // whole subgraph a template opted into keeps its side effects. This
+          // stops at `.marko`/style/asset ids, which are never added to the
+          // set, so a template's own imports stay shakeable.
+          const isCssModule = cssModuleReg.test(importee);
 
-          if (
-            resolved &&
-            !resolved.external &&
-            !isSideEffectFile(cleanUrl(resolved.id))
-          ) {
-            markoSideEffectImportIds.add(resolved.id);
+          if (isCssModule || markoSideEffectImportIds.has(importer)) {
+            const resolved = await this.resolve(importee, importer, {
+              ...importOpts,
+              skipSelf: true,
+            });
+
+            if (resolved && !resolved.external) {
+              if (!isSideEffectFile(cleanUrl(resolved.id))) {
+                markoSideEffectImportIds.add(resolved.id);
+              }
+
+              if (isCssModule && cssModuleReg.test(resolved.id)) {
+                // The `.js` tail keeps vite's css pipeline off the facade.
+                return `${cssModuleFacadePrefix}${resolved.id}.js`;
+              }
+            }
           }
         }
 
@@ -870,7 +878,10 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
             return importee;
         }
 
-        if (virtualFiles.has(importee)) {
+        if (
+          virtualFiles.has(importee) ||
+          importee.endsWith(cssModuleStyleExt)
+        ) {
           return importee;
         }
 
@@ -984,6 +995,38 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
             return linkAssetsRuntimeCode;
           case noClientAssetsRuntimeId:
             return "NO_CLIENT_ASSETS";
+        }
+
+        if (rawId.startsWith(cssModuleFacadePrefix)) {
+          const file = rawId.slice(cssModuleFacadePrefix.length, -3);
+          return (
+            `import ${JSON.stringify(file + cssModuleStyleExt)};\n` +
+            `export * from ${JSON.stringify(file + "?transform-only")};\n` +
+            `export { default } from ${JSON.stringify(file + "?transform-only")};\n`
+          );
+        }
+
+        if (id.endsWith(cssModuleStyleExt)) {
+          // Serve the css module's compiled css as this plain css id's
+          // source, unwrapped from the string literal the `?inline` module
+          // default exports.
+          const inlineId = id.slice(0, -cssModuleStyleExt.length) + "?inline";
+          const { code } = await this.load({ id: inlineId });
+          if (code) {
+            for (const node of this.parse(code).body) {
+              if (
+                node.type === "ExportDefaultDeclaration" &&
+                node.declaration.type === "Literal" &&
+                typeof node.declaration.value === "string"
+              ) {
+                return node.declaration.value;
+              }
+            }
+          }
+
+          return this.error(
+            `@marko/vite: could not read the compiled css for ${inlineId}.`,
+          );
         }
 
         const info = getMarkoFileInfo(id);
@@ -1306,24 +1349,38 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           meta: { markoAPI: meta.api },
         };
       },
+      renderChunk(_code, chunk, _opts, meta) {
+        // A css module's stylesheet is a side effect module, so a group of
+        // them shared by some pages but not others gets its own chunk. Once
+        // the css is extracted only the `import "./dep.js"` lines that order
+        // it after its dependencies are left, and every page preloads a script
+        // that does nothing. Vite's pure css pass drops such a chunk (folding
+        // its stylesheets into each importer) only when its code is entirely
+        // empty, so blank it when the imports are redundant: severing them is
+        // safe once every importer already imports the same chunks itself.
+        // (An entirely empty chunk has no imports to sever and is vite's.)
+        if (
+          linked &&
+          this.environment.name !== "ssr" &&
+          !chunk.isEntry &&
+          !chunk.isDynamicEntry &&
+          !chunk.exports.length &&
+          Object.values(chunk.modules).every((mod) => !mod.renderedLength) &&
+          Object.values(meta.chunks).every(
+            (importer) =>
+              !importer.imports.includes(chunk.fileName) ||
+              chunk.imports.every((dep) => importer.imports.includes(dep)),
+          )
+        ) {
+          return { code: "", map: null };
+        }
+      },
     },
     {
       name: "marko-vite:post",
       apply: "build",
       enforce: "post", // We use a "post" plugin to allow us to read the final generated `.html` from vite.,
       sharedDuringBuild: true,
-      transform(_source, id, opts) {
-        if (!opts?.ssr && /\.module\.[^.]+(?:\?|$)/.test(id)) {
-          // CSS modules in vite tree shake, however when coupled with
-          // Marko (which leaves code on the server) this leads to no
-          // reference to the css module and causes it to be removed
-          // even when it should not be. Here we say all css moduleish
-          // files should not tree shake.
-          return {
-            moduleSideEffects: "no-treeshake",
-          };
-        }
-      },
       async generateBundle(outputOptions, bundle, isWrite) {
         if (!serverManifest) {
           return;
