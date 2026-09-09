@@ -64,6 +64,8 @@ export interface Options {
   babelConfig?: compiler.Config["babelConfig"];
   // Compiles templates for pages that persist across navigations (patched in place).
   persisted?: boolean;
+  // Templates a persisted page renders only in structure the server selects (their `$global` reads are the server's).
+  constructed?: compiler.Config["constructed"];
   // Filter marko files used as entries
   isEntry?: (importee: string, importer: string) => boolean;
 }
@@ -72,6 +74,7 @@ export interface Options {
 declare module "@marko/compiler" {
   interface Config {
     persisted?: boolean;
+    constructed?: boolean | ((filename: string) => boolean);
   }
 }
 
@@ -333,6 +336,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           runtimeId,
           babelConfig,
           persisted: opts.persisted,
+          constructed: opts.constructed,
           sourceMaps: true,
           writeVersionComment: false,
           resolveVirtualDependency,
