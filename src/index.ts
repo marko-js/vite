@@ -62,8 +62,8 @@ export interface Options {
   basePathVar?: string;
   // Overrides the Babel config that Marko will use.
   babelConfig?: compiler.Config["babelConfig"];
-  // Compiles templates for pages that persist across navigations (patched in place).
-  persisted?: boolean;
+  // Compiles templates for the patch protocol: pages patched in place across navigations.
+  patches?: boolean;
   // Filter marko files used as entries
   isEntry?: (importee: string, importer: string) => boolean;
 }
@@ -71,7 +71,7 @@ export interface Options {
 // Until the published compiler declares the option.
 declare module "@marko/compiler" {
   interface Config {
-    persisted?: boolean;
+    patches?: boolean;
   }
 }
 
@@ -332,7 +332,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           optimize,
           runtimeId,
           babelConfig,
-          persisted: opts.persisted,
+          patches: opts.patches,
           sourceMaps: true,
           writeVersionComment: false,
           resolveVirtualDependency,
