@@ -1,0 +1,12 @@
+import Lazy from "./tags/lazy.marko" with { load: "render" }
+
+<style>
+  div { color: green }
+</style>
+
+<layout>
+  <div#app>
+    <stateful/>
+    <Lazy/>
+  </div>
+</layout>
