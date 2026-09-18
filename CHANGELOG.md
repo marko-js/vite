@@ -1,5 +1,11 @@
 # Changelog
 
+## 6.1.12
+
+### Patch Changes
+
+- [#316](https://github.com/marko-js/vite/pull/316) [`6795020`](https://github.com/marko-js/vite/commit/67950200cd2de012330c620fe14b2ad3a9c2135e) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Link the stylesheets of a lazily loaded template that has no client code. Its client chunk is pure css, which vite prunes before the plugin collected the css to flush with the template's html, so the stylesheet only arrived once the module script ran and the html painted unstyled until then.
+
 ## 6.1.11
 
 ### Patch Changes
