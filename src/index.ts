@@ -247,6 +247,11 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
   let isBuildApp = false;
   let devServer: vite.ViteDevServer;
   let serverManifest: ServerManifest | undefined;
+  // Each load entry's stylesheets, read before vite's css plugin prunes a
+  // chunk that ended up pure css: it folds such a chunk's css into its
+  // static importers and deletes it, but a load entry reaches its template
+  // through a dynamic import, which keeps only the pruned chunk's name.
+  let loadEntryCss: Map<string, Set<string>> | undefined;
   let basePath = "/";
   let getMarkoAssetFns: undefined | API.getMarkoAssetCodeForEntry[];
   let checkIsEntry: NonNullable<Options["isEntry"]> = () => true;
@@ -274,6 +279,28 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
       name: "marko-vite:pre",
       enforce: "pre", // Must be pre to allow us to resolve assets before vite.
       sharedDuringBuild: true,
+      generateBundle(_outputOptions, bundle) {
+        if (
+          !serverManifest?.loadEntries ||
+          this.environment.config.consumer !== "client"
+        )
+          return;
+        loadEntryCss = new Map();
+        for (const entryId in serverManifest.loadEntries) {
+          loadEntryCss.set(
+            entryId,
+            collectCssFiles(
+              bundle,
+              normalizePath(
+                path.join(
+                  root,
+                  toLoadHTMLChunkId(serverManifest.loadEntries[entryId]),
+                ),
+              ),
+            ),
+          );
+        }
+      },
       async buildApp(builder) {
         const { ssr, client } = builder.environments;
         isBuildApp = true;
@@ -1436,8 +1463,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
             if (serverManifest.loadEntries) {
               for (const entryId in serverManifest.loadEntries) {
                 const fileName = serverManifest.loadEntries[entryId];
-                const chunkId =
-                  fileName.slice(0, -markoExt.length) + loadEntryExt + htmlExt;
+                const chunkId = toLoadHTMLChunkId(fileName);
                 const chunk = bundle[chunkId];
 
                 if (chunk?.type === "asset") {
@@ -1450,10 +1476,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
                   // (making it part of the render blocking group).
                   let html = chunk.source.toString();
                   let cssLinks = "";
-                  for (const cssFileName of collectCssFiles(
-                    bundle,
-                    normalizePath(path.join(root, chunkId)),
-                  )) {
+                  for (const cssFileName of loadEntryCss?.get(entryId) || []) {
                     cssLinks += `<link rel="stylesheet" href=${JSON.stringify(
                       basePath + cssFileName,
                     )}>`;
@@ -1543,6 +1566,10 @@ function toHTMLEntries(root: string, serverEntries: ServerManifest["entries"]) {
   }
 
   return result;
+}
+
+function toLoadHTMLChunkId(relativeFileName: string) {
+  return relativeFileName.slice(0, -markoExt.length) + loadEntryExt + htmlExt;
 }
 
 function toLoadHTMLEntry(root: string, relativeFileName: string) {
