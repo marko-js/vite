@@ -64,6 +64,9 @@ export interface Options {
   babelConfig?: compiler.Config["babelConfig"];
   // Filter marko files used as entries
   isEntry?: (importee: string, importer: string) => boolean;
+  // Compiles templates so a server response can patch the document the
+  // browser already holds instead of replacing it.
+  patches?: boolean;
 }
 
 enum InternalFileKind {
@@ -360,6 +363,11 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
 
         if (linked) {
           (baseConfig as any).markoViteLinked = linked;
+        }
+
+        // Typed once `@marko/compiler` declares the option, like the linked flag.
+        if (opts.patches) {
+          (baseConfig as any).patches = true;
         }
 
         useLinkAssets = linked && supportsLinkAssets(opts.translator);
