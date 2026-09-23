@@ -49,8 +49,8 @@ importers:
         specifier: ^9.39.1
         version: 9.39.4
       '@marko/compiler':
-        specifier: ^5.41.6
-        version: 5.41.6
+        specifier: ^5.42.6
+        version: 5.42.6
       '@marko/fixture-snapshots':
         specifier: ^2.2.1
         version: 2.2.1(@marko/testing-library@6.4.2(marko@5.39.27))(marko@5.39.27)
@@ -630,9 +630,9 @@ packages:
   '@manypkg/get-packages@1.1.3':
     resolution: {integrity: sha512-fo+QhuU3qE/2TQMQmbVMqaQ6EWbMhi4ABWP+O4AM1NqPBuy0OrApV5LO6BrrgnhtAHS2NH6RrVk9OL181tTi8A==}
 
-  '@marko/compiler@5.41.6':
-    resolution: {integrity: sha512-7yO1vvyfUo7+c3RQ7wGApJqs9QmIT2a07/BiKzivqDS00Mkg4rOB9oHvNKkqu7d5KIsVT4X9l+J6bHHe3LOFLQ==}
-    engines: {node: 18 || 20 || >=22}
+  '@marko/compiler@5.42.6':
+    resolution: {integrity: sha512-I5OlCAO40fiKiRYgK18U+rDg91X7AVTFgY4lwy29BShhxZyw5NRvKJ7RzAut+gC8WBrr5R7fn9aRZvxkd6MEHg==}
+    engines: {node: '>=22'}
 
   '@marko/fixture-snapshots@2.2.1':
     resolution: {integrity: sha512-sY2BhyziaK751vw4xpn7wSICT4yrUmxTmnlowwNJsKRUQwprHiPR2ONugrPzVMc454tqAACfQRN7BxU3rk0rOg==}
@@ -1703,6 +1703,9 @@ packages:
 
   htmljs-parser@5.12.1:
     resolution: {integrity: sha512-QnHLg5SWqoH5o8MD4iOWJFtdKSS2lXxtNgyznFXvEeeCK0CTi6URdYtFGkFGDANdq8RZzkuc91KaBgLx2WAhSA==}
+
+  htmljs-parser@5.17.1:
+    resolution: {integrity: sha512-ww3wkVhxedYGoqZIFbA5tQfgyDvdqv2rIOkMsdu4fez2XOAcOgR+3ZLKbpFwhfaOWYAmSpj8JFrjOqRcjAg+Sg==}
 
   htmlparser2@10.1.0:
     resolution: {integrity: sha512-VTZkM9GWRAtEpveh7MSF6SjjrpNVNNVJfFup7xTY3UpFtm67foy9HDVXneLtFVt4pMz5kZtgNcvCniNFb1hlEQ==}
@@ -3444,12 +3447,11 @@ snapshots:
       globby: 11.1.0
       read-yaml-file: 1.1.0
 
-  '@marko/compiler@5.41.6':
+  '@marko/compiler@5.42.6':
     dependencies:
       '@luxass/strip-json-comments': 2.0.1
       complain: 1.6.1
-      he: 1.2.0
-      htmljs-parser: 5.12.1
+      htmljs-parser: 5.17.1
       jsesc: 3.1.0
       kleur: 4.1.5
       lasso-package-root: 1.0.1
@@ -3472,7 +3474,7 @@ snapshots:
 
   '@marko/runtime-tags@6.3.20':
     dependencies:
-      '@marko/compiler': 5.41.6
+      '@marko/compiler': 5.42.6
       csstype: 3.2.3
       fastest-levenshtein: 1.0.16
       magic-string: 0.30.21
@@ -4464,6 +4466,8 @@ snapshots:
 
   htmljs-parser@5.12.1: {}
 
+  htmljs-parser@5.17.1: {}
+
   htmlparser2@10.1.0:
     dependencies:
       domelementtype: 2.3.0
@@ -4855,7 +4859,7 @@ snapshots:
 
   marko@5.39.27:
     dependencies:
-      '@marko/compiler': 5.41.6
+      '@marko/compiler': 5.42.6
       '@marko/runtime-tags': 6.3.20
       app-module-path: 2.2.0
       argly: 1.2.0

@@ -9,6 +9,8 @@ import { createRequire } from "module";
 import net from "net";
 import path from "path";
 import url from "url";
+import { stripVTControlCharacters } from "util";
+import type { DevEnvironment, Rollup } from "vite";
 
 import markoPlugin, { type Options } from "..";
 import { type Browser, fromURL } from "./utils/create-browser";
@@ -33,6 +35,8 @@ interface FixtureConfig {
   hmr?: HMRStep[];
   options?: Options;
   env?: Record<string, string>;
+  /** The fixture fails to compile: snapshot the error Vite prints instead of a page. */
+  error?: true;
 }
 
 const requireCwd = createRequire(process.cwd());
@@ -52,10 +56,15 @@ for (const fixture of fs.readdirSync(FIXTURES)) {
       path.join(dir, "test.config.ts"),
     ) as FixtureConfig;
 
-    if (config.env) {
+    // An error snapshot must not depend on whether a coding agent runs it.
+    const env = config.error
+      ? { MARKO_AGENT_FIX_GUIDE: "0", ...config.env }
+      : config.env;
+
+    if (env) {
       const preservedEnv: [string, string | undefined | false][] = [];
       before(() => {
-        for (const [key, value] of Object.entries(config.env!)) {
+        for (const [key, value] of Object.entries(env)) {
           preservedEnv.push([
             key,
             key in process.env ? process.env[key] : false,
@@ -73,6 +82,12 @@ for (const fixture of fs.readdirSync(FIXTURES)) {
           }
         }
       });
+    }
+
+    if (config.error) {
+      it("dev", () => snapDevError(dir, config));
+      it("build", () => snapBuildError(dir, config));
+      return;
     }
 
     const steps = toSteps(config.steps);
@@ -194,6 +209,86 @@ for (const fixture of fs.readdirSync(FIXTURES)) {
       }
     }
   });
+}
+
+async function snapDevError(dir: string, config: FixtureConfig) {
+  const devServer = await vite.createServer({
+    root: dir,
+    logLevel: "silent",
+    server: { middlewareMode: true, hmr: false, watch: null },
+    optimizeDeps: { noDiscovery: true, include: [] },
+    plugins: [markoPlugin(getErrorOptions(config))],
+  });
+
+  try {
+    const error = await getRejection(
+      config.ssr
+        ? devServer.ssrLoadModule(path.join(dir, "src/index.js"))
+        : transformImports(devServer.environments.client, "/src/index.js"),
+    );
+    // How Vite prints a failed request in the terminal and error overlay.
+    await snap(
+      errorSnapshot(dir, vite.buildErrorMessage(error, [error.message], false)),
+      { ext: ".md", dir },
+    );
+  } finally {
+    await devServer.close();
+  }
+}
+
+async function snapBuildError(dir: string, config: FixtureConfig) {
+  const error = await getRejection(
+    vite.build({
+      root: dir,
+      logLevel: "silent",
+      plugins: [markoPlugin(getErrorOptions(config))],
+      build: {
+        write: false,
+        ssr: config.ssr ? path.join(dir, "src/index.js") : undefined,
+      },
+    }),
+  );
+  // Rolldown's message is its whole report: id, position, message and frame.
+  await snap(errorSnapshot(dir, error.message), { ext: ".md", dir });
+}
+
+function getErrorOptions(config: FixtureConfig): Options | undefined {
+  return config.ssr ? config.options : { ...config.options, linked: false };
+}
+
+async function getRejection(promise: Promise<unknown>) {
+  try {
+    await promise;
+  } catch (err) {
+    return err as Rollup.RollupError;
+  }
+  throw new Error("Expected the fixture to fail to compile");
+}
+
+// Requests a module and every fixture module it imports, as a page would.
+async function transformImports(
+  env: DevEnvironment,
+  moduleUrl: string,
+  seen = new Set<string>(),
+) {
+  if (seen.has(moduleUrl)) return;
+  seen.add(moduleUrl);
+  await env.transformRequest(moduleUrl);
+  const mod = await env.moduleGraph.getModuleByUrl(moduleUrl);
+  for (const dep of mod?.importedModules ?? []) {
+    if (dep.file?.startsWith(env.config.root)) {
+      await transformImports(env, dep.url, seen);
+    }
+  }
+}
+
+function errorSnapshot(dir: string, message: string) {
+  // Compiler messages print paths with the platform separator; ids use `/`.
+  const posix = (text: string) => text.replaceAll(path.sep, "/");
+  const text = posix(stripVTControlCharacters(message))
+    .replaceAll(`${posix(dir)}/`, "")
+    .replaceAll(`${posix(path.relative(process.cwd(), dir))}/`, "");
+  return `\`\`\`\n${text.replace(/^\n+|\s+$/g, "")}\n\`\`\`\n`;
 }
 
 async function testHMR(dir: string, config: FixtureConfig) {
