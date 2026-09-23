@@ -1,5 +1,11 @@
 # Changelog
 
+## 6.1.13
+
+### Patch Changes
+
+- [#318](https://github.com/marko-js/vite/pull/318) [`5956ab7`](https://github.com/marko-js/vite/commit/5956ab743b82bd7788c3cd7f23d14396ed243fec) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Report compile errors in the shape Vite and Rolldown print. An error in the template being transformed now carries a plain message plus `loc` and `frame`, so the terminal and overlay show `file:line:column` and a single code frame (including through the SSR module runner). An error from a template it analyzed keeps the compiler's own message, which names that file, instead of printing `undefined:undefined` and the frame twice.
+
 ## 6.1.12
 
 ### Patch Changes
