@@ -12,6 +12,7 @@ import cjsInteropTranslate, {
   cjsInteropHelpersId,
 } from "./cjs-interop-translate";
 import transformCjsToEsm from "./cjs-to-esm";
+import { toBundlerError } from "./compile-error";
 import globImportTransformer from "./glob-import-transform";
 import {
   getDevLoadAssetsManifest,
@@ -212,13 +213,19 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
   >();
 
   // `@marko/compiler` annotates compile errors with the agent cheat-sheet
-  // pointer; here we only surface warning diagnostics to the terminal.
+  // pointer; here we surface warning diagnostics and reshape errors for `id`.
   async function compileAndReportWarnings(
+    id: string,
     source: string,
     filename: string,
     config: compiler.Config,
   ) {
-    const result = await compiler.compile(source, filename, config);
+    let result: compiler.CompileResult;
+    try {
+      result = await compiler.compile(source, filename, config);
+    } catch (err) {
+      throw toBundlerError(err, id);
+    }
     let printed = printedWarnings.get(filename);
     if (printed?.source !== source) {
       printedWarnings.set(filename, (printed = { source, labels: new Set() }));
@@ -1172,6 +1179,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           if (!info && isCJSModule(id, rootResolveFile)) {
             if (isBuild) {
               const { code, map, meta } = await compileAndReportWarnings(
+                id,
                 source,
                 id,
                 serverCJSConfig,
@@ -1187,6 +1195,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         }
 
         const compiled = await compileAndReportWarnings(
+          id,
           source,
           fileName,
           isSSR
