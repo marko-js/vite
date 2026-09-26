@@ -77,6 +77,8 @@ By default this plugin operates in `linked` mode (you can disabled this by passi
 With this you _do not_ create `.html` files for `Vite`, it's Marko all the way down!
 Scripts, styles and other content that _would have_ been injected into the `.html` files is instead automatically injected into your `.marko` templates.
 
+In a linked production build, the browser bundle treats a module as free of side effects unless a `.marko` file imports it bare (`import "./register-elements.js"`), which extends to everything that module imports. A module the browser uses no export from is therefore dropped, even one a plain `.js` file outside that subgraph imports bare; `.marko` files, styles and assets are never marked side-effect free. A package's own `"sideEffects"` field still decides for the files it covers: `false` drops them even when imported bare, and `true` keeps them. A `build.rolldownOptions.treeshake.moduleSideEffects` function in your config is consulted first; setting it to anything but a function, or `treeshake: false`, turns this off.
+
 In this mode you must use the [Vite SSR API](https://vitejs.dev/guide/ssr.html#setting-up-the-dev-server).
 
 Here's an example using `express`.
