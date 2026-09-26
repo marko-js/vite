@@ -7,11 +7,6 @@
   src="/assets/class-[hash].marko-[hash].js"
   type="module"
 />
-<link
-  crossorigin=""
-  href="/assets/[hash].js"
-  rel="modulepreload"
-/>
 <div
   class="clickable"
 >
