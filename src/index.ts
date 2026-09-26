@@ -29,6 +29,7 @@ import {
   type LinkAssetsDocManifest,
 } from "./manifest-generator";
 import { normalizePath, POSIX_SEP, WINDOWS_SEP } from "./normalize-path";
+import preloadCssPlugin from "./preload-css";
 import { cleanUrl, hasOpaqueQuery } from "./query";
 import { ReadOncePersistedStore } from "./read-once-persisted-store";
 import relativeAssetsTransform from "./relative-assets-transform";
@@ -282,6 +283,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
     isMarkoFile(file) || styleImportReg.test(file) || viteAssetsInclude(file);
 
   return [
+    preloadCssPlugin(),
     {
       name: "marko-vite:pre",
       enforce: "pre", // Must be pre to allow us to resolve assets before vite.
