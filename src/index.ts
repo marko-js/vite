@@ -29,6 +29,12 @@ import {
   type LinkAssetsDocManifest,
 } from "./manifest-generator";
 import { normalizePath, POSIX_SEP, WINDOWS_SEP } from "./normalize-path";
+import {
+  getPatchClientRuntime,
+  getPatchServerRuntime,
+  patchImportId,
+  patchRuntimeId,
+} from "./patch-runtime";
 import { cleanUrl, hasOpaqueQuery } from "./query";
 import { ReadOncePersistedStore } from "./read-once-persisted-store";
 import relativeAssetsTransform from "./relative-assets-transform";
@@ -65,6 +71,12 @@ export interface Options {
   babelConfig?: compiler.Config["babelConfig"];
   // Filter marko files used as entries
   isEntry?: (importee: string, importer: string) => boolean;
+  /**
+   * Compiles templates so a response can patch the document the browser
+   * holds; `@marko/vite/patch` serves the build's side of the protocol.
+   * @experimental The patch protocol may change in a minor release.
+   */
+  patches?: boolean;
 }
 
 enum InternalFileKind {
@@ -89,6 +101,10 @@ interface ServerManifest {
     [entryId: string]: string;
   };
   chunksNeedingAssets: string[];
+  /** Server chunks that read a `patches` build's id, appended once the browser build is hashed. */
+  chunksNeedingPatchBuild: string[];
+  /** A hash of the server's compiled templates, which the id also covers: a page holds their shells. */
+  patchTemplates?: string;
   ssrAssetIds: string[];
 }
 
@@ -159,6 +175,11 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
   let serverEntryConfig: compiler.Config;
   let serverEntryLinkConfig: compiler.Config;
   let useLinkAssets = false;
+  // A `patches` dev server's build id (one per session); a build's is a hash
+  // of the browser build, appended to the server chunks that read it.
+  let devPatchBuild: string | undefined;
+  // A `patches` server build's compiled templates, by root relative id.
+  const patchTemplates = new Map<string, string>();
   let virtualFileCacheDirPromise: Promise<unknown> | undefined;
 
   const resolveVirtualDependency: compiler.Config["resolveVirtualDependency"] =
@@ -369,6 +390,12 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           (baseConfig as any).markoViteLinked = linked;
         }
 
+        // Typed once `@marko/compiler` declares the option, like the linked flag.
+        if (opts.patches) {
+          (baseConfig as any).patches = true;
+          if (!isBuild) devPatchBuild = Date.now().toString(36);
+        }
+
         useLinkAssets = linked && supportsLinkAssets(opts.translator);
 
         if (useLinkAssets) {
@@ -447,6 +474,17 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         };
 
         compiler.configure(baseConfig);
+        // A patch build's main runtime entry is its `patch` entry.
+        if (
+          opts.patches &&
+          !compiler
+            .getRuntimeEntryFiles("html", opts.translator)[0]
+            ?.endsWith("/patch")
+        ) {
+          throw new Error(
+            "The `patches` option needs a Marko runtime with patch support, and the installed one has no `html/patch` entry: pages would compile without patches and `@marko/vite/patch` would have nothing to serve. Install a Marko 6 release with `patches` support.",
+          );
+        }
         devEntryFile = path.join(root, "index.html");
         devEntryFilePosix = normalizePath(devEntryFile);
         renderAssetsRuntimeCode = getRenderAssetsRuntime({
@@ -832,8 +870,10 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
               entries: {},
               entrySources: {},
               chunksNeedingAssets: [],
+              chunksNeedingPatchBuild: [],
               ssrAssetIds: [],
             };
+            patchTemplates.clear();
           } else {
             if (!isBuildApp && !serverManifest) {
               serverManifest = await store.read().catch(noop);
@@ -901,7 +941,15 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
           case renderAssetsRuntimeId:
           case linkAssetsRuntimeId:
           case noClientAssetsRuntimeId:
+          case patchRuntimeId:
             return importee;
+          case patchImportId:
+            if (!opts.patches) {
+              this.error(
+                `"${patchImportId}" serves the \`patches\` option, which this build does not enable.`,
+              );
+            }
+            return patchRuntimeId;
         }
 
         if (virtualFiles.has(importee)) {
@@ -1018,6 +1066,16 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
             return linkAssetsRuntimeCode;
           case noClientAssetsRuntimeId:
             return "NO_CLIENT_ASSETS";
+          case patchRuntimeId: {
+            const client = this.environment.config.consumer === "client";
+            const [runtime] = compiler.getRuntimeEntryFiles(
+              client ? "dom" : "html",
+              opts.translator,
+            );
+            return client
+              ? getPatchClientRuntime(runtime)
+              : getPatchServerRuntime(runtime, devPatchBuild);
+          }
         }
 
         const info = getMarkoFileInfo(id);
@@ -1216,6 +1274,10 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         const { meta } = compiled;
         let { code } = compiled;
 
+        if (opts.patches && isBuild && isSSR) {
+          patchTemplates.set(normalizePath(path.relative(root, id)), code);
+        }
+
         if (linked && isBuild && !isSSR && compiled.ast) {
           // Record every bare `import "x"` the template compiles to so the
           // treeshake hook keeps it (externals are left for vite to handle).
@@ -1389,7 +1451,20 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
                   path.resolve(dir, fileName),
                 );
               }
+              if (chunk.moduleIds.includes(patchRuntimeId)) {
+                serverManifest.chunksNeedingPatchBuild.push(
+                  path.resolve(dir, fileName),
+                );
+              }
             }
+          }
+
+          if (patchTemplates.size) {
+            const hash = crypto.createHash("sha256");
+            for (const id of [...patchTemplates.keys()].sort()) {
+              hash.update(id + "\0" + patchTemplates.get(id) + "\0");
+            }
+            serverManifest.patchTemplates = hash.digest("base64url");
           }
 
           if (serverManifest.loadEntries) {
@@ -1514,6 +1589,27 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
 
             for (const fileName of serverManifest.chunksNeedingAssets) {
               await fs.promises.appendFile(fileName, manifestStr);
+            }
+          }
+
+          if (serverManifest.chunksNeedingPatchBuild.length) {
+            // The build's id is a hash of what its pages run (every output
+            // file but maps, by name) and the server templates whose shells
+            // they hold, so equal builds share it.
+            const hash = crypto.createHash("sha256");
+            hash.update(serverManifest.patchTemplates || "");
+            for (const fileName of Object.keys(bundle).sort()) {
+              const file = bundle[fileName];
+              if (!fileName.endsWith(".map")) {
+                hash.update(fileName + "\0");
+                hash.update(file.type === "chunk" ? file.code : file.source);
+              }
+            }
+            const buildStr = `\n;var __MARKO_PATCH_BUILD__=${JSON.stringify(
+              hash.digest("base64url").slice(0, 8),
+            )};\n`;
+            for (const fileName of serverManifest.chunksNeedingPatchBuild) {
+              await fs.promises.appendFile(fileName, buildStr);
             }
           }
         }
@@ -1718,11 +1814,12 @@ function isEmpty(obj: unknown) {
 function getKnownTemplates(cwd: string) {
   let knownTemplates = optimizeKnownTemplatesForRoot.get(cwd);
   if (!knownTemplates) {
+    // A template's id is its place in the list, so the order must not depend
+    // on how the file system lists a directory.
     optimizeKnownTemplatesForRoot.set(
       cwd,
-      (knownTemplates = glob.globSync(
-        ["**/*.marko", "**/node_modules/.marko/**/*.marko"],
-        {
+      (knownTemplates = glob
+        .globSync(["**/*.marko", "**/node_modules/.marko/**/*.marko"], {
           cwd,
           absolute: true,
           // The node_modules pattern forces the walk into package trees, and
@@ -1739,8 +1836,8 @@ function getKnownTemplates(cwd: string) {
             "**/*stories*/**",
             "**/*test*/**",
           ],
-        },
-      )),
+        })
+        .sort()),
     );
   }
   return knownTemplates;

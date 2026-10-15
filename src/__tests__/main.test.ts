@@ -10,7 +10,7 @@ import net from "net";
 import path from "path";
 import url from "url";
 import { stripVTControlCharacters } from "util";
-import type { DevEnvironment, Rollup } from "vite";
+import type { DevEnvironment, Rollup, ViteDevServer } from "vite";
 
 import markoPlugin, { type Options } from "..";
 import { type Browser, fromURL } from "./utils/create-browser";
@@ -212,19 +212,22 @@ for (const fixture of fs.readdirSync(FIXTURES)) {
 }
 
 async function snapDevError(dir: string, config: FixtureConfig) {
-  const devServer = await vite.createServer({
-    root: dir,
-    logLevel: "silent",
-    server: { middlewareMode: true, hmr: false, watch: null },
-    optimizeDeps: { noDiscovery: true, include: [] },
-    plugins: [markoPlugin(getErrorOptions(config))],
-  });
-
+  let devServer: ViteDevServer | undefined;
   try {
+    // A plugin's config can fail too, before the server starts.
     const error = await getRejection(
-      config.ssr
-        ? devServer.ssrLoadModule(path.join(dir, "src/index.js"))
-        : transformImports(devServer.environments.client, "/src/index.js"),
+      (async () => {
+        devServer = await vite.createServer({
+          root: dir,
+          logLevel: "silent",
+          server: { middlewareMode: true, hmr: false, watch: null },
+          optimizeDeps: { noDiscovery: true, include: [] },
+          plugins: [markoPlugin(getErrorOptions(config))],
+        });
+        await (config.ssr
+          ? devServer.ssrLoadModule(path.join(dir, "src/index.js"))
+          : transformImports(devServer.environments.client, "/src/index.js"));
+      })(),
     );
     // How Vite prints a failed request in the terminal and error overlay.
     await snap(
@@ -232,7 +235,7 @@ async function snapDevError(dir: string, config: FixtureConfig) {
       { ext: ".md", dir },
     );
   } finally {
-    await devServer.close();
+    await devServer?.close();
   }
 }
 
