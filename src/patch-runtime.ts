@@ -15,14 +15,14 @@ export function getPatchServerRuntime(runtime: string, build?: string): string {
   return build
     ? `import { setPatchBuild } from ${from};
 setPatchBuild(${JSON.stringify(build)});
-export { patchRequest, patchResponseHeaders } from ${from};
+export { PatchRequestKind, patchRequestKind, patchResponseHeaders } from ${from};
 `
-    : `import { setPatchBuild, patchRequest as request } from ${from};
-export { patchResponseHeaders } from ${from};
+    : `import { setPatchBuild, patchRequestKind as requestKind } from ${from};
+export { PatchRequestKind, patchResponseHeaders } from ${from};
 let named;
-export function patchRequest(headers, url) {
+export function patchRequestKind(headers, url) {
   named ||= (setPatchBuild(__MARKO_PATCH_BUILD__), 1);
-  return request(headers, url);
+  return requestKind(headers, url);
 }
 `;
 }
