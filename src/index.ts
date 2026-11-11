@@ -119,6 +119,14 @@ const styleImportReg =
   /\.(?:css(?:\.[cm]?[jt]s)?|less|s[ac]ss|styl(?:us)?|pcss|postcss)(?:\?|$)/i;
 const optionalWatchFileReg =
   /[\\/](?:([^\\/]+)\.)?(?:marko-tag.json|(?:style|component|component-browser)\.\w+)$/;
+// Files that, when changed, can change which tags a template finds.
+const taglibFileReg = /[\\/](?:marko|package|(?:[^\\/]+\.)?marko-tag)\.json$/;
+// Files that add or remove a tag, in a `tags` or `components` folder under the
+// root: templates, and class API entry files named exactly in a tag's folder.
+const tagTemplateReg =
+  /(?:^|\/)(?:tags|components)\/(?:[^/]+\/)*[^/.][^/]*\.marko$/;
+const tagEntryFileReg =
+  /(?:^|\/)(?:tags|components)\/(?:[^/]+\/)+(?:[^/]+\.)?(?:renderer|index|code-generator|node-factory|transform(?:er)?|migrate|parse|translate)\.[cm]?[jt]s$/;
 const noClientAssetsRuntimeId = "\0no_client_bundles.mjs";
 const markoExt = ".marko";
 const htmlExt = ".html";
@@ -269,6 +277,8 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
   const cachedSources = new Map<string, string>();
   const transformWatchFiles = new Map<string, string[]>();
   const transformAnalyzedTags = new Map<string, Set<string>>();
+  // When a change that can alter any template's compile was last handled.
+  let recompiledAt: number | undefined;
   // Resolved ids of a template's explicit bare `import "x"` imports (filled in
   // `transform`); the treeshake hook keeps these, everything else is shakeable.
   const markoSideEffectImportIds = new Set<string>();
@@ -717,29 +727,51 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
               devServer.watcher.emit("change", id);
             }
           }
-
-          if (type === "unlink" || type === "add") {
-            const optionalMatch = optionalWatchFileReg.exec(fileName);
-            if (optionalMatch) {
-              const markoFile =
-                fileName.slice(0, optionalMatch.index + 1) +
-                (optionalMatch[1] || "index") +
-                ".marko";
-              if (transformWatchFiles.has(markoFile)) {
-                devServer.watcher.emit("change", markoFile);
-              }
-            }
-          }
         });
       },
 
       async hotUpdate(ctx) {
-        compiler.taglib.clearCaches();
-        baseConfig.cache!.clear();
-        clearScanCache();
-
-        const modules = new Set(ctx.modules);
         const fileName = normalizePath(ctx.file);
+        const relativeFileName = path.posix.relative(root, fileName);
+
+        if (
+          taglibFileReg.test(fileName) ||
+          (ctx.type !== "update" &&
+            (tagTemplateReg.test(relativeFileName) ||
+              tagEntryFileReg.test(relativeFileName) ||
+              optionalWatchFileReg.test(fileName)))
+        ) {
+          // Any template may now find a different tag or sibling file, so every
+          // one is recompiled. This hook runs once per environment per change.
+          if (recompiledAt !== ctx.timestamp) {
+            recompiledAt = ctx.timestamp;
+            compiler.taglib.clearCaches();
+            baseConfig.cache!.clear();
+            clearScanCache();
+            // Files a template extracts (eg its styles) wait on its recompile.
+            for (const ids of virtualFilesForTemplate.values()) {
+              for (const id of ids) {
+                if (!isDeferredPromise(virtualFiles.get(id))) {
+                  virtualFiles.set(id, createDeferredPromise());
+                }
+              }
+            }
+            for (const env of Object.values(devServer.environments)) {
+              for (const [file, mods] of env.moduleGraph.fileToModulesMap) {
+                if (file.endsWith(markoExt) || virtualFiles.has(file)) {
+                  for (const mod of mods) env.moduleGraph.invalidateModule(mod);
+                }
+              }
+            }
+            devServer.hot.send({ type: "full-reload" });
+          }
+          return [];
+        }
+
+        // The compile cache checks a template's content and dependencies
+        // itself, but the dependency scan only knows the file changed.
+        clearScanCache(fileName);
+        const modules = new Set(ctx.modules);
 
         // When a child tag template changes, parent templates that analyzed
         // it may need recompilation (e.g., input destructuring changes in
