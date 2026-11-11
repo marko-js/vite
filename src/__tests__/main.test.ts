@@ -26,7 +26,8 @@ declare global {
 }
 
 type Step = () => Promise<unknown> | unknown;
-type HMRChange = [file: string, find: string, replace: string];
+// A `null` find creates the file, which is removed after the test.
+type HMRChange = [file: string, find: string | null, replace: string];
 type HMRStep = { changes: HMRChange[]; steps?: Step | Step[] };
 
 interface FixtureConfig {
@@ -294,6 +295,7 @@ function errorSnapshot(dir: string, message: string) {
 async function testHMR(dir: string, config: FixtureConfig) {
   const hmrSteps = config.hmr!;
   const originalFiles = new Map<string, string>();
+  const createdFiles: string[] = [];
 
   const devServer = await vite.createServer({
     root: dir,
@@ -359,6 +361,16 @@ async function testHMR(dir: string, config: FixtureConfig) {
     for (const [hmrIdx, hmrStep] of hmrSteps.entries()) {
       for (const [file, find, replace] of hmrStep.changes) {
         const filePath = path.join(dir, file);
+        if (find === null) {
+          // Written in a folder the watcher ignores, then moved into place, so
+          // the watcher sees one add rather than an add and a change.
+          const tmpPath = path.join(dir, "__snapshots__", path.basename(file));
+          fs.mkdirSync(path.dirname(tmpPath), { recursive: true });
+          fs.writeFileSync(tmpPath, replace);
+          fs.renameSync(tmpPath, filePath);
+          createdFiles.push(filePath);
+          continue;
+        }
         if (!originalFiles.has(filePath)) {
           originalFiles.set(filePath, fs.readFileSync(filePath, "utf8"));
         }
@@ -399,9 +411,10 @@ async function testHMR(dir: string, config: FixtureConfig) {
 
       const hmrHtml = getHTML();
       const changesDesc = hmrStep.changes
-        .map(
-          ([file, find, replace]) =>
-            `${file}: ${JSON.stringify(find)} → ${JSON.stringify(replace)}`,
+        .map(([file, find, replace]) =>
+          find === null
+            ? `${file}: created with ${JSON.stringify(replace)}`
+            : `${file}: ${JSON.stringify(find)} → ${JSON.stringify(replace)}`,
         )
         .join("\n");
 
@@ -443,6 +456,9 @@ async function testHMR(dir: string, config: FixtureConfig) {
     globalThis.browser?.window.close();
     for (const [filePath, content] of originalFiles) {
       fs.writeFileSync(filePath, content);
+    }
+    for (const filePath of createdFiles) {
+      fs.rmSync(filePath, { force: true });
     }
     await devServer.close();
   }

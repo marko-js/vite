@@ -6,8 +6,9 @@ import { relativeImportPath } from "relative-import-path";
 
 const nmsReg = /[\\/]node_modules[\\/]/;
 let cache = new Map<string, Set<string>>();
-export function clearScanCache() {
-  cache = new Map();
+export function clearScanCache(filename?: string) {
+  if (filename) cache.delete(filename);
+  else cache = new Map();
 }
 
 export function scan(filename: string, code: string): string {
