@@ -155,7 +155,10 @@ export default async function (code: string, id: string) {
         }
 
         const specifier = node.arguments[0];
-        if (specifier.type === "StringLiteral") {
+        if (
+          specifier.type === "Literal" &&
+          typeof specifier.value === "string"
+        ) {
           callExpressions.push(node);
         }
       },
@@ -199,14 +202,6 @@ export default async function (code: string, id: string) {
   const hasDefault = exports.includes("default");
 
   if (isUmd) {
-    let endDefinition = code.indexOf("'use strict';");
-    if (endDefinition === -1) {
-      endDefinition = code.indexOf('"use strict";');
-    }
-    if (endDefinition === -1) {
-      endDefinition = code.length;
-    }
-
     helpers.prepend(`var __umdGlobal = ${GLOBAL_HELPER};
 var __umdExports = [];
 var __umdRoot = new Proxy(__umdGlobal, {

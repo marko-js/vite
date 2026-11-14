@@ -46,7 +46,7 @@ export default {
       const { filter } = cjsInteropMarkoVite;
       const children = program.get("body");
 
-      for (let i = children.length; i--; ) {
+      for (let i = children.length; i--;) {
         const child = children[i];
         if (child.isImportDeclaration()) {
           translateImport(child, filter);
