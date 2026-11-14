@@ -10,7 +10,6 @@
     Mounted: true Clicks: 0
   </div>
 </div>
-Loaded stateless tagLoaded layout tag
 ```
 
 # Step 0

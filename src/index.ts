@@ -668,8 +668,7 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
         getMarkoAssetFns = undefined;
         for (const plugin of config.plugins) {
           const fn = plugin.api?.getMarkoAssetCodeForEntry as
-            | undefined
-            | API.getMarkoAssetCodeForEntry;
+            undefined | API.getMarkoAssetCodeForEntry;
           if (fn) {
             if (getMarkoAssetFns) {
               getMarkoAssetFns.push(fn);
