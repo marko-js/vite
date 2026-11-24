@@ -56,7 +56,11 @@ export default {
             : [path.join(cwd, "**/node_modules/**")],
         });
 
-        for (const file of results) {
+        for (const result of results) {
+          // fast-glob joins with `/` even on Windows, where the filename uses
+          // `\`; `relativeImportPath` splits on the platform's separator, so
+          // it needs both in one form to find their shared folders.
+          const file = path.normalize(result);
           if (file.endsWith(".marko") && file !== filename && !seen.has(file)) {
             seen.add(file);
             program.node.body.push(
