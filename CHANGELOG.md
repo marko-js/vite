@@ -1,5 +1,15 @@
 # Changelog
 
+## 6.1.15
+
+### Patch Changes
+
+- [#324](https://github.com/marko-js/vite/pull/324) [`df354bd`](https://github.com/marko-js/vite/commit/df354bd4c1e85db871c4ed3609f2e4dff6818a35) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Update dependencies.
+
+- [#327](https://github.com/marko-js/vite/pull/327) [`69f00bf`](https://github.com/marko-js/vite/commit/69f00bf7ce48943c087c311344b36cfd59645a13) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Import the templates an eager `import.meta.glob` matches by a relative path on Windows, rather than an absolute `D:/…` path that the compiler can't resolve.
+
+- [#326](https://github.com/marko-js/vite/pull/326) [`690df02`](https://github.com/marko-js/vite/commit/690df023e41a41deeda4074ab961dc7f4ee522d5) Thanks [@DylanPiercey](https://github.com/DylanPiercey)! - Recompile every template whose output follows an edited one in dev, not only the templates that read it directly: a template's output also follows what its child templates read (a grandchild's `<return>` decides its parent's tag variable), so an edit invalidates each template listing it in `analyzedTags`, then each listing those.
+
 ## 6.1.14
 
 ### Patch Changes
