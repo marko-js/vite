@@ -774,9 +774,21 @@ export default function markoPlugin(opts: Options = {}): vite.Plugin[] {
 
         // When a child tag template changes, parent templates that analyzed
         // it may need recompilation (e.g., input destructuring changes in
-        // Tags API affect the parent's compiled output).
+        // Tags API affect the parent's compiled output), and so may theirs: a
+        // grandchild's `<return>` decides its parent's tag variable.
+        const analyzedBy = new Map<string, string[]>();
         for (const [parent, files] of transformAnalyzedTags) {
-          if (files.has(fileName)) {
+          for (const file of files) {
+            const parents = analyzedBy.get(file);
+            if (parents) parents.push(parent);
+            else analyzedBy.set(file, [parent]);
+          }
+        }
+        const changed = new Set([fileName]);
+        for (const file of changed) {
+          for (const parent of analyzedBy.get(file) || []) {
+            // A set visits each entry once, so an import cycle ends the walk.
+            changed.add(parent);
             const mods = this.environment.moduleGraph.getModulesByFile(parent);
             if (mods) {
               for (const mod of mods) {
